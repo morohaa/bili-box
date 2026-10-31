@@ -88,6 +88,7 @@ import com.example.bilibox.ui.theme.BiliBoxTheme
 import com.example.bilibox.bili.BiliClient
 import com.example.bilibox.bili.BiliPlayback
 import com.example.bilibox.bili.BiliQn
+import com.example.bilibox.bili.VideoSearchItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
@@ -100,10 +101,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 import kotlinx.coroutines.CancellationException
 
 private val Ink = Color(0xFF24313D)
@@ -152,8 +151,21 @@ private sealed interface LocalVideoScanState {
 private sealed interface SearchState {
     data object Idle : SearchState
     data object Loading : SearchState
-    data class Success(val items: List<SearchVideo>) : SearchState
-    data class Error(val message: String) : SearchState
+    data class Success(
+        val items: List<SearchVideo>,
+        val page: Int,
+        val hasMore: Boolean,
+        val order: SearchOrder,
+    ) : SearchState
+    data class Error(val message: String, val page: Int = 1, val order: SearchOrder = SearchOrder.RELEVANCE) : SearchState
+}
+
+private enum class SearchOrder(val apiValue: String, val label: String) {
+    RELEVANCE(BiliClient.SEARCH_ORDER_TOTALRANK, "综合排序"),
+    MOST_PLAYED(BiliClient.SEARCH_ORDER_CLICK, "最多播放"),
+    NEWEST(BiliClient.SEARCH_ORDER_PUBDATE, "最新发布"),
+    MOST_DANMAKU(BiliClient.SEARCH_ORDER_DM, "最多弹幕"),
+    MOST_SAVED(BiliClient.SEARCH_ORDER_STOW, "最多收藏"),
 }
 
 private sealed interface PlaybackState {
@@ -179,7 +191,33 @@ private fun BiliBoxApp() {
     var session by remember { mutableStateOf<BiliSession?>(BiliSessionStore.load(context)) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchState by remember { mutableStateOf<SearchState>(SearchState.Idle) }
+    var searchOrder by rememberSaveable { mutableStateOf(SearchOrder.RELEVANCE) }
     val scope = rememberCoroutineScope()
+    val searchClient = remember(session?.cookie) {
+        BiliClient().also { it.cookieHeader = session?.cookie }
+    }
+    val runSearch: (Int, SearchOrder) -> Unit = { page, order ->
+        val keyword = searchQuery.trim()
+        if (keyword.isNotEmpty()) {
+            searchOrder = order
+            searchState = SearchState.Loading
+            scope.launch {
+                searchState = try {
+                    val result = searchClient.searchVideos(keyword, page, order.apiValue)
+                    SearchState.Success(
+                        items = result.items.map(::toSearchVideo),
+                        page = result.page,
+                        hasMore = result.hasMore,
+                        order = order,
+                    )
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    SearchState.Error(error.message ?: "搜索失败，请稍后重试", page, order)
+                }
+            }
+        }
+    }
     var selectedVideo by remember { mutableStateOf<SearchVideo?>(null) }
     var selectedLocalVideo by remember { mutableStateOf<LocalVideo?>(null) }
     var localPlaylist by remember { mutableStateOf<List<LocalVideo>>(emptyList()) }
@@ -209,35 +247,19 @@ private fun BiliBoxApp() {
                         VideoSearchField(
                             query = searchQuery,
                             onQueryChange = { searchQuery = it },
-                            onSearch = {
-                                val keyword = searchQuery.trim()
-                                if (keyword.isNotEmpty()) {
-                                    searchState = SearchState.Loading
-                                    scope.launch {
-                                        searchState = try {
-                                            SearchState.Success(searchBilibiliVideos(keyword))
-                                        } catch (error: Exception) {
-                                            SearchState.Error(error.message ?: "搜索失败，请稍后重试")
-                                        }
-                                    }
-                                }
-                            }
+                            onSearch = { runSearch(1, searchOrder) }
                         )
                         Spacer(Modifier.height(26.dp))
                         when (val state = searchState) {
                             SearchState.Idle -> HomeContent(saved) { saved = !saved }
                             SearchState.Loading -> SearchLoading()
-                            is SearchState.Error -> SearchError(state.message) {
-                                searchState = SearchState.Loading
-                                scope.launch {
-                                    searchState = try {
-                                        SearchState.Success(searchBilibiliVideos(searchQuery.trim()))
-                                    } catch (error: Exception) {
-                                        SearchState.Error(error.message ?: "搜索失败，请稍后重试")
-                                    }
-                                }
-                            }
-                            is SearchState.Success -> SearchResults(state.items) { selectedVideo = it }
+                            is SearchState.Error -> SearchError(state.message) { runSearch(state.page, state.order) }
+                            is SearchState.Success -> SearchResults(
+                                state = state,
+                                onVideoClick = { selectedVideo = it },
+                                onOrderChange = { runSearch(1, it) },
+                                onPageChange = { runSearch(it, state.order) },
+                            )
                         }
                     }
                     1 -> CollectionPage("动态", "关注的人，分享的日常", "今天的灵感", "沿着海岸线，收集一整个夏天")
@@ -1429,18 +1451,57 @@ private fun SearchError(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun SearchResults(items: List<SearchVideo>, onVideoClick: (SearchVideo) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun SearchResults(
+    state: SearchState.Success,
+    onVideoClick: (SearchVideo) -> Unit,
+    onOrderChange: (SearchOrder) -> Unit,
+    onPageChange: (Int) -> Unit,
+) {
+    var orderMenuExpanded by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Text("搜索结果", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.weight(1f))
-        Text("${items.size} 个视频", color = Muted, fontSize = 12.sp)
+        Text("${state.items.size} 个视频", color = Muted, fontSize = 12.sp)
     }
-    if (items.isEmpty()) {
+    Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("排序", color = Muted, fontSize = 12.sp)
+        Box {
+            TextButton(onClick = { orderMenuExpanded = true }) {
+                Text(state.order.label, color = Pink, fontSize = 12.sp)
+                Text("⌄", color = Pink, fontSize = 14.sp)
+            }
+            DropdownMenu(expanded = orderMenuExpanded, onDismissRequest = { orderMenuExpanded = false }) {
+                SearchOrder.entries.forEach { order ->
+                    DropdownMenuItem(
+                        text = { Text(order.label) },
+                        onClick = {
+                            orderMenuExpanded = false
+                            if (order != state.order) onOrderChange(order)
+                        },
+                    )
+                }
+            }
+        }
+    }
+    if (state.items.isEmpty()) {
         EmptyCard("没有找到视频", "换个关键词试试看。")
     } else {
-        items.forEach { video ->
+        state.items.forEach { video ->
             SearchResultCard(video) { onVideoClick(video) }
             Spacer(Modifier.height(14.dp))
+        }
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        TextButton(onClick = { onPageChange(state.page - 1) }, enabled = state.page > 1) {
+            Text("上一页", color = if (state.page > 1) Pink else Muted)
+        }
+        Text("第 ${state.page} 页", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
+        TextButton(onClick = { onPageChange(state.page + 1) }, enabled = state.hasMore) {
+            Text("下一页", color = if (state.hasMore) Pink else Muted)
         }
     }
 }
@@ -1635,43 +1696,20 @@ private fun RemoteCover(url: String, modifier: Modifier = Modifier) {
     }
 }
 
-private suspend fun searchBilibiliVideos(keyword: String): List<SearchVideo> = withContext(Dispatchers.IO) {
-    val encoded = URLEncoder.encode(keyword, Charsets.UTF_8.name())
-    val url = URL("https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=$encoded&page=1")
-    val connection = url.openConnection() as HttpURLConnection
-    connection.connectTimeout = 10000
-    connection.readTimeout = 10000
-    connection.requestMethod = "GET"
-    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36")
-    connection.setRequestProperty("Referer", "https://www.bilibili.com/")
-    try {
-        val status = connection.responseCode
-        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-        if (status !in 200..299) error("B 站接口暂不可用（HTTP $status）")
-        val root = JSONObject(body)
-        if (root.optInt("code", -1) != 0) error(root.optString("message").ifBlank { "B 站搜索暂不可用" })
-        val result = root.optJSONObject("data")?.optJSONArray("result")
-            ?: return@withContext emptyList()
-        buildList {
-            for (index in 0 until minOf(result.length(), 20)) {
-                val item = result.optJSONObject(index) ?: continue
-                val bvid = item.optString("bvid")
-                if (bvid.isBlank()) continue
-                val rawTitle = item.optString("title").replace(Regex("<[^>]*>"), "")
-                add(SearchVideo(
-                    title = android.text.Html.fromHtml(rawTitle, android.text.Html.FROM_HTML_MODE_LEGACY).toString(),
-                    author = item.optString("author", "未知 UP 主"),
-                    playCount = item.optString("play", "--"),
-                    duration = item.optString("duration", "--:--"),
-                    bvid = bvid,
-                    coverUrl = item.optString("pic").let { if (it.startsWith("http://")) it.replaceFirst("http://", "https://") else it }
-                ))
-            }
-        }
-    } finally {
-        connection.disconnect()
-    }
+private fun toSearchVideo(item: VideoSearchItem): SearchVideo {
+    val cleanTitle = item.title.replace(Regex("<[^>]*>"), "")
+    return SearchVideo(
+        title = android.text.Html.fromHtml(cleanTitle, android.text.Html.FROM_HTML_MODE_LEGACY).toString(),
+        author = item.author,
+        playCount = item.play,
+        duration = item.duration,
+        bvid = item.bvid,
+        coverUrl = when {
+            item.pic.startsWith("//") -> "https:${item.pic}"
+            item.pic.startsWith("http://") -> item.pic.replaceFirst("http://", "https://")
+            else -> item.pic
+        },
+    )
 }
 
 @Composable

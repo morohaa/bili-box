@@ -133,3 +133,18 @@ data class Durl(
     val url: String = "",
     @SerialName("backup_url") val backupUrl: List<String>? = null,
 )
+
+data class VideoSearchItem(
+    val title: String = "",
+    val author: String = "",
+    val play: String = "",
+    val duration: String = "",
+    val bvid: String = "",
+    val pic: String = "",
+)
+
+data class VideoSearchPage(
+    val items: List<VideoSearchItem> = emptyList(),
+    val page: Int = 1,
+    val hasMore: Boolean = false,
+)
