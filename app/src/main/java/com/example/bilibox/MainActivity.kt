@@ -1,11 +1,21 @@
 package com.example.bilibox
 
+import android.Manifest
+import android.content.ContentUris
+import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
+import android.os.Build
+import android.provider.MediaStore
+import android.text.format.Formatter
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
@@ -49,11 +59,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.bilibox.ui.theme.BiliBoxTheme
-import androidx.media3.common.MediaItem
+import com.example.bilibox.bili.BiliClient
+import com.example.bilibox.bili.BiliPlayback
+import com.example.bilibox.bili.BiliQn
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -80,6 +91,20 @@ private data class SearchVideo(
     val coverUrl: String
 )
 
+private data class LocalVideo(
+    val uri: Uri,
+    val name: String,
+    val durationMs: Long,
+    val sizeBytes: Long
+)
+
+private sealed interface LocalVideoScanState {
+    data object NeedsPermission : LocalVideoScanState
+    data object Loading : LocalVideoScanState
+    data class Ready(val videos: List<LocalVideo>) : LocalVideoScanState
+    data class Error(val message: String) : LocalVideoScanState
+}
+
 private sealed interface SearchState {
     data object Idle : SearchState
     data object Loading : SearchState
@@ -105,6 +130,7 @@ class MainActivity : ComponentActivity() {
 private fun BiliBoxApp() {
     val context = LocalContext.current
     var selected by rememberSaveable { mutableIntStateOf(0) }
+    var librarySource by rememberSaveable { mutableIntStateOf(0) }
     var saved by rememberSaveable { mutableStateOf(false) }
     var session by remember { mutableStateOf<BiliSession?>(BiliSessionStore.load(context)) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -163,10 +189,11 @@ private fun BiliBoxApp() {
                     }
                     1 -> CollectionPage("动态", "关注的人，分享的日常", "今天的灵感", "沿着海岸线，收集一整个夏天")
                     2 -> {
-                        SectionTitle("媒体库", "把喜欢的留在这里")
-                        Spacer(Modifier.height(24.dp))
-                        if (saved) VideoCard("日落之前，去海边走走", "你的收藏 · 1 个视频", 0)
-                        else EmptyCard("还没有收藏", "在首页点击收藏，把喜欢的视频放进媒体库。")
+                        LibraryPage(
+                            source = librarySource,
+                            onSourceChange = { librarySource = it },
+                            hasSavedVideo = saved,
+                        )
                     }
                     else -> MyPage(if (saved) 1 else 0, session) { session = it }
                 }
@@ -177,6 +204,228 @@ private fun BiliBoxApp() {
         if (selectedVideo == null) {
             LiquidNavigation(selected, { selected = it }, backdrop,
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp))
+        }
+    }
+}
+
+@Composable
+private fun LibraryPage(source: Int, onSourceChange: (Int) -> Unit, hasSavedVideo: Boolean) {
+    LibrarySourceSwitcher(source, onSourceChange)
+    Spacer(Modifier.height(24.dp))
+    if (source == 0) {
+        if (hasSavedVideo) {
+            VideoCard("日落之前，去海边走走", "哔哩哔哩下载 · 1 个视频", 0)
+        } else {
+            EmptyCard("还没有哔哩哔哩下载", "从哔哩哔哩下载的视频会出现在这里。")
+        }
+    } else {
+        LocalVideoPage()
+    }
+}
+
+@Composable
+private fun LocalVideoPage() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var scanState by remember { mutableStateOf<LocalVideoScanState>(LocalVideoScanState.NeedsPermission) }
+
+    val scanLocalVideos: () -> Unit = {
+        scanState = LocalVideoScanState.Loading
+        scope.launch {
+            scanState = try {
+                LocalVideoScanState.Ready(withContext(Dispatchers.IO) { queryLocalVideos(context) })
+            } catch (error: Exception) {
+                LocalVideoScanState.Error(error.message ?: "扫描本地视频失败")
+            }
+        }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.any { it }) scanLocalVideos()
+        else scanState = LocalVideoScanState.NeedsPermission
+    }
+
+    LaunchedEffect(Unit) {
+        if (hasLocalVideoPermission(context)) scanLocalVideos()
+    }
+
+    when (val state = scanState) {
+        LocalVideoScanState.NeedsPermission -> {
+            EmptyCard("扫描本地视频", "允许访问本机视频后，BiliBox 会读取设备中的视频文件。")
+            Spacer(Modifier.height(14.dp))
+            Button(
+                onClick = { permissionLauncher.launch(localVideoPermissions()) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Pink)
+            ) { Text("允许访问并扫描") }
+        }
+        LocalVideoScanState.Loading -> {
+            Column(Modifier.fillMaxWidth().padding(top = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = Pink, strokeWidth = 2.dp)
+                Spacer(Modifier.height(14.dp))
+                Text("正在扫描本地视频…", color = Muted, fontSize = 13.sp)
+            }
+        }
+        is LocalVideoScanState.Error -> {
+            EmptyCard("扫描失败", state.message)
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                TextButton(onClick = scanLocalVideos) { Text("重新扫描", color = Pink) }
+            }
+        }
+        is LocalVideoScanState.Ready -> {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("本地视频", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                Text("${state.videos.size} 个", color = Muted, fontSize = 12.sp)
+                Spacer(Modifier.width(6.dp))
+                TextButton(onClick = scanLocalVideos, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text("重新扫描", color = Pink, fontSize = 12.sp)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            if (state.videos.isEmpty()) {
+                EmptyCard("没有找到本地视频", "把视频保存到本机后，点击“重新扫描”即可显示。")
+            } else {
+                state.videos.forEachIndexed { index, video ->
+                    LocalVideoRow(context, video)
+                    if (index != state.videos.lastIndex) Spacer(Modifier.height(10.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalVideoRow(context: Context, video: LocalVideo) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = .78f))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier.size(52.dp).background(Pink.copy(alpha = .12f), RoundedCornerShape(15.dp)),
+            contentAlignment = Alignment.Center
+        ) { Text("▶", color = Pink, fontSize = 20.sp) }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(video.name, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+            Spacer(Modifier.height(5.dp))
+            Text(
+                "${formatVideoDuration(video.durationMs)} · ${Formatter.formatFileSize(context, video.sizeBytes)}",
+                color = Muted,
+                fontSize = 11.sp
+            )
+        }
+    }
+}
+
+private fun hasLocalVideoPermission(context: Context): Boolean {
+    val permission = if (Build.VERSION.SDK_INT >= 33) {
+        Manifest.permission.READ_MEDIA_VIDEO
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+    if (context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) return true
+    return Build.VERSION.SDK_INT >= 34 && context.checkSelfPermission(
+        Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+    ) == PackageManager.PERMISSION_GRANTED
+}
+
+private fun localVideoPermissions(): Array<String> = when {
+    Build.VERSION.SDK_INT >= 34 -> arrayOf(
+        Manifest.permission.READ_MEDIA_VIDEO,
+        Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+    )
+    Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_VIDEO)
+    else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+}
+
+private fun queryLocalVideos(context: Context): List<LocalVideo> {
+    val collection = if (Build.VERSION.SDK_INT >= 29) {
+        MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+    } else {
+        MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+    }
+    val projection = arrayOf(
+        MediaStore.Video.Media._ID,
+        MediaStore.Video.Media.DISPLAY_NAME,
+        MediaStore.Video.Media.DURATION,
+        MediaStore.Video.Media.SIZE
+    )
+    val videos = mutableListOf<LocalVideo>()
+    context.contentResolver.query(
+        collection,
+        projection,
+        null,
+        null,
+        "${MediaStore.Video.Media.DATE_ADDED} DESC"
+    )?.use { cursor ->
+        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+        val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+        val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+        val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+        while (cursor.moveToNext()) {
+            val id = cursor.getLong(idColumn)
+            videos += LocalVideo(
+                uri = ContentUris.withAppendedId(collection, id),
+                name = cursor.getString(nameColumn).orEmpty().ifBlank { "未命名视频" },
+                durationMs = cursor.getLong(durationColumn).coerceAtLeast(0L),
+                sizeBytes = cursor.getLong(sizeColumn).coerceAtLeast(0L)
+            )
+        }
+    }
+    return videos
+}
+
+private fun formatVideoDuration(durationMs: Long): String {
+    val totalSeconds = (durationMs / 1000L).coerceAtLeast(0L)
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+    return if (hours > 0) {
+        "%d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        "%d:%02d".format(minutes, seconds)
+    }
+}
+
+@Composable
+private fun LibrarySourceSwitcher(selected: Int, onSelect: (Int) -> Unit) {
+    val labels = listOf("哔哩哔哩下载", "本地视频")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = .72f))
+            .padding(5.dp)
+            .selectableGroup(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        labels.forEachIndexed { index, label ->
+            val isSelected = selected == index
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (isSelected) Pink else Color.Transparent)
+                    .selectable(isSelected, onClick = { onSelect(index) }, role = Role.Tab),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    label,
+                    color = if (isSelected) Color.White else Muted,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                )
+            }
         }
     }
 }
@@ -251,26 +500,23 @@ private fun SearchResults(items: List<SearchVideo>, onVideoClick: (SearchVideo) 
 @Composable
 private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val client = remember(video.bvid, session?.cookie) {
+        BiliClient().also { it.cookieHeader = session?.cookie }
+    }
     val exoPlayer = remember(video.bvid, session?.cookie) {
-        val headers = buildMap {
-            put("Referer", "https://www.bilibili.com/")
-            put("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36")
-            session?.cookie?.takeIf { it.isNotBlank() }?.let { put("Cookie", it) }
-        }
-        val httpFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setDefaultRequestProperties(headers)
-        val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
+        val dataSourceFactory = DefaultDataSource.Factory(context, BiliPlayback.dataSourceFactory(session?.cookie))
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
     }
     var playbackState by remember(video.bvid, session?.cookie) { mutableStateOf<PlaybackState>(PlaybackState.Loading) }
-    var streamUrls by remember(video.bvid, session?.cookie) { mutableStateOf<List<String>>(emptyList()) }
-    var streamIndex by remember(video.bvid, session?.cookie) { mutableIntStateOf(0) }
+    var playbackData by remember(video.bvid, session?.cookie) { mutableStateOf<com.example.bilibox.bili.PlayData?>(null) }
+    var playbackCid by remember(video.bvid, session?.cookie) { mutableLongStateOf(0L) }
+    var playbackCandidateIndex by remember(video.bvid, session?.cookie) { mutableIntStateOf(0) }
+    var playbackCandidateCount by remember(video.bvid, session?.cookie) { mutableIntStateOf(1) }
+    var durlFallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
-    val currentStreamUrls by rememberUpdatedState(streamUrls)
-    val currentStreamIndex by rememberUpdatedState(streamIndex)
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
@@ -278,17 +524,46 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                val nextIndex = currentStreamIndex + 1
-                if (nextIndex < currentStreamUrls.size) {
-                    streamIndex = nextIndex
+                val data = playbackData
+                val nextIndex = playbackCandidateIndex + 1
+                if (data != null && nextIndex < playbackCandidateCount) {
+                    playbackCandidateIndex = nextIndex
                     playbackState = PlaybackState.Loading
-                    exoPlayer.setMediaItem(MediaItem.fromUri(currentStreamUrls[nextIndex]))
-                    exoPlayer.prepare()
-                    exoPlayer.playWhenReady = true
+                    BiliPlayback.attach(exoPlayer, data, preferredQn = BiliQn.P1080, candidateIndex = nextIndex, cookie = session?.cookie)
+                    return
+                }
+                // DASH uses separate audio/video URLs. If every CDN pair is rejected,
+                // request the older single-file stream format as a compatibility fallback.
+                if (!durlFallbackTried && playbackCid > 0) {
+                    durlFallbackTried = true
+                    playbackState = PlaybackState.Loading
+                    scope.launch {
+                        try {
+                            val fallback = client.playUrl(
+                                bvid = video.bvid,
+                                cid = playbackCid,
+                                qn = BiliQn.P720,
+                                fnval = BiliClient.FNVAL_DURL,
+                            )
+                            playbackData = fallback
+                            playbackCandidateIndex = 0
+                            playbackCandidateCount = BiliPlayback.candidateCount(fallback, preferredQn = BiliQn.P720)
+                            BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P720, cookie = session?.cookie)
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            playbackState = PlaybackState.Error("播放器无法读取视频流：${error.message ?: "单文件流也不可用"}")
+                        }
+                    }
                     return
                 }
                 val detail = error.cause?.message?.takeIf { it.isNotBlank() }
-                playbackState = PlaybackState.Error("播放器无法读取视频流：${error.errorCodeName}${detail?.let { "（$it）" }.orEmpty()}")
+                val message = if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && detail?.contains("403") == true) {
+                    "CDN 返回 HTTP 403，当前网络出口可能被 B 站拒绝"
+                } else {
+                    "播放器无法读取视频流：${error.errorCodeName}${detail?.let { "（$it）" }.orEmpty()}"
+                }
+                playbackState = PlaybackState.Error(message)
             }
         }
         exoPlayer.addListener(listener)
@@ -299,14 +574,18 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
     }
     LaunchedEffect(video.bvid, session?.cookie, retryToken) {
         playbackState = PlaybackState.Loading
+        durlFallbackTried = false
         try {
-            val urls = withContext(Dispatchers.IO) { resolveBilibiliStreams(video.bvid, session?.cookie) }
-            if (urls.isEmpty()) throw IllegalStateException("B 站没有返回可用的视频流")
-            streamUrls = urls
-            streamIndex = 0
-            exoPlayer.setMediaItem(MediaItem.fromUri(urls.first()))
-            exoPlayer.prepare()
-            exoPlayer.playWhenReady = true
+            client.warmUp()
+            val info = client.videoInfo(video.bvid)
+            val cid = info.pages.firstOrNull()?.cid ?: info.cid
+            if (cid <= 0) throw IllegalStateException("B 站没有返回视频分 P 信息")
+            val play = client.playUrl(info.bvid.ifBlank { video.bvid }, cid, qn = BiliQn.P1080)
+            playbackCid = cid
+            playbackData = play
+            playbackCandidateIndex = 0
+            playbackCandidateCount = BiliPlayback.candidateCount(play, preferredQn = BiliQn.P1080)
+            BiliPlayback.attach(exoPlayer, play, preferredQn = BiliQn.P1080, candidateIndex = 0, cookie = session?.cookie)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -452,76 +731,6 @@ private suspend fun searchBilibiliVideos(keyword: String): List<SearchVideo> = w
     }
 }
 
-private fun resolveBilibiliStreams(bvid: String, cookie: String?): List<String> {
-    val view = biliApiJson(
-        "https://api.bilibili.com/x/web-interface/view?bvid=${URLEncoder.encode(bvid, Charsets.UTF_8.name())}",
-        cookie
-    )
-    val viewCode = view.optInt("code", -1)
-    if (viewCode != 0) throw IllegalStateException(view.optString("message").ifBlank { "无法读取视频信息（$viewCode）" })
-    val cid = view.optJSONObject("data")?.optLong("cid")?.takeIf { it > 0 }
-        ?: throw IllegalStateException("B 站没有返回视频分 P 信息")
-
-    val qualities = if (cookie.isNullOrBlank()) listOf(32) else listOf(80, 64, 32)
-    var lastMessage = "B 站没有返回可用的视频流"
-    val streams = linkedSetOf<String>()
-    for (quality in qualities) {
-        val playUrl = "https://api.bilibili.com/x/player/playurl?bvid=${URLEncoder.encode(bvid, Charsets.UTF_8.name())}&cid=$cid&qn=$quality&fnval=0&fourk=0"
-        val play = biliApiJson(playUrl, cookie)
-        val playCode = play.optInt("code", -1)
-        if (playCode != 0) {
-            lastMessage = play.optString("message").ifBlank { "无法获取 ${qualityLabel(quality)} 视频流（$playCode）" }
-            continue
-        }
-        val data = play.optJSONObject("data")
-        val durl = data?.optJSONArray("durl")
-        val firstSegment = durl?.optJSONObject(0)
-        if (firstSegment != null) {
-            firstSegment.optString("url").normalizedStreamUrl()?.let(streams::add)
-            val backups = firstSegment.optJSONArray("backup_url")
-            if (backups != null) {
-                for (backupIndex in 0 until backups.length()) {
-                    backups.optString(backupIndex).normalizedStreamUrl()?.let(streams::add)
-                }
-            }
-        }
-        if (firstSegment == null) lastMessage = "${qualityLabel(quality)} 暂无兼容视频流"
-    }
-    if (streams.isNotEmpty()) return streams.toList()
-    throw IllegalStateException(
-        if (cookie.isNullOrBlank()) "$lastMessage；登录后可尝试更高画质和受限视频"
-        else "$lastMessage；请确认账号有权观看该视频"
-    )
-}
-
-private fun String?.normalizedStreamUrl(): String? =
-    this?.trim()?.takeIf { it.isNotBlank() }?.replaceFirst("http://", "https://")
-
-private fun qualityLabel(quality: Int): String = when (quality) {
-    80 -> "1080P"
-    64 -> "720P"
-    else -> "480P"
-}
-
-private fun biliApiJson(endpoint: String, cookie: String? = null): JSONObject {
-    val connection = URL(endpoint).openConnection() as HttpURLConnection
-    connection.connectTimeout = 10000
-    connection.readTimeout = 10000
-    connection.requestMethod = "GET"
-    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36")
-    connection.setRequestProperty("Referer", "https://www.bilibili.com/")
-    cookie?.takeIf { it.isNotBlank() }?.let { connection.setRequestProperty("Cookie", it) }
-    return try {
-        val status = connection.responseCode
-        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-        if (status !in 200..299) throw IllegalStateException("B 站接口暂不可用（HTTP $status）")
-        JSONObject(body)
-    } finally {
-        connection.disconnect()
-    }
-}
-
 @Composable
 private fun Header() {
     Row(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 32.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -660,7 +869,7 @@ private fun LiquidNavigation(selected: Int, onSelect: (Int) -> Unit, backdrop: G
                         .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .9f), Color.White.copy(alpha = .38f))), CircleShape)
                         .then(Modifier.clip(CircleShape)))
                     Row(Modifier.fillMaxSize().selectableGroup()) {
-                        listOf("首页", "动态", "媒体库").forEachIndexed { index, title ->
+                        listOf("首页", "动态", "视频").forEachIndexed { index, title ->
                             NavigationItem(index, title, selected == index, { onSelect(index) }, Modifier.weight(1f))
                         }
                     }
