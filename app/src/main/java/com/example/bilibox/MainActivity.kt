@@ -31,6 +31,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -104,6 +105,9 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.CancellationException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val Ink = Color(0xFF24313D)
 private val Pink = Color(0xFFEF7196)
@@ -113,6 +117,8 @@ private data class SearchVideo(
     val title: String,
     val author: String,
     val playCount: String,
+    val commentCount: Long,
+    val publishTime: Long,
     val duration: String,
     val bvid: String,
     val coverUrl: String
@@ -239,7 +245,7 @@ private fun BiliBoxApp() {
             // The scrollable page is captured once and shared by both glass surfaces.
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    .statusBarsPadding().padding(horizontal = 24.dp)
+                    .statusBarsPadding().padding(horizontal = 16.dp)
             ) {
                 Header()
                 when (selected) {
@@ -1487,8 +1493,8 @@ private fun SearchResults(
         EmptyCard("没有找到视频", "换个关键词试试看。")
     } else {
         state.items.forEach { video ->
-            SearchResultCard(video) { onVideoClick(video) }
-            Spacer(Modifier.height(14.dp))
+            SearchResultCard(video, Modifier.offset(x = (-4).dp)) { onVideoClick(video) }
+            HorizontalDivider(color = Color(0xFFDDE3E8), thickness = 1.dp)
         }
     }
     Row(
@@ -1617,6 +1623,12 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
                 Spacer(Modifier.height(8.dp))
                 Text("${video.author} · ${video.playCount} 次播放 · ${video.duration}",
                     color = Muted, fontSize = 12.sp)
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    VideoMetaIcon(kind = "date", modifier = Modifier.size(width = 14.dp, height = 13.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text("发布时间  ${formatPublishDate(video.publishTime)}", color = Muted, fontSize = 12.sp)
+                }
                 Spacer(Modifier.height(16.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     VideoAction(3, "分享", false) {
@@ -1658,20 +1670,113 @@ private fun formatPlaybackTime(positionMs: Long, unknownWhenZero: Boolean = fals
 }
 
 @Composable
-private fun SearchResultCard(video: SearchVideo, onClick: () -> Unit) {
+private fun SearchResultCard(video: SearchVideo, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = .86f)).clickable(onClick = onClick).padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier.fillMaxWidth().clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        RemoteCover(video.coverUrl, Modifier.width(132.dp).height(82.dp))
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(video.title, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, lineHeight = 19.sp)
-            Spacer(Modifier.height(7.dp))
-            Text(video.author, color = Muted, fontSize = 11.sp, maxLines = 1)
-            Spacer(Modifier.height(4.dp))
-            Text("▶ ${video.playCount}   ·   ${video.duration}", color = Muted, fontSize = 10.sp, maxLines = 1)
+        Box(
+            Modifier.width(144.dp).height(90.dp).clip(RoundedCornerShape(11.dp)),
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            RemoteCover(video.coverUrl, Modifier.fillMaxSize())
+            Text(
+                video.duration,
+                color = Color.White,
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+                modifier = Modifier
+                    .padding(end = 5.dp, bottom = 5.dp)
+                    .background(Color.Black.copy(alpha = .68f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Box(Modifier.weight(1f).height(90.dp)) {
+            Text(
+                video.title,
+                color = Ink,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                lineHeight = 17.sp,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+            Column(Modifier.align(Alignment.BottomStart)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.padding(start = 2.dp)
+                            .size(width = 14.dp, height = 12.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color.Transparent)
+                            .border(0.6.dp, Muted, RoundedCornerShape(4.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("UP", color = Muted, fontSize = 6.sp, lineHeight = 7.sp, fontWeight = FontWeight.Medium)
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    Text(video.author, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    VideoMeta(icon = "play", value = video.playCount)
+                    VideoMeta(icon = "comment", value = video.commentCount.toString())
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VideoMeta(icon: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.wrapContentWidth()) {
+        VideoMetaIcon(kind = icon, modifier = Modifier.size(width = 16.dp, height = 13.dp))
+        Spacer(Modifier.width(2.dp))
+        Text(value, color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun VideoMetaIcon(kind: String, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val strokeWidth = size.minDimension * .065f
+        val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val left = size.width * .14f
+        val right = size.width * .86f
+        val top = size.height * .14f
+        val bottom = size.height * .86f
+        when (kind) {
+            "play" -> {
+                drawRoundRect(Muted, Offset(left, top), androidx.compose.ui.geometry.Size(right - left, bottom - top),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .18f), style = stroke)
+                val path = Path().apply {
+                    moveTo(size.width * .43f, size.height * .31f)
+                    lineTo(size.width * .67f, size.height * .5f)
+                    lineTo(size.width * .43f, size.height * .69f)
+                    close()
+                }
+                drawPath(path, Muted)
+            }
+            "comment" -> {
+                drawRoundRect(Muted, Offset(left, top), androidx.compose.ui.geometry.Size(right - left, bottom - top),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .16f), style = stroke)
+                drawCircle(Muted, size.minDimension * .055f, Offset(size.width * .31f, size.height * .4f))
+                drawLine(Muted, Offset(size.width * .43f, size.height * .4f), Offset(size.width * .7f, size.height * .4f), strokeWidth)
+                drawCircle(Muted, size.minDimension * .055f, Offset(size.width * .31f, size.height * .62f))
+                drawLine(Muted, Offset(size.width * .43f, size.height * .62f), Offset(size.width * .62f, size.height * .62f), strokeWidth)
+            }
+            "date" -> {
+                drawRoundRect(Muted, Offset(left, top + size.height * .08f),
+                    androidx.compose.ui.geometry.Size(right - left, bottom - top - size.height * .08f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .12f), style = stroke)
+                drawLine(Muted, Offset(left, size.height * .38f), Offset(right, size.height * .38f), strokeWidth)
+                drawLine(Muted, Offset(size.width * .34f, size.height * .08f), Offset(size.width * .34f, size.height * .3f), strokeWidth)
+                drawLine(Muted, Offset(size.width * .66f, size.height * .08f), Offset(size.width * .66f, size.height * .3f), strokeWidth)
+            }
         }
     }
 }
@@ -1701,7 +1806,9 @@ private fun toSearchVideo(item: VideoSearchItem): SearchVideo {
     return SearchVideo(
         title = android.text.Html.fromHtml(cleanTitle, android.text.Html.FROM_HTML_MODE_LEGACY).toString(),
         author = item.author,
-        playCount = item.play,
+        playCount = formatPlayCount(item.play),
+        commentCount = item.commentCount,
+        publishTime = item.publishTime,
         duration = item.duration,
         bvid = item.bvid,
         coverUrl = when {
@@ -1710,6 +1817,23 @@ private fun toSearchVideo(item: VideoSearchItem): SearchVideo {
             else -> item.pic
         },
     )
+}
+
+private fun formatPlayCount(raw: String): String {
+    val normalized = raw.trim().replace(",", "")
+    val numeric = when {
+        normalized.endsWith("万") -> normalized.removeSuffix("万").toDoubleOrNull()?.times(10_000.0)
+        else -> normalized.toDoubleOrNull()
+    } ?: return raw.ifBlank { "--" }
+    if (numeric <= 10_000) return numeric.toLong().toString()
+    val tenThousands = numeric / 10_000.0
+    val formatted = String.format(Locale.US, "%.1f", tenThousands).trimEnd('0').trimEnd('.')
+    return "$formatted 万".replace(" ", "")
+}
+
+private fun formatPublishDate(timestampSeconds: Long): String {
+    if (timestampSeconds <= 0L) return "--"
+    return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(timestampSeconds * 1000L))
 }
 
 @Composable

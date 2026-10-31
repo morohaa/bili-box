@@ -85,6 +85,10 @@ class BiliClient(
                 title = item.stringValue("title"),
                 author = item.stringValue("author").ifBlank { "未知 UP 主" },
                 play = item.stringValue("play").ifBlank { "--" },
+                commentCount = item.stringValue("video_review")
+                    .ifBlank { item.stringValue("review") }
+                    .toLongOrNull() ?: 0L,
+                publishTime = item.stringValue("pubdate").toLongOrNull() ?: 0L,
                 duration = item.stringValue("duration").ifBlank { "--:--" },
                 bvid = bvid,
                 pic = item.stringValue("pic"),

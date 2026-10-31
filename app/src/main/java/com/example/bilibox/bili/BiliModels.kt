@@ -138,6 +138,8 @@ data class VideoSearchItem(
     val title: String = "",
     val author: String = "",
     val play: String = "",
+    val commentCount: Long = 0,
+    val publishTime: Long = 0,
     val duration: String = "",
     val bvid: String = "",
     val pic: String = "",
