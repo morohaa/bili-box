@@ -14,21 +14,28 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.doubleClick
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.ui.PlayerView
 import androidx.test.filters.SdkSuppress
+import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -71,6 +78,64 @@ class PlayerToolsTest {
         compose.onNodeWithContentDescription("截取视频画面").assertExists()
         compose.onNodeWithTag("video-touch").performTouchInput { doubleClick(center) }
         compose.runOnIdle { assertEquals(2, playbackToggles) }
+    }
+
+    @Test
+    fun portraitVideoSwipesSelectBrightnessOrVolumeByStartingSide() {
+        val startedSides = mutableListOf<PlayerGestureSide>()
+        var leftDelta = 0f
+        var rightDelta = 0f
+        compose.setContent {
+            PlayerTouchSurface(
+                locked = false,
+                verticalGesturesEnabled = true,
+                onToggleControls = {},
+                onTogglePlayback = {},
+                onVerticalGestureStart = { startedSides.add(it) },
+                onVerticalSwipe = { side, delta ->
+                    if (side == PlayerGestureSide.LEFT) leftDelta += delta else rightDelta += delta
+                },
+                // The portrait page still has a compact 16:9 video touch surface.
+                modifier = Modifier.size(320.dp, 180.dp).testTag("video-touch")
+            )
+        }
+        compose.onNodeWithTag("video-touch").performTouchInput {
+            swipe(Offset(center.x * .4f, center.y * 1.5f), Offset(center.x * .4f, center.y * .5f))
+        }
+        compose.onNodeWithTag("video-touch").performTouchInput {
+            swipe(Offset(center.x * 1.6f, center.y * 1.5f), Offset(center.x * 1.6f, center.y * .5f))
+        }
+        compose.runOnIdle {
+            assertEquals(listOf(PlayerGestureSide.LEFT, PlayerGestureSide.RIGHT), startedSides)
+            assertTrue(leftDelta < 0f)
+            assertTrue(rightDelta < 0f)
+        }
+    }
+
+    @Test
+    fun gestureFeedbackUsesReferenceStyleAndExposesCurrentLevelAccessibly() {
+        compose.setContent {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                PlayerGestureFeedback(PlayerGestureSide.LEFT, .45f)
+            }
+        }
+        compose.onNodeWithContentDescription("亮度调节").assertExists()
+        compose.onNodeWithContentDescription("亮度调节")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "45%"))
+    }
+
+    @Test
+    fun brightnessGestureSetsWindowBrightnessOverride() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                val original = activity.window.attributes.screenBrightness
+                setPlayerWindowBrightness(activity.window, .73f)
+                assertEquals(.73f, activity.window.attributes.screenBrightness, .001f)
+                val attributes = activity.window.attributes
+                attributes.screenBrightness = original
+                activity.window.attributes = attributes
+            }
+        }
     }
 
     @Test

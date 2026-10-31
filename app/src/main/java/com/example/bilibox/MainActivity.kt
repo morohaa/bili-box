@@ -9,10 +9,12 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.BitmapFactory
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.provider.MediaStore
+import android.provider.Settings
 import android.text.format.Formatter
 import android.view.LayoutInflater
 import android.widget.Toast
@@ -121,6 +123,22 @@ private data class LocalVideo(
     val sizeBytes: Long
 )
 
+private data class PlayerGestureFeedbackState(
+    val side: PlayerGestureSide,
+    val level: Float
+)
+
+private fun readScreenBrightness(activity: ComponentActivity): Float {
+    val override = activity.window.attributes.screenBrightness
+    if (override >= 0f) return override.coerceIn(0f, 1f)
+    val systemBrightness = Settings.System.getInt(
+        activity.contentResolver,
+        Settings.System.SCREEN_BRIGHTNESS,
+        128
+    )
+    return systemBrightness.coerceIn(0, 255) / 255f
+}
+
 private sealed interface LocalVideoScanState {
     data object NeedsPermission : LocalVideoScanState
     data object Loading : LocalVideoScanState
@@ -167,6 +185,10 @@ private fun BiliBoxApp() {
             onBack = { selectedLocalVideo = null })
         return
     }
+    selectedVideo?.let { video ->
+        BiliVideoDetail(video, session) { selectedVideo = null }
+        return
+    }
     val backdrop = rememberGraphicsLayer()
     Box(Modifier.fillMaxSize().background(Color(0xFFF4F6FA))) {
         Box(Modifier.fillMaxSize().drawWithContent {
@@ -181,42 +203,38 @@ private fun BiliBoxApp() {
                 Header()
                 when (selected) {
                     0 -> {
-                        if (selectedVideo != null) {
-                            BiliVideoDetail(selectedVideo!!, session) { selectedVideo = null }
-                        } else {
-                            VideoSearchField(
-                                query = searchQuery,
-                                onQueryChange = { searchQuery = it },
-                                onSearch = {
-                                    val keyword = searchQuery.trim()
-                                    if (keyword.isNotEmpty()) {
-                                        searchState = SearchState.Loading
-                                        scope.launch {
-                                            searchState = try {
-                                                SearchState.Success(searchBilibiliVideos(keyword))
-                                            } catch (error: Exception) {
-                                                SearchState.Error(error.message ?: "搜索失败，请稍后重试")
-                                            }
-                                        }
-                                    }
-                                }
-                            )
-                            Spacer(Modifier.height(26.dp))
-                            when (val state = searchState) {
-                                SearchState.Idle -> HomeContent(saved) { saved = !saved }
-                                SearchState.Loading -> SearchLoading()
-                                is SearchState.Error -> SearchError(state.message) {
+                        VideoSearchField(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            onSearch = {
+                                val keyword = searchQuery.trim()
+                                if (keyword.isNotEmpty()) {
                                     searchState = SearchState.Loading
                                     scope.launch {
                                         searchState = try {
-                                            SearchState.Success(searchBilibiliVideos(searchQuery.trim()))
+                                            SearchState.Success(searchBilibiliVideos(keyword))
                                         } catch (error: Exception) {
                                             SearchState.Error(error.message ?: "搜索失败，请稍后重试")
                                         }
                                     }
                                 }
-                                is SearchState.Success -> SearchResults(state.items) { selectedVideo = it }
                             }
+                        )
+                        Spacer(Modifier.height(26.dp))
+                        when (val state = searchState) {
+                            SearchState.Idle -> HomeContent(saved) { saved = !saved }
+                            SearchState.Loading -> SearchLoading()
+                            is SearchState.Error -> SearchError(state.message) {
+                                searchState = SearchState.Loading
+                                scope.launch {
+                                    searchState = try {
+                                        SearchState.Success(searchBilibiliVideos(searchQuery.trim()))
+                                    } catch (error: Exception) {
+                                        SearchState.Error(error.message ?: "搜索失败，请稍后重试")
+                                    }
+                                }
+                            }
+                            is SearchState.Success -> SearchResults(state.items) { selectedVideo = it }
                         }
                     }
                     1 -> CollectionPage("动态", "关注的人，分享的日常", "今天的灵感", "沿着海岸线，收集一整个夏天")
@@ -367,7 +385,6 @@ private fun LocalVideoRow(context: Context, video: LocalVideo, onClick: () -> Un
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LocalVideoPlayer(
     video: LocalVideo,
@@ -377,35 +394,175 @@ private fun LocalVideoPlayer(
 ) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
-    val fullScreen = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val progressStore = remember(context) { PlaybackProgressStore(context) }
     // File size also distinguishes a replacement file that reuses a MediaStore URI.
     val progressKey = remember(video.uri, video.sizeBytes) { "${video.uri}|${video.sizeBytes}" }
     val resumePosition = remember(progressKey) { progressStore.load(progressKey, video.durationMs) }
-    val player = remember(video.uri) {
-        createCompatiblePlayer(context)
+    val player = remember(video.uri) { createCompatiblePlayer(context) }
+    var playbackError by remember(player) { mutableStateOf<String?>(null) }
+    var playbackState by remember(player) { mutableIntStateOf(Player.STATE_IDLE) }
+    var liked by remember(video.uri) { mutableStateOf(false) }
+    var saved by remember(video.uri) { mutableStateOf(false) }
+    fun savePlaybackProgress() {
+        // Ignore the empty/idle player during setup or a failed preparation.
+        if (player.mediaItemCount == 0 || player.playbackState == Player.STATE_IDLE) return
+        progressStore.save(
+            progressKey,
+            player.currentPosition,
+            player.duration.takeIf { it > 0L } ?: video.durationMs,
+            completed = player.playbackState == Player.STATE_ENDED
+        )
     }
-    var position by remember(video.uri) { mutableLongStateOf(resumePosition) }
-    var duration by remember(video.uri) { mutableLongStateOf(video.durationMs) }
-    var isPlaying by remember(video.uri) { mutableStateOf(true) }
-    var scrubbing by remember(video.uri) { mutableStateOf(false) }
-    var scrubPosition by remember(video.uri) { mutableFloatStateOf(0f) }
-    var speed by remember(video.uri) { mutableFloatStateOf(1f) }
-    var speedMenuExpanded by remember(video.uri) { mutableStateOf(false) }
-    var episodesExpanded by remember(video.uri) { mutableStateOf(false) }
-    var playbackError by remember(video.uri) { mutableStateOf<String?>(null) }
-    var playbackState by remember(video.uri) { mutableIntStateOf(Player.STATE_IDLE) }
-    var detailsTab by remember(video.uri) { mutableIntStateOf(0) }
-    var controlsVisible by remember(video.uri) { mutableStateOf(true) }
-    var screenLocked by remember(video.uri) { mutableStateOf(false) }
-    var orientationBeforeLock by remember(video.uri) { mutableStateOf<Int?>(null) }
+
+    DisposableEffect(player, activity) {
+        val listener = object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                val detail = (error.cause?.message ?: error.message)?.takeIf { it.isNotBlank() }
+                playbackError = "${error.errorCodeName}${detail?.let { "：$it" }.orEmpty()}"
+            }
+
+            override fun onPlaybackStateChanged(state: Int) {
+                playbackState = state
+                if (state == Player.STATE_READY) playbackError = null
+            }
+
+            override fun onEvents(player: Player, events: Player.Events) {
+                if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED,
+                        Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_POSITION_DISCONTINUITY)) {
+                    savePlaybackProgress()
+                }
+            }
+        }
+        val lifecycleObserver = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                savePlaybackProgress()
+            }
+        }
+        player.addListener(listener)
+        activity?.lifecycle?.addObserver(lifecycleObserver)
+        player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri), resumePosition)
+        player.prepare()
+        player.playWhenReady = true
+        onDispose {
+            savePlaybackProgress()
+            activity?.lifecycle?.removeObserver(lifecycleObserver)
+            player.removeListener(listener)
+            player.release()
+        }
+    }
+    LaunchedEffect(player) {
+        while (true) {
+            delay(5_000)
+            savePlaybackProgress()
+        }
+    }
+    LaunchedEffect(player, playbackState) {
+        if (playbackState == Player.STATE_BUFFERING) {
+            delay(12_000)
+            if (player.playbackState == Player.STATE_BUFFERING && playbackError == null) {
+                playbackError = "加载超时，请检查文件是否可读取或编码是否受支持"
+            }
+        }
+    }
+    VideoPlayerScreen(
+        player = player,
+        title = video.name,
+        defaultDurationMs = video.durationMs,
+        playbackError = playbackError,
+        sourceLabel = "本地视频",
+        commentMessage = "本地视频暂时没有评论",
+        onBack = onBack,
+        onRetry = {
+            playbackError = null
+            val retryPosition = player.currentPosition.coerceAtLeast(0L)
+            player.stop()
+            player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri), retryPosition)
+            player.prepare()
+            player.playWhenReady = true
+        },
+        episodes = { dismiss ->
+            LocalVideoEpisodes(playlist, video, onDismiss = dismiss, onVideoSelected = {
+                dismiss()
+                onVideoSelected(it)
+            })
+        },
+        details = { duration ->
+            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
+                Text(video.name, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "本地视频 · ${Formatter.formatFileSize(context, video.sizeBytes)} · ${formatVideoDuration(duration)}",
+                    color = Muted,
+                    fontSize = 12.sp
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    VideoAction(0, if (liked) "已点赞" else "点赞", liked) { liked = !liked }
+                    VideoAction(1, "投币", false, enabled = false) { }
+                    VideoAction(2, if (saved) "已收藏" else "收藏", saved) { saved = !saved }
+                    VideoAction(3, "分享", false) {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "video/*"
+                            putExtra(Intent.EXTRA_STREAM, video.uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "分享视频"))
+                    }
+                }
+                HorizontalDivider(Modifier.padding(top = 14.dp), color = Color(0xFFE9EAEC), thickness = 1.dp)
+                Spacer(Modifier.height(14.dp))
+                Text("视频信息", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                Text("${video.name}\n${Formatter.formatFileSize(context, video.sizeBytes)}", color = Muted, fontSize = 12.sp, lineHeight = 19.sp)
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun VideoPlayerScreen(
+    player: ExoPlayer,
+    title: String,
+    defaultDurationMs: Long = 0L,
+    playbackError: String? = null,
+    loadingMessage: String? = null,
+    sourceLabel: String,
+    commentMessage: String,
+    onBack: () -> Unit,
+    onRetry: () -> Unit,
+    episodes: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
+    details: @Composable (duration: Long) -> Unit,
+) {
+    val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    val fullScreen = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    var position by remember(player) { mutableLongStateOf(player.currentPosition.coerceAtLeast(0L)) }
+    var duration by remember(player) { mutableLongStateOf(defaultDurationMs) }
+    var isPlaying by remember(player) { mutableStateOf(player.isPlaying) }
+    var scrubbing by remember(player) { mutableStateOf(false) }
+    var scrubPosition by remember(player) { mutableFloatStateOf(0f) }
+    var speed by remember(player) { mutableFloatStateOf(1f) }
+    var speedMenuExpanded by remember(player) { mutableStateOf(false) }
+    var episodesExpanded by remember(player) { mutableStateOf(false) }
+    var playbackState by remember(player) { mutableIntStateOf(player.playbackState) }
+    var detailsTab by remember(player) { mutableIntStateOf(0) }
+    var controlsVisible by remember(player) { mutableStateOf(true) }
+    var screenLocked by remember(player) { mutableStateOf(false) }
+    var orientationBeforeLock by remember(player) { mutableStateOf<Int?>(null) }
     var playerView by remember(player) { mutableStateOf<PlayerView?>(null) }
     var hasVideoFrame by remember(player) { mutableStateOf(false) }
     var savingFrame by remember { mutableStateOf(false) }
+    var screenBrightness by remember(activity) {
+        mutableFloatStateOf(activity?.let(::readScreenBrightness) ?: .5f)
+    }
+    var volumeGestureRemainder by remember(player) { mutableFloatStateOf(0f) }
+    var gestureFeedback by remember(player) { mutableStateOf<PlayerGestureFeedbackState?>(null) }
+    var verticalGestureActive by remember(player) { mutableStateOf(false) }
     val captureScope = rememberCoroutineScope()
-    var liked by remember(video.uri) { mutableStateOf(false) }
-    var saved by remember(video.uri) { mutableStateOf(false) }
 
+    val originalWindowBrightness = remember(activity) { activity?.window?.attributes?.screenBrightness }
     DisposableEffect(activity) {
         val originalOrientation = activity?.requestedOrientation
         val controller = activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
@@ -414,6 +571,11 @@ private fun LocalVideoPlayer(
         val barsBehavior = controller?.systemBarsBehavior
         onDispose {
             if (originalOrientation != null) activity?.requestedOrientation = originalOrientation
+            if (originalWindowBrightness != null) activity?.window?.let { window ->
+                val attributes = window.attributes
+                attributes.screenBrightness = originalWindowBrightness
+                window.attributes = attributes
+            }
             controller?.show(WindowInsetsCompat.Type.systemBars())
             if (lightStatusBars != null) controller?.isAppearanceLightStatusBars = lightStatusBars
             if (lightNavigationBars != null) controller?.isAppearanceLightNavigationBars = lightNavigationBars
@@ -467,6 +629,49 @@ private fun LocalVideoPlayer(
         }
     }
 
+    fun updateGestureFeedback(side: PlayerGestureSide) {
+        if (side == PlayerGestureSide.LEFT) {
+            val level = screenBrightness.coerceIn(0f, 1f)
+            gestureFeedback = PlayerGestureFeedbackState(side, level)
+        } else {
+            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+            val volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            gestureFeedback = PlayerGestureFeedbackState(side, volume.toFloat() / maxVolume)
+        }
+    }
+
+    fun startVerticalGesture(side: PlayerGestureSide) {
+        verticalGestureActive = true
+        if (side == PlayerGestureSide.LEFT) {
+            screenBrightness = activity?.let(::readScreenBrightness) ?: screenBrightness
+        } else {
+            volumeGestureRemainder = 0f
+        }
+        updateGestureFeedback(side)
+    }
+
+    fun adjustFromVerticalGesture(side: PlayerGestureSide, deltaFraction: Float) {
+        if (side == PlayerGestureSide.LEFT) {
+            val newBrightness = (screenBrightness - deltaFraction).coerceIn(.02f, 1f)
+            screenBrightness = newBrightness
+            activity?.window?.let { setPlayerWindowBrightness(it, newBrightness) }
+        } else {
+            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+            volumeGestureRemainder += -deltaFraction * maxVolume
+            val volumeSteps = volumeGestureRemainder.toInt()
+            if (volumeSteps != 0) {
+                val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                audioManager.setStreamVolume(
+                    AudioManager.STREAM_MUSIC,
+                    (current + volumeSteps).coerceIn(0, maxVolume),
+                    0
+                )
+                volumeGestureRemainder -= volumeSteps
+            }
+        }
+        updateGestureFeedback(side)
+    }
+
     fun takeVideoScreenshot() {
         if (savingFrame || screenLocked || !hasVideoFrame || playbackError != null) return
         val frame = try {
@@ -497,75 +702,22 @@ private fun LocalVideoPlayer(
         else Toast.makeText(context, "需要存储权限才能保存视频画面", Toast.LENGTH_SHORT).show()
     }
 
-    fun savePlaybackProgress() {
-        // Ignore the empty/idle player during setup or a failed preparation.
-        if (player.mediaItemCount == 0 || player.playbackState == Player.STATE_IDLE) return
-        progressStore.save(
-            progressKey,
-            player.currentPosition,
-            player.duration.takeIf { it > 0L } ?: video.durationMs,
-            completed = player.playbackState == Player.STATE_ENDED
-        )
-    }
-
-    DisposableEffect(player, activity) {
+    DisposableEffect(player) {
         val listener = object : Player.Listener {
-            override fun onRenderedFirstFrame() {
-                hasVideoFrame = true
-            }
-
-            override fun onPlayerError(error: PlaybackException) {
-                val detail = (error.cause?.message ?: error.message)?.takeIf { it.isNotBlank() }
-                playbackError = "${error.errorCodeName}${detail?.let { "：$it" }.orEmpty()}"
-            }
-
+            override fun onRenderedFirstFrame() { hasVideoFrame = true }
             override fun onPlaybackStateChanged(state: Int) {
                 playbackState = state
-                if (state == Player.STATE_READY) playbackError = null
-            }
-
-            override fun onEvents(player: Player, events: Player.Events) {
-                if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED,
-                        Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_POSITION_DISCONTINUITY)) {
-                    savePlaybackProgress()
-                }
-            }
-        }
-        val lifecycleObserver = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
-                savePlaybackProgress()
+                if (state == Player.STATE_IDLE) hasVideoFrame = false
             }
         }
         player.addListener(listener)
-        activity?.lifecycle?.addObserver(lifecycleObserver)
-        player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri), resumePosition)
-        player.prepare()
-        player.playWhenReady = true
         onDispose {
-            savePlaybackProgress()
-            activity?.lifecycle?.removeObserver(lifecycleObserver)
             player.removeListener(listener)
-            player.release()
-            playerView = null
         }
     }
     LaunchedEffect(player) {
         while (true) {
-            delay(5_000)
-            savePlaybackProgress()
-        }
-    }
-    LaunchedEffect(player, playbackState) {
-        if (playbackState == Player.STATE_BUFFERING) {
-            delay(12_000)
-            if (player.playbackState == Player.STATE_BUFFERING && playbackError == null) {
-                playbackError = "加载超时，请检查文件是否可读取或编码是否受支持"
-            }
-        }
-    }
-    LaunchedEffect(player) {
-        while (true) {
-            duration = player.duration.takeIf { it > 0 } ?: video.durationMs
+            duration = player.duration.takeIf { it > 0 } ?: defaultDurationMs
             if (!scrubbing) position = player.currentPosition.coerceAtLeast(0L)
             isPlaying = player.isPlaying
             speed = player.playbackParameters.speed
@@ -576,6 +728,12 @@ private fun LocalVideoPlayer(
         if (controlsVisible && (isPlaying || screenLocked) && !scrubbing && !speedMenuExpanded && !episodesExpanded) {
             delay(4_000)
             controlsVisible = false
+        }
+    }
+    LaunchedEffect(gestureFeedback, verticalGestureActive) {
+        if (gestureFeedback != null && !verticalGestureActive) {
+            delay(900)
+            gestureFeedback = null
         }
     }
     BackHandler {
@@ -603,18 +761,21 @@ private fun LocalVideoPlayer(
                 locked = screenLocked,
                 onToggleControls = { controlsVisible = !controlsVisible },
                 onTogglePlayback = { togglePlayback() },
+                verticalGesturesEnabled = !screenLocked,
+                onVerticalGestureStart = { startVerticalGesture(it) },
+                onVerticalSwipe = { side, delta -> adjustFromVerticalGesture(side, delta) },
+                onVerticalGestureEnd = { verticalGestureActive = false },
                 modifier = Modifier.fillMaxSize()
             )
             if (playbackError != null) {
+                Column(Modifier.padding(horizontal = 24.dp, vertical = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("暂时无法播放", color = Color.White, fontSize = 14.sp)
+                    TextButton(onClick = onRetry) { Text("重试", color = Pink) }
+                }
+            } else if (loadingMessage != null || playbackState != Player.STATE_READY) {
                 Text(
-                    "视频暂时无法解码\n请尝试低分辨率视频，或换设备播放",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(20.dp)
-                )
-            } else if (playbackState != Player.STATE_READY) {
-                Text(
-                    if (playbackState == Player.STATE_BUFFERING) "正在加载视频…" else "等待视频加载",
+                    loadingMessage ?: if (playbackState == Player.STATE_BUFFERING) "正在加载视频…" else "等待视频加载",
                     color = Color.White.copy(alpha = .82f),
                     fontSize = 13.sp
                 )
@@ -628,7 +789,7 @@ private fun LocalVideoPlayer(
                             else Modifier.padding(start = 6.dp, end = 6.dp, top = 12.dp))
                 ) {
                     val seekBar: @Composable (Modifier) -> Unit = { modifier ->
-                        LocalVideoSeekBar(
+                        VideoSeekBar(
                             position = if (scrubbing) scrubPosition else position.toFloat(),
                             duration = duration,
                             onSeek = { scrubbing = true; scrubPosition = it },
@@ -665,11 +826,13 @@ private fun LocalVideoPlayer(
                         }
                         if (fullScreen) {
                             Spacer(Modifier.weight(1f))
-                            TextButton(onClick = { episodesExpanded = true },
-                                contentPadding = PaddingValues(horizontal = 16.dp)) {
-                                Text("选集", color = Color.White, fontSize = 14.sp)
+                            if (episodes != null) {
+                                TextButton(onClick = { episodesExpanded = true },
+                                    contentPadding = PaddingValues(horizontal = 16.dp)) {
+                                    Text("选集", color = Color.White, fontSize = 14.sp)
+                                }
+                                Spacer(Modifier.width(12.dp))
                             }
-                            Spacer(Modifier.width(12.dp))
                             Box {
                                 TextButton(onClick = { speedMenuExpanded = true },
                                     contentPadding = PaddingValues(horizontal = 16.dp)) {
@@ -718,7 +881,7 @@ private fun LocalVideoPlayer(
                         }, Color.White, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
                     }
                 }
-                Text(if (fullScreen) video.name else "", color = Color.White, fontSize = 14.sp,
+                Text(if (fullScreen) title else "", color = Color.White, fontSize = 14.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 if (!fullScreen) Box {
                     IconButton(onClick = { speedMenuExpanded = true }, modifier = Modifier.semantics { contentDescription = "更多播放设置" }) {
@@ -752,13 +915,18 @@ private fun LocalVideoPlayer(
                         .navigationBarsPadding().padding(end = 10.dp).offset(y = (-36).dp)
                 )
             }
+            gestureFeedback?.let { feedback ->
+                PlayerGestureFeedback(
+                    side = feedback.side,
+                    level = feedback.level,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
             if (fullScreen && episodesExpanded && !screenLocked) {
-                LocalVideoEpisodes(playlist, video, onDismiss = { episodesExpanded = false },
-                    onVideoSelected = {
-                        episodesExpanded = false
-                        controlsVisible = true
-                        onVideoSelected(it)
-                    })
+                episodes?.invoke {
+                    episodesExpanded = false
+                    controlsVisible = true
+                }
             }
         }
 
@@ -783,57 +951,23 @@ private fun LocalVideoPlayer(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                Text("本地视频", color = Muted, fontSize = 12.sp)
+                Text(sourceLabel, color = Muted, fontSize = 12.sp)
             }
             HorizontalDivider(color = Color(0xFFE9EAEC), thickness = 1.dp)
 
             if (detailsTab == 0) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
-                    Text(video.name, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "本地视频 · ${Formatter.formatFileSize(context, video.sizeBytes)} · ${formatVideoDuration(duration)}",
-                        color = Muted,
-                        fontSize = 12.sp
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        LocalVideoAction(0, if (liked) "已点赞" else "点赞", liked) { liked = !liked }
-                        LocalVideoAction(1, "投币", false, enabled = false) { }
-                        LocalVideoAction(2, if (saved) "已收藏" else "收藏", saved) { saved = !saved }
-                        LocalVideoAction(3, "分享", false) {
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "video/*"
-                                putExtra(Intent.EXTRA_STREAM, video.uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(intent, "分享视频"))
-                        }
-                    }
-                    HorizontalDivider(Modifier.padding(top = 14.dp), color = Color(0xFFE9EAEC), thickness = 1.dp)
-                    Spacer(Modifier.height(14.dp))
-                    Text("视频信息", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    Text("${video.name}\n${Formatter.formatFileSize(context, video.sizeBytes)}", color = Muted, fontSize = 12.sp, lineHeight = 19.sp)
-                    if (playbackError != null) {
-                        Spacer(Modifier.height(12.dp))
-                        Text("播放失败：${playbackError}", color = Color(0xFFB42318), fontSize = 12.sp)
-                        TextButton(onClick = {
-                            playbackError = null
-                            hasVideoFrame = false
-                            val retryPosition = player.currentPosition.coerceAtLeast(0L)
-                            player.stop()
-                            player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri), retryPosition)
-                            player.prepare()
-                            player.playWhenReady = true
-                        }) { Text("重试", color = Pink) }
+                details(duration)
+                playbackError?.let { message ->
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                        Text("播放失败：$message", color = Color(0xFFB42318), fontSize = 12.sp)
+                        TextButton(onClick = onRetry) { Text("重试", color = Pink) }
                     }
                 }
             } else {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
                     Text("评论", color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Text("本地视频暂时没有评论", color = Muted, fontSize = 13.sp)
+                    Text(commentMessage, color = Muted, fontSize = 13.sp)
                 }
             }
         }
@@ -842,7 +976,7 @@ private fun LocalVideoPlayer(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LocalVideoSeekBar(
+private fun VideoSeekBar(
     position: Float,
     duration: Long,
     onSeek: (Float) -> Unit,
@@ -1026,7 +1160,7 @@ private tailrec fun Context.findActivity(): ComponentActivity? = when (this) {
 }
 
 @Composable
-private fun RowScope.LocalVideoAction(index: Int, label: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+private fun RowScope.VideoAction(index: Int, label: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     val tint = if (selected) Pink else Color(0xFF62666D).copy(alpha = if (enabled) 1f else .4f)
     Column(
         Modifier.weight(1f).clickable(enabled = enabled, onClick = onClick).padding(vertical = 8.dp),
@@ -1273,22 +1407,6 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
     var playbackCandidateCount by remember(video.bvid, session?.cookie) { mutableIntStateOf(1) }
     var durlFallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
-    var playbackPosition by remember(video.bvid, session?.cookie) { mutableLongStateOf(0L) }
-    var playbackDuration by remember(video.bvid, session?.cookie) { mutableLongStateOf(0L) }
-    var isPlaying by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
-    var isScrubbing by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
-    var scrubPosition by remember(video.bvid, session?.cookie) { mutableFloatStateOf(0f) }
-    var speedMenuExpanded by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
-    var playbackSpeed by remember(video.bvid, session?.cookie) { mutableFloatStateOf(1f) }
-    LaunchedEffect(exoPlayer) {
-        while (true) {
-            playbackDuration = exoPlayer.duration.takeIf { it > 0 } ?: 0L
-            if (!isScrubbing) playbackPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
-            playbackSpeed = exoPlayer.playbackParameters.speed
-            isPlaying = exoPlayer.isPlaying
-            delay(250)
-        }
-    }
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
@@ -1364,121 +1482,43 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
             playbackState = PlaybackState.Error(error.message ?: "无法获取视频播放地址")
         }
     }
-    BackHandler(onBack = onBack)
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth().clickable(onClick = onBack).padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("‹", color = Ink, fontSize = 32.sp, modifier = Modifier.padding(end = 8.dp))
-            Text("返回搜索结果", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(video.title, color = Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold, lineHeight = 28.sp)
-        Spacer(Modifier.height(6.dp))
-        Text("${video.author}  ·  ${video.playCount} 次播放", color = Muted, fontSize = 12.sp)
-        Spacer(Modifier.height(18.dp))
-        when (val state = playbackState) {
-            PlaybackState.Loading -> Box(
-                Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xFF18222C)), contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = Pink, strokeWidth = 2.dp)
-                    Spacer(Modifier.height(12.dp))
-                    Text("正在获取视频流…", color = Color.White.copy(alpha = .8f), fontSize = 12.sp)
-                }
-            }
-            is PlaybackState.Error -> Column(
-                Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xFF18222C)).padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text("暂时无法播放", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    VideoPlayerScreen(
+        player = exoPlayer,
+        title = video.title,
+        playbackError = (playbackState as? PlaybackState.Error)?.message,
+        loadingMessage = if (playbackState == PlaybackState.Loading) "正在获取视频流…" else null,
+        sourceLabel = "哔哩哔哩",
+        commentMessage = "暂不支持查看在线评论",
+        onBack = onBack,
+        onRetry = { retryToken++ },
+        details = {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
+                Text(video.title, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp)
                 Spacer(Modifier.height(8.dp))
-                Text(state.message, color = Color.White.copy(alpha = .7f), fontSize = 12.sp)
-                Spacer(Modifier.height(12.dp))
-                TextButton(onClick = { retryToken++ }) { Text("重试", color = Color.White) }
-            }
-            PlaybackState.Ready -> AndroidView(
-                factory = { viewContext ->
-                    createTexturePlayerView(viewContext, exoPlayer)
-                },
-                update = { it.player = exoPlayer },
-                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp))
-            )
-        }
-        if (playbackState == PlaybackState.Ready) {
-            Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Slider(
-                    value = if (isScrubbing) scrubPosition else playbackPosition.toFloat(),
-                    onValueChange = { value ->
-                        isScrubbing = true
-                        scrubPosition = value
-                    },
-                    onValueChangeFinished = {
-                        exoPlayer.seekTo(scrubPosition.toLong())
-                        playbackPosition = scrubPosition.toLong()
-                        isScrubbing = false
-                    },
-                    valueRange = 0f..playbackDuration.coerceAtLeast(1L).toFloat(),
-                    enabled = playbackDuration > 0,
-                    modifier = Modifier.weight(1f),
-                    colors = SliderDefaults.colors(
-                        thumbColor = Pink,
-                        activeTrackColor = Pink,
-                        inactiveTrackColor = Color(0xFFD9DEE5)
-                    )
-                )
-                Text(
-                    "${formatPlaybackTime(if (isScrubbing) scrubPosition.toLong() else playbackPosition)} / ${formatPlaybackTime(playbackDuration, unknownWhenZero = true)}",
-                    color = Muted,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = { exoPlayer.playWhenReady = !exoPlayer.playWhenReady }) {
-                    Text(if (isPlaying) "暂停" else "播放", color = Ink, fontSize = 13.sp)
-                }
-                Spacer(Modifier.weight(1f))
-                Box {
-                    TextButton(onClick = { speedMenuExpanded = true }) {
-                        Text("${playbackSpeed}x 倍速", color = Ink, fontSize = 13.sp)
-                    }
-                    DropdownMenu(
-                        expanded = speedMenuExpanded,
-                        onDismissRequest = { speedMenuExpanded = false }
-                    ) {
-                        listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
-                            DropdownMenuItem(
-                                text = { Text("${speed}x", color = if (playbackSpeed == speed) Pink else Ink) },
-                                onClick = {
-                                    exoPlayer.setPlaybackSpeed(speed)
-                                    playbackSpeed = speed
-                                    speedMenuExpanded = false
-                                }
-                            )
+                Text("${video.author} · ${video.playCount} 次播放 · ${video.duration}",
+                    color = Muted, fontSize = 12.sp)
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    VideoAction(3, "分享", false) {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, "${video.title} https://www.bilibili.com/video/${video.bvid}")
                         }
+                        context.startActivity(Intent.createChooser(intent, "分享视频"))
                     }
                 }
+                HorizontalDivider(Modifier.padding(top = 14.dp), color = Color(0xFFE9EAEC), thickness = 1.dp)
+                Spacer(Modifier.height(14.dp))
+                Text("视频信息", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (session == null) "匿名播放 · 登录后可尝试更高画质"
+                    else "已登录播放 · 使用账号权限获取视频流",
+                    color = Muted, fontSize = 12.sp, lineHeight = 19.sp
+                )
             }
         }
-        Spacer(Modifier.height(16.dp))
-        Text(
-            if (session == null) "匿名播放 · ${video.duration} · 登录后可尝试更高画质"
-            else "已登录播放 · ${video.duration} · 使用账号权限获取视频流",
-            color = Muted,
-            fontSize = 11.sp
-        )
-    }
+    )
 }
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)

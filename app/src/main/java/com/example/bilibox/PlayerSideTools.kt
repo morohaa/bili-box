@@ -1,7 +1,9 @@
 package com.example.bilibox
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -17,25 +19,128 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import android.view.Window
+
+internal enum class PlayerGestureSide { LEFT, RIGHT }
+
+internal fun setPlayerWindowBrightness(window: Window, level: Float) {
+    val attributes = window.attributes
+    attributes.screenBrightness = level.coerceIn(.02f, 1f)
+    window.attributes = attributes
+}
 
 @Composable
 internal fun PlayerTouchSurface(
     locked: Boolean,
     onToggleControls: () -> Unit,
     onTogglePlayback: () -> Unit,
+    verticalGesturesEnabled: Boolean = true,
+    onVerticalGestureStart: (PlayerGestureSide) -> Unit = {},
+    onVerticalSwipe: (PlayerGestureSide, Float) -> Unit = { _, _ -> },
+    onVerticalGestureEnd: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val toggleControls by rememberUpdatedState(onToggleControls)
     val togglePlayback by rememberUpdatedState(onTogglePlayback)
-    Box(modifier.pointerInput(locked) {
+    val startVerticalGesture by rememberUpdatedState(onVerticalGestureStart)
+    val verticalSwipe by rememberUpdatedState(onVerticalSwipe)
+    val endVerticalGesture by rememberUpdatedState(onVerticalGestureEnd)
+    val verticalDragModifier = if (verticalGesturesEnabled) Modifier.pointerInput(verticalGesturesEnabled) {
+        var gestureSide: PlayerGestureSide? = null
+        detectVerticalDragGestures(
+            onDragStart = { position ->
+                gestureSide = if (position.x < size.width / 2f) PlayerGestureSide.LEFT else PlayerGestureSide.RIGHT
+                gestureSide?.let(startVerticalGesture)
+            },
+            onVerticalDrag = { change, dragAmount ->
+                change.consume()
+                val height = size.height.toFloat()
+                if (height > 0f) gestureSide?.let { verticalSwipe(it, dragAmount / height) }
+            },
+            onDragEnd = {
+                if (gestureSide != null) endVerticalGesture()
+                gestureSide = null
+            },
+            onDragCancel = {
+                if (gestureSide != null) endVerticalGesture()
+                gestureSide = null
+            }
+        )
+    } else Modifier
+    Box(modifier.then(verticalDragModifier).pointerInput(locked) {
         detectTapGestures(
             onTap = { toggleControls() },
             onDoubleTap = { if (locked) toggleControls() else togglePlayback() }
         )
     })
+}
+
+@Composable
+internal fun PlayerGestureFeedback(
+    side: PlayerGestureSide,
+    level: Float,
+    modifier: Modifier = Modifier,
+) {
+    val percentage = (level.coerceIn(0f, 1f) * 100).toInt()
+    Row(
+        modifier.width(200.dp).height(58.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.Black.copy(alpha = .36f))
+            .semantics {
+                contentDescription = if (side == PlayerGestureSide.LEFT) "亮度调节" else "音量调节"
+                stateDescription = "$percentage%"
+            }
+            .padding(horizontal = 22.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+    ) {
+        Canvas(Modifier.size(36.dp)) {
+            val scale = size.minDimension / 32f
+            val white = Color.White
+            val stroke = Stroke(width = 2.2f * scale, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            if (side == PlayerGestureSide.LEFT) {
+                val center = Offset(size.width / 2f, size.height / 2f)
+                drawCircle(white, radius = 5.5f * scale, center = center, style = stroke)
+                for (angle in 0 until 8) {
+                    val radians = Math.toRadians(angle * 45.0)
+                    val inner = 10f * scale
+                    val outer = 13f * scale
+                    drawLine(
+                        white,
+                        Offset(center.x + kotlin.math.cos(radians).toFloat() * inner, center.y + kotlin.math.sin(radians).toFloat() * inner),
+                        Offset(center.x + kotlin.math.cos(radians).toFloat() * outer, center.y + kotlin.math.sin(radians).toFloat() * outer),
+                        strokeWidth = 2.2f * scale,
+                        cap = StrokeCap.Round
+                    )
+                }
+            } else {
+                drawPath(Path().apply {
+                    moveTo(3f * scale, 12f * scale)
+                    lineTo(9f * scale, 12f * scale)
+                    lineTo(18f * scale, 5f * scale)
+                    lineTo(18f * scale, 27f * scale)
+                    lineTo(9f * scale, 20f * scale)
+                    lineTo(3f * scale, 20f * scale)
+                    close()
+                }, white, style = stroke)
+                drawPath(Path().apply {
+                    moveTo(21f * scale, 11f * scale)
+                    quadraticTo(27f * scale, 16f * scale, 21f * scale, 21f * scale)
+                    moveTo(23f * scale, 7f * scale)
+                    cubicTo(32f * scale, 12f * scale, 32f * scale, 20f * scale, 23f * scale, 25f * scale)
+                }, white, style = stroke)
+            }
+        }
+        Spacer(Modifier.width(20.dp))
+        Box(Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = .32f))) {
+            Box(Modifier.fillMaxWidth(level.coerceIn(0f, 1f)).fillMaxHeight().background(Color(0xFFFF6699)))
+        }
+    }
 }
 
 @Composable
