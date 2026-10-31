@@ -45,7 +45,7 @@ private val MyInk = Color(0xFF24313D)
 private val MyPink = Color(0xFFEF7196)
 private val MyMuted = Color(0xFF82909D)
 
-private data class BiliSession(val username: String, val avatarUrl: String, val cookie: String)
+internal data class BiliSession(val username: String, val avatarUrl: String, val cookie: String)
 
 private sealed interface LoginUiState {
     data object SignedOut : LoginUiState
@@ -54,7 +54,7 @@ private sealed interface LoginUiState {
     data class Failed(val message: String) : LoginUiState
 }
 
-private object BiliSessionStore {
+internal object BiliSessionStore {
     private const val alias = "bilibox_bili_session_key"
     private const val prefsName = "bili_session_secure"
     private const val dataKey = "encrypted_session"
@@ -99,10 +99,8 @@ private object BiliSessionStore {
 }
 
 @Composable
-internal fun MyPage(savedCount: Int) {
+internal fun MyPage(savedCount: Int, session: BiliSession?, onSessionChange: (BiliSession?) -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var session by remember { mutableStateOf(BiliSessionStore.load(context)) }
     var state by remember { mutableStateOf<LoginUiState>(LoginUiState.SignedOut) }
     var creating by rememberSaveable { mutableIntStateOf(0) }
 
@@ -130,7 +128,7 @@ internal fun MyPage(savedCount: Int) {
                     QrPollResult.Expired -> state = LoginUiState.Failed("二维码已过期，请重新获取")
                     is QrPollResult.Success -> {
                         BiliSessionStore.save(context, result.session)
-                        session = result.session
+                        onSessionChange(result.session)
                         state = LoginUiState.SignedOut
                     }
                 }
@@ -154,9 +152,9 @@ internal fun MyPage(savedCount: Int) {
                 onRetry = { creating++ }
             )
         } else {
-            SignedInPanel(session!!, savedCount) {
+            SignedInPanel(session, savedCount) {
                 BiliSessionStore.clear(context)
-                session = null
+                onSessionChange(null)
                 state = LoginUiState.SignedOut
             }
         }
@@ -178,7 +176,7 @@ private fun SignedOutPanel(state: LoginUiState, onLogin: () -> Unit, onRetry: ()
         Spacer(Modifier.height(16.dp))
         Text("登录哔哩哔哩账号", color = MyInk, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(7.dp))
-        Text("扫码登录后，可在后续功能中使用账号能力", color = MyMuted, fontSize = 12.sp, textAlign = TextAlign.Center)
+        Text("登录后可用账号权限获取更高画质视频", color = MyMuted, fontSize = 12.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(18.dp))
         when (state) {
             LoginUiState.SignedOut -> Button(onClick = onLogin, colors = ButtonDefaults.buttonColors(containerColor = MyPink)) { Text("扫码登录") }
