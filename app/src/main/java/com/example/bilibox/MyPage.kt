@@ -267,7 +267,9 @@ private fun pollLoginQr(key: String, initialCookie: String): QrPollResult {
         0 -> {
             val data = root.optJSONObject("data")
             val cookie = mergeCookies(initialCookie, response.cookies, cookieFromCallbackUrl(data?.optString("url").orEmpty()))
-            if (!hasLoginCookies(cookie)) throw IllegalStateException("无法验证登录状态，请刷新二维码后重试")
+            // Some B 站 edge responses use code=0 before returning the auth cookies.
+            // Keep polling in that case instead of treating the transient response as a failed login.
+            if (!hasLoginCookies(cookie)) return QrPollResult.Pending
             val nav = biliLoginRequest("https://api.bilibili.com/x/web-interface/nav", cookie = cookie).json
             val account = nav.optJSONObject("data")
             if (nav.optInt("code", -1) != 0 || account?.optBoolean("isLogin", false) != true) {
