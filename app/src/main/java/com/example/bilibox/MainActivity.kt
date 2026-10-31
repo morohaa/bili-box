@@ -15,6 +15,7 @@ import android.os.Build
 import android.provider.MediaStore
 import android.text.format.Formatter
 import android.view.LayoutInflater
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -396,6 +397,12 @@ private fun LocalVideoPlayer(
     var playbackState by remember(video.uri) { mutableIntStateOf(Player.STATE_IDLE) }
     var detailsTab by remember(video.uri) { mutableIntStateOf(0) }
     var controlsVisible by remember(video.uri) { mutableStateOf(true) }
+    var screenLocked by remember(video.uri) { mutableStateOf(false) }
+    var orientationBeforeLock by remember(video.uri) { mutableStateOf<Int?>(null) }
+    var playerView by remember(player) { mutableStateOf<PlayerView?>(null) }
+    var hasVideoFrame by remember(player) { mutableStateOf(false) }
+    var savingFrame by remember { mutableStateOf(false) }
+    val captureScope = rememberCoroutineScope()
     var liked by remember(video.uri) { mutableStateOf(false) }
     var saved by remember(video.uri) { mutableStateOf(false) }
 
@@ -416,6 +423,7 @@ private fun LocalVideoPlayer(
     LaunchedEffect(activity, fullScreen) {
         speedMenuExpanded = false
         episodesExpanded = false
+        if (!fullScreen) screenLocked = false
         activity?.let {
             WindowCompat.getInsetsController(it.window, it.window.decorView).apply {
                 isAppearanceLightStatusBars = false
@@ -439,9 +447,54 @@ private fun LocalVideoPlayer(
     }
 
     fun togglePlayback() {
+        if (screenLocked) return
         if (player.playbackState == Player.STATE_ENDED) player.seekTo(0L)
         player.playWhenReady = !player.isPlaying
         controlsVisible = true
+    }
+
+    fun toggleScreenLock() {
+        screenLocked = !screenLocked
+        controlsVisible = true
+        speedMenuExpanded = false
+        episodesExpanded = false
+        if (screenLocked) {
+            orientationBeforeLock = activity?.requestedOrientation
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
+        } else {
+            activity?.requestedOrientation = orientationBeforeLock ?: ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            orientationBeforeLock = null
+        }
+    }
+
+    fun takeVideoScreenshot() {
+        if (savingFrame || screenLocked || !hasVideoFrame || playbackError != null) return
+        val frame = try {
+            playerView?.let(::captureVideoFrame)
+        } catch (_: Exception) { null }
+        if (frame == null) {
+            Toast.makeText(context, "暂时无法截取画面，请等待视频显示后重试", Toast.LENGTH_SHORT).show()
+            return
+        }
+        savingFrame = true
+        captureScope.launch {
+            try {
+                withContext(Dispatchers.IO) { saveVideoFrame(context, frame) }
+                Toast.makeText(context, "已保存到相册 Pictures/BiliBox", Toast.LENGTH_SHORT).show()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                Toast.makeText(context, "截帧保存失败，请检查存储空间或权限后重试", Toast.LENGTH_SHORT).show()
+            } finally {
+                frame.recycle()
+                savingFrame = false
+            }
+        }
+    }
+
+    val screenshotPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) takeVideoScreenshot()
+        else Toast.makeText(context, "需要存储权限才能保存视频画面", Toast.LENGTH_SHORT).show()
     }
 
     fun savePlaybackProgress() {
@@ -457,6 +510,10 @@ private fun LocalVideoPlayer(
 
     DisposableEffect(player, activity) {
         val listener = object : Player.Listener {
+            override fun onRenderedFirstFrame() {
+                hasVideoFrame = true
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 val detail = (error.cause?.message ?: error.message)?.takeIf { it.isNotBlank() }
                 playbackError = "${error.errorCodeName}${detail?.let { "：$it" }.orEmpty()}"
@@ -489,6 +546,7 @@ private fun LocalVideoPlayer(
             activity?.lifecycle?.removeObserver(lifecycleObserver)
             player.removeListener(listener)
             player.release()
+            playerView = null
         }
     }
     LaunchedEffect(player) {
@@ -514,14 +572,15 @@ private fun LocalVideoPlayer(
             delay(250)
         }
     }
-    LaunchedEffect(controlsVisible, isPlaying, scrubbing, speedMenuExpanded, episodesExpanded) {
-        if (controlsVisible && isPlaying && !scrubbing && !speedMenuExpanded && !episodesExpanded) {
+    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, episodesExpanded) {
+        if (controlsVisible && (isPlaying || screenLocked) && !scrubbing && !speedMenuExpanded && !episodesExpanded) {
             delay(4_000)
             controlsVisible = false
         }
     }
     BackHandler {
         when {
+            screenLocked -> controlsVisible = true
             episodesExpanded -> episodesExpanded = false
             speedMenuExpanded -> speedMenuExpanded = false
             else -> navigateBack()
@@ -536,16 +595,16 @@ private fun LocalVideoPlayer(
             contentAlignment = Alignment.Center
         ) {
             AndroidView(
-                factory = { viewContext -> createTexturePlayerView(viewContext, player) },
-                update = { it.player = player },
+                factory = { viewContext -> createTexturePlayerView(viewContext, player).also { playerView = it } },
+                update = { it.player = player; playerView = it },
                 modifier = Modifier.fillMaxSize()
             )
-            Box(Modifier.fillMaxSize().pointerInput(player) {
-                detectTapGestures(
-                    onTap = { controlsVisible = !controlsVisible },
-                    onDoubleTap = { togglePlayback() }
-                )
-            })
+            PlayerTouchSurface(
+                locked = screenLocked,
+                onToggleControls = { controlsVisible = !controlsVisible },
+                onTogglePlayback = { togglePlayback() },
+                modifier = Modifier.fillMaxSize()
+            )
             if (playbackError != null) {
                 Text(
                     "视频暂时无法解码\n请尝试低分辨率视频，或换设备播放",
@@ -560,7 +619,7 @@ private fun LocalVideoPlayer(
                     fontSize = 13.sp
                 )
             }
-            if (controlsVisible) {
+            if (controlsVisible && !screenLocked) {
                 Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .7f))))
@@ -643,7 +702,7 @@ private fun LocalVideoPlayer(
                     }
                 }
             }
-            if (controlsVisible) Row(
+            if (controlsVisible && !screenLocked) Row(
                 Modifier.align(Alignment.TopStart).fillMaxWidth()
                     .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .48f), Color.Transparent)))
                     .then(if (fullScreen) Modifier.displayCutoutPadding() else Modifier)
@@ -677,7 +736,23 @@ private fun LocalVideoPlayer(
                         })
                 }
             }
-            if (fullScreen && episodesExpanded) {
+            if (fullScreen && controlsVisible) {
+                PlayerSideTools(
+                    locked = screenLocked,
+                    screenshotEnabled = hasVideoFrame && playbackError == null && !savingFrame,
+                    onScreenshot = {
+                        if (Build.VERSION.SDK_INT == 28 && context.checkSelfPermission(
+                                Manifest.permission.WRITE_EXTERNAL_STORAGE
+                            ) != PackageManager.PERMISSION_GRANTED) {
+                            screenshotPermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        } else takeVideoScreenshot()
+                    },
+                    onToggleLock = { toggleScreenLock() },
+                    modifier = Modifier.align(Alignment.CenterEnd).displayCutoutPadding()
+                        .navigationBarsPadding().padding(end = 10.dp).offset(y = (-36).dp)
+                )
+            }
+            if (fullScreen && episodesExpanded && !screenLocked) {
                 LocalVideoEpisodes(playlist, video, onDismiss = { episodesExpanded = false },
                     onVideoSelected = {
                         episodesExpanded = false
@@ -745,6 +820,7 @@ private fun LocalVideoPlayer(
                         Text("播放失败：${playbackError}", color = Color(0xFFB42318), fontSize = 12.sp)
                         TextButton(onClick = {
                             playbackError = null
+                            hasVideoFrame = false
                             val retryPosition = player.currentPosition.coerceAtLeast(0L)
                             player.stop()
                             player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri), retryPosition)
