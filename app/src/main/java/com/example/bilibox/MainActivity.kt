@@ -1,7 +1,9 @@
 package com.example.bilibox
 
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateColorAsState
@@ -15,6 +17,8 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,19 +34,62 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.Image
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.bilibox.ui.theme.BiliBoxTheme
+import androidx.media3.common.MediaItem
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import kotlinx.coroutines.CancellationException
 
 private val Ink = Color(0xFF24313D)
 private val Pink = Color(0xFFEF7196)
 private val Muted = Color(0xFF82909D)
+
+private data class SearchVideo(
+    val title: String,
+    val author: String,
+    val playCount: String,
+    val duration: String,
+    val bvid: String,
+    val coverUrl: String
+)
+
+private sealed interface SearchState {
+    data object Idle : SearchState
+    data object Loading : SearchState
+    data class Success(val items: List<SearchVideo>) : SearchState
+    data class Error(val message: String) : SearchState
+}
+
+private sealed interface PlaybackState {
+    data object Loading : PlaybackState
+    data class Ready(val streamUrl: String) : PlaybackState
+    data class Error(val message: String) : PlaybackState
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,6 +103,10 @@ class MainActivity : ComponentActivity() {
 private fun BiliBoxApp() {
     var selected by rememberSaveable { mutableIntStateOf(0) }
     var saved by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var searchState by remember { mutableStateOf<SearchState>(SearchState.Idle) }
+    val scope = rememberCoroutineScope()
+    var selectedVideo by remember { mutableStateOf<SearchVideo?>(null) }
     val backdrop = rememberGraphicsLayer()
     Box(Modifier.fillMaxSize().background(Color(0xFFF4F6FA))) {
         Box(Modifier.fillMaxSize().drawWithContent {
@@ -67,7 +118,45 @@ private fun BiliBoxApp() {
                 .statusBarsPadding().padding(horizontal = 24.dp)) {
                 Header()
                 when (selected) {
-                    0 -> HomeContent(saved) { saved = !saved }
+                    0 -> {
+                        if (selectedVideo != null) {
+                            BiliVideoDetail(selectedVideo!!) { selectedVideo = null }
+                        } else {
+                            VideoSearchField(
+                                query = searchQuery,
+                                onQueryChange = { searchQuery = it },
+                                onSearch = {
+                                    val keyword = searchQuery.trim()
+                                    if (keyword.isNotEmpty()) {
+                                        searchState = SearchState.Loading
+                                        scope.launch {
+                                            searchState = try {
+                                                SearchState.Success(searchBilibiliVideos(keyword))
+                                            } catch (error: Exception) {
+                                                SearchState.Error(error.message ?: "搜索失败，请稍后重试")
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                            Spacer(Modifier.height(26.dp))
+                            when (val state = searchState) {
+                                SearchState.Idle -> HomeContent(saved) { saved = !saved }
+                                SearchState.Loading -> SearchLoading()
+                                is SearchState.Error -> SearchError(state.message) {
+                                    searchState = SearchState.Loading
+                                    scope.launch {
+                                        searchState = try {
+                                            SearchState.Success(searchBilibiliVideos(searchQuery.trim()))
+                                        } catch (error: Exception) {
+                                            SearchState.Error(error.message ?: "搜索失败，请稍后重试")
+                                        }
+                                    }
+                                }
+                                is SearchState.Success -> SearchResults(state.items) { selectedVideo = it }
+                            }
+                        }
+                    }
                     1 -> CollectionPage("动态", "关注的人，分享的日常", "今天的灵感", "沿着海岸线，收集一整个夏天")
                     2 -> {
                         SectionTitle("媒体库", "把喜欢的留在这里")
@@ -75,26 +164,289 @@ private fun BiliBoxApp() {
                         if (saved) VideoCard("日落之前，去海边走走", "你的收藏 · 1 个视频", 0)
                         else EmptyCard("还没有收藏", "在首页点击收藏，把喜欢的视频放进媒体库。")
                     }
-                    else -> {
-                        SectionTitle("我的", "每一次好奇，都值得被记录")
-                        Spacer(Modifier.height(28.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(64.dp).background(Pink.copy(alpha = .14f), CircleShape), contentAlignment = Alignment.Center) {
-                                Text("B", color = Pink, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(Modifier.width(16.dp))
-                            Column { Text("BiliBox 观众", fontWeight = FontWeight.Bold, color = Ink, fontSize = 20.sp); Text("今天也有新的发现", color = Muted, fontSize = 13.sp) }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        EmptyCard("${if (saved) 1 else 0} 个收藏", "喜欢的内容，会在媒体库里等你。")
-                    }
+                    else -> MyPage(if (saved) 1 else 0)
                 }
                 Spacer(Modifier.height(150.dp))
                 Spacer(Modifier.navigationBarsPadding())
             }
         }
-        LiquidNavigation(selected, { selected = it }, backdrop,
-            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp))
+        if (selectedVideo == null) {
+            LiquidNavigation(selected, { selected = it }, backdrop,
+                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp))
+        }
+    }
+}
+
+@Composable
+private fun VideoSearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            shape = RoundedCornerShape(18.dp),
+            placeholder = { Text("搜索 B 站视频", color = Muted) },
+            leadingIcon = { Text("⌕", fontSize = 26.sp, color = Pink) },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+            colors = OutlinedTextFieldDefaults.colors(
+                unfocusedContainerColor = Color.White.copy(alpha = .76f),
+                focusedContainerColor = Color.White,
+                unfocusedBorderColor = Color(0xFFE4E9EF),
+                focusedBorderColor = Pink
+            )
+        )
+        Spacer(Modifier.width(10.dp))
+        Button(
+            onClick = onSearch,
+            enabled = query.isNotBlank(),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Pink)
+        ) { Text("搜索") }
+    }
+}
+
+@Composable
+private fun SearchLoading() {
+    Column(Modifier.fillMaxWidth().padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        CircularProgressIndicator(color = Pink, strokeWidth = 2.dp)
+        Spacer(Modifier.height(16.dp))
+        Text("正在搜索视频…", color = Muted, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun SearchError(message: String, onRetry: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("暂时没有搜到结果", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        Text(message, color = Muted, fontSize = 12.sp)
+        Spacer(Modifier.height(16.dp))
+        TextButton(onClick = onRetry) { Text("重试", color = Pink) }
+    }
+}
+
+@Composable
+private fun SearchResults(items: List<SearchVideo>, onVideoClick: (SearchVideo) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text("搜索结果", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.weight(1f))
+        Text("${items.size} 个视频", color = Muted, fontSize = 12.sp)
+    }
+    if (items.isEmpty()) {
+        EmptyCard("没有找到视频", "换个关键词试试看。")
+    } else {
+        items.forEach { video ->
+            SearchResultCard(video) { onVideoClick(video) }
+            Spacer(Modifier.height(14.dp))
+        }
+    }
+}
+
+@Composable
+private fun BiliVideoDetail(video: SearchVideo, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val exoPlayer = remember(video.bvid) {
+        val httpFactory = DefaultHttpDataSource.Factory().setDefaultRequestProperties(
+            mapOf(
+                "Referer" to "https://www.bilibili.com/",
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36"
+            )
+        )
+        val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .build()
+    }
+    var playbackState by remember(video.bvid) { mutableStateOf<PlaybackState>(PlaybackState.Loading) }
+    var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
+    DisposableEffect(exoPlayer) {
+        onDispose { exoPlayer.release() }
+    }
+    LaunchedEffect(video.bvid, retryToken) {
+        playbackState = PlaybackState.Loading
+        try {
+            val streamUrl = withContext(Dispatchers.IO) { resolveBilibiliStream(video.bvid) }
+            exoPlayer.setMediaItem(MediaItem.fromUri(streamUrl))
+            exoPlayer.prepare()
+            exoPlayer.playWhenReady = true
+            playbackState = PlaybackState.Ready(streamUrl)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            playbackState = PlaybackState.Error(error.message ?: "无法获取视频播放地址")
+        }
+    }
+    BackHandler(onBack = onBack)
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().clickable(onClick = onBack).padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("‹", color = Ink, fontSize = 32.sp, modifier = Modifier.padding(end = 8.dp))
+            Text("返回搜索结果", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(video.title, color = Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold, lineHeight = 28.sp)
+        Spacer(Modifier.height(6.dp))
+        Text("${video.author}  ·  ${video.playCount} 次播放", color = Muted, fontSize = 12.sp)
+        Spacer(Modifier.height(18.dp))
+        when (val state = playbackState) {
+            PlaybackState.Loading -> Box(
+                Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFF18222C)), contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = Pink, strokeWidth = 2.dp)
+                    Spacer(Modifier.height(12.dp))
+                    Text("正在获取视频流…", color = Color.White.copy(alpha = .8f), fontSize = 12.sp)
+                }
+            }
+            is PlaybackState.Error -> Column(
+                Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFF18222C)).padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text("暂时无法播放", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+                Text(state.message, color = Color.White.copy(alpha = .7f), fontSize = 12.sp)
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = { retryToken++ }) { Text("重试", color = Color.White) }
+            }
+            is PlaybackState.Ready -> AndroidView(
+                factory = { viewContext ->
+                    PlayerView(viewContext).apply {
+                        player = exoPlayer
+                        useController = true
+                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                        keepScreenOn = true
+                    }
+                },
+                update = { it.player = exoPlayer },
+                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp))
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Text("原生 Media3 播放器 · ${video.duration}", color = Muted, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun SearchResultCard(video: SearchVideo, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = .86f)).clickable(onClick = onClick).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RemoteCover(video.coverUrl, Modifier.width(132.dp).height(82.dp))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(video.title, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, lineHeight = 19.sp)
+            Spacer(Modifier.height(7.dp))
+            Text(video.author, color = Muted, fontSize = 11.sp, maxLines = 1)
+            Spacer(Modifier.height(4.dp))
+            Text("▶ ${video.playCount}   ·   ${video.duration}", color = Muted, fontSize = 10.sp, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun RemoteCover(url: String, modifier: Modifier = Modifier) {
+    var bitmap by remember(url) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(url) {
+        bitmap = withContext(Dispatchers.IO) {
+            runCatching {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.connectTimeout = 8000
+                connection.readTimeout = 8000
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                try { connection.inputStream.use(BitmapFactory::decodeStream) } finally { connection.disconnect() }
+            }.getOrNull()
+        }
+    }
+    Box(modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFFE7EDF2)), contentAlignment = Alignment.Center) {
+        bitmap?.let { Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        if (bitmap == null) Text("B", color = Pink.copy(alpha = .75f), fontSize = 24.sp, fontWeight = FontWeight.Black)
+    }
+}
+
+private suspend fun searchBilibiliVideos(keyword: String): List<SearchVideo> = withContext(Dispatchers.IO) {
+    val encoded = URLEncoder.encode(keyword, Charsets.UTF_8.name())
+    val url = URL("https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=$encoded&page=1")
+    val connection = url.openConnection() as HttpURLConnection
+    connection.connectTimeout = 10000
+    connection.readTimeout = 10000
+    connection.requestMethod = "GET"
+    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36")
+    connection.setRequestProperty("Referer", "https://www.bilibili.com/")
+    try {
+        val status = connection.responseCode
+        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+        val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        if (status !in 200..299) error("B 站接口暂不可用（HTTP $status）")
+        val root = JSONObject(body)
+        if (root.optInt("code", -1) != 0) error(root.optString("message").ifBlank { "B 站搜索暂不可用" })
+        val result = root.optJSONObject("data")?.optJSONArray("result")
+            ?: return@withContext emptyList()
+        buildList {
+            for (index in 0 until minOf(result.length(), 20)) {
+                val item = result.optJSONObject(index) ?: continue
+                val bvid = item.optString("bvid")
+                if (bvid.isBlank()) continue
+                val rawTitle = item.optString("title").replace(Regex("<[^>]*>"), "")
+                add(SearchVideo(
+                    title = android.text.Html.fromHtml(rawTitle, android.text.Html.FROM_HTML_MODE_LEGACY).toString(),
+                    author = item.optString("author", "未知 UP 主"),
+                    playCount = item.optString("play", "--"),
+                    duration = item.optString("duration", "--:--"),
+                    bvid = bvid,
+                    coverUrl = item.optString("pic").let { if (it.startsWith("http://")) it.replaceFirst("http://", "https://") else it }
+                ))
+            }
+        }
+    } finally {
+        connection.disconnect()
+    }
+}
+
+private fun resolveBilibiliStream(bvid: String): String {
+    val view = biliApiJson("https://api.bilibili.com/x/web-interface/view?bvid=${URLEncoder.encode(bvid, Charsets.UTF_8.name())}")
+    val viewCode = view.optInt("code", -1)
+    if (viewCode != 0) throw IllegalStateException(view.optString("message").ifBlank { "无法读取视频信息（$viewCode）" })
+    val cid = view.optJSONObject("data")?.optLong("cid")?.takeIf { it > 0 }
+        ?: throw IllegalStateException("B 站没有返回视频分 P 信息")
+
+    val playUrl = "https://api.bilibili.com/x/player/playurl?bvid=${URLEncoder.encode(bvid, Charsets.UTF_8.name())}&cid=$cid&qn=32&fnval=0&fourk=0"
+    val play = biliApiJson(playUrl)
+    val playCode = play.optInt("code", -1)
+    if (playCode != 0) throw IllegalStateException(play.optString("message").ifBlank { "B 站暂不允许匿名获取该视频播放地址（$playCode）" })
+    val data = play.optJSONObject("data") ?: throw IllegalStateException("播放地址响应为空")
+    val durl = data.optJSONArray("durl")
+    val stream = durl?.optJSONObject(0)?.optString("url")
+    if (stream.isNullOrBlank()) {
+        throw IllegalStateException("B 站没有提供匿名可用的 MP4 视频流，可能需要登录或该视频受限")
+    }
+    return stream
+}
+
+private fun biliApiJson(endpoint: String): JSONObject {
+    val connection = URL(endpoint).openConnection() as HttpURLConnection
+    connection.connectTimeout = 10000
+    connection.readTimeout = 10000
+    connection.requestMethod = "GET"
+    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36")
+    connection.setRequestProperty("Referer", "https://www.bilibili.com/")
+    return try {
+        val status = connection.responseCode
+        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+        val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        if (status !in 200..299) throw IllegalStateException("B 站接口暂不可用（HTTP $status）")
+        JSONObject(body)
+    } finally {
+        connection.disconnect()
     }
 }
 
