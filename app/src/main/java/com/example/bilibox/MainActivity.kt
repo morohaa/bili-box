@@ -48,6 +48,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -75,6 +76,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.bilibox.ui.theme.BiliBoxTheme
 import com.example.bilibox.bili.BiliClient
 import com.example.bilibox.bili.BiliPlayback
@@ -374,10 +377,14 @@ private fun LocalVideoPlayer(
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val fullScreen = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val progressStore = remember(context) { PlaybackProgressStore(context) }
+    // File size also distinguishes a replacement file that reuses a MediaStore URI.
+    val progressKey = remember(video.uri, video.sizeBytes) { "${video.uri}|${video.sizeBytes}" }
+    val resumePosition = remember(progressKey) { progressStore.load(progressKey, video.durationMs) }
     val player = remember(video.uri) {
         createCompatiblePlayer(context)
     }
-    var position by remember(video.uri) { mutableLongStateOf(0L) }
+    var position by remember(video.uri) { mutableLongStateOf(resumePosition) }
     var duration by remember(video.uri) { mutableLongStateOf(video.durationMs) }
     var isPlaying by remember(video.uri) { mutableStateOf(true) }
     var scrubbing by remember(video.uri) { mutableStateOf(false) }
@@ -437,7 +444,18 @@ private fun LocalVideoPlayer(
         controlsVisible = true
     }
 
-    DisposableEffect(player) {
+    fun savePlaybackProgress() {
+        // Ignore the empty/idle player during setup or a failed preparation.
+        if (player.mediaItemCount == 0 || player.playbackState == Player.STATE_IDLE) return
+        progressStore.save(
+            progressKey,
+            player.currentPosition,
+            player.duration.takeIf { it > 0L } ?: video.durationMs,
+            completed = player.playbackState == Player.STATE_ENDED
+        )
+    }
+
+    DisposableEffect(player, activity) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 val detail = (error.cause?.message ?: error.message)?.takeIf { it.isNotBlank() }
@@ -448,14 +466,35 @@ private fun LocalVideoPlayer(
                 playbackState = state
                 if (state == Player.STATE_READY) playbackError = null
             }
+
+            override fun onEvents(player: Player, events: Player.Events) {
+                if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED,
+                        Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_POSITION_DISCONTINUITY)) {
+                    savePlaybackProgress()
+                }
+            }
+        }
+        val lifecycleObserver = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                savePlaybackProgress()
+            }
         }
         player.addListener(listener)
-        player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri))
+        activity?.lifecycle?.addObserver(lifecycleObserver)
+        player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri), resumePosition)
         player.prepare()
         player.playWhenReady = true
         onDispose {
+            savePlaybackProgress()
+            activity?.lifecycle?.removeObserver(lifecycleObserver)
             player.removeListener(listener)
             player.release()
+        }
+    }
+    LaunchedEffect(player) {
+        while (true) {
+            delay(5_000)
+            savePlaybackProgress()
         }
     }
     LaunchedEffect(player, playbackState) {
@@ -526,7 +565,7 @@ private fun LocalVideoPlayer(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .7f))))
                         .then(if (fullScreen) Modifier.displayCutoutPadding().navigationBarsPadding()
-                            .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 8.dp)
+                            .padding(start = 18.dp, end = 18.dp, top = 12.dp)
                             else Modifier.padding(start = 6.dp, end = 6.dp, top = 12.dp))
                 ) {
                     val seekBar: @Composable (Modifier) -> Unit = { modifier ->
@@ -542,7 +581,20 @@ private fun LocalVideoPlayer(
                             modifier = modifier
                         )
                     }
-                    if (fullScreen) seekBar(Modifier.fillMaxWidth())
+                    if (fullScreen) {
+                        Text(
+                            "${formatPlaybackTime(if (scrubbing) scrubPosition.toLong() else position)}/${formatPlaybackTime(duration, unknownWhenZero = true)}",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            lineHeight = 20.sp,
+                            maxLines = 1,
+                            modifier = Modifier.padding(start = 13.dp)
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        // The track adds half the 18dp thumb width to this inset:
+                        // 4 + 9 = 13dp, matching the play triangle's leading edge.
+                        seekBar(Modifier.fillMaxWidth().padding(start = 4.dp))
+                    }
                     Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = { togglePlayback() },
@@ -556,14 +608,14 @@ private fun LocalVideoPlayer(
                             Spacer(Modifier.weight(1f))
                             TextButton(onClick = { episodesExpanded = true },
                                 contentPadding = PaddingValues(horizontal = 16.dp)) {
-                                Text("选集", color = Color.White, fontSize = 16.sp)
+                                Text("选集", color = Color.White, fontSize = 14.sp)
                             }
                             Spacer(Modifier.width(12.dp))
                             Box {
                                 TextButton(onClick = { speedMenuExpanded = true },
                                     contentPadding = PaddingValues(horizontal = 16.dp)) {
                                     Text(if (speed == 1f) "倍速" else "${speed}x", color = Color.White,
-                                        fontSize = 16.sp, modifier = Modifier.semantics { contentDescription = "倍速" })
+                                        fontSize = 14.sp, modifier = Modifier.semantics { contentDescription = "倍速" })
                                 }
                                 PlaybackSpeedMenu(speedMenuExpanded, speed, dark = true,
                                     onDismiss = { speedMenuExpanded = false }, onSpeedSelected = {
@@ -693,8 +745,9 @@ private fun LocalVideoPlayer(
                         Text("播放失败：${playbackError}", color = Color(0xFFB42318), fontSize = 12.sp)
                         TextButton(onClick = {
                             playbackError = null
+                            val retryPosition = player.currentPosition.coerceAtLeast(0L)
                             player.stop()
-                            player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri))
+                            player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri), retryPosition)
                             player.prepare()
                             player.playWhenReady = true
                         }) { Text("重试", color = Pink) }
@@ -720,27 +773,30 @@ private fun LocalVideoSeekBar(
     onSeekFinished: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Slider(
-        value = position.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
-        onValueChange = onSeek,
-        onValueChangeFinished = onSeekFinished,
-        valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
-        enabled = duration > 0,
-        modifier = modifier.semantics { contentDescription = "播放进度" },
-        thumb = { TelevisionSeekThumb() },
-        track = { sliderState ->
-            SliderDefaults.Track(
-                sliderState = sliderState,
-                modifier = Modifier.height(2.dp),
-                thumbTrackGapSize = 0.dp,
-                drawStopIndicator = null,
-                colors = SliderDefaults.colors(
-                    activeTrackColor = Color(0xFFFF6699),
-                    inactiveTrackColor = Color.White.copy(alpha = .45f)
+    // Keep the visual layout compact; Compose still expands the touch target.
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        Slider(
+            value = position.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
+            onValueChange = onSeek,
+            onValueChangeFinished = onSeekFinished,
+            valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
+            enabled = duration > 0,
+            modifier = modifier.height(24.dp).semantics { contentDescription = "播放进度" },
+            thumb = { TelevisionSeekThumb() },
+            track = { sliderState ->
+                SliderDefaults.Track(
+                    sliderState = sliderState,
+                    modifier = Modifier.height(2.dp),
+                    thumbTrackGapSize = 0.dp,
+                    drawStopIndicator = null,
+                    colors = SliderDefaults.colors(
+                        activeTrackColor = Color(0xFFFF6699),
+                        inactiveTrackColor = Color.White.copy(alpha = .45f)
+                    )
                 )
-            )
-        }
-    )
+            }
+        )
+    }
 }
 
 @Composable
@@ -833,33 +889,36 @@ private fun PlaybackIcon(playing: Boolean) {
                     androidx.compose.ui.geometry.CornerRadius(1.2f * u))
             }
         } else {
-            drawPath(Path().apply {
-                moveTo(5f * u, 2f * u)
-                quadraticTo(2f * u, .5f * u, 2f * u, 4f * u)
-                lineTo(2f * u, 22f * u)
-                quadraticTo(2f * u, 25.5f * u, 5f * u, 24f * u)
-                lineTo(23f * u, 14.8f * u)
-                quadraticTo(26f * u, 13f * u, 23f * u, 11.2f * u)
-                close()
-            }, Color.White)
+            scale(scaleX = 1f, scaleY = .88f, pivot = center) {
+                drawPath(Path().apply {
+                    moveTo(5f * u, 2f * u)
+                    quadraticTo(2f * u, .5f * u, 2f * u, 4f * u)
+                    lineTo(2f * u, 22f * u)
+                    quadraticTo(2f * u, 25.5f * u, 5f * u, 24f * u)
+                    lineTo(23f * u, 14.8f * u)
+                    quadraticTo(26f * u, 13f * u, 23f * u, 11.2f * u)
+                    close()
+                }, Color.White)
+            }
         }
     }
 }
 
 @Composable
 private fun TelevisionSeekThumb() {
-    Canvas(Modifier.size(24.dp)) {
+    Canvas(Modifier.size(18.dp)) {
         val u = size.width / 24f
         val outline = Color(0xFF161616)
         val stroke = Stroke(1.6f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        drawLine(outline, Offset(8f*u, 2f*u), Offset(11f*u, 6f*u), 2f*u, StrokeCap.Round)
-        drawLine(outline, Offset(17f*u, 2f*u), Offset(13f*u, 6f*u), 2f*u, StrokeCap.Round)
-        drawRoundRect(Color.White, Offset(2f*u, 6f*u), androidx.compose.ui.geometry.Size(20f*u, 16f*u),
+        // Center the television body on the track, independently of its antennae.
+        drawLine(outline, Offset(7f*u, 1f*u), Offset(10f*u, 4f*u), 2f*u, StrokeCap.Round)
+        drawLine(outline, Offset(17f*u, 1f*u), Offset(14f*u, 4f*u), 2f*u, StrokeCap.Round)
+        drawRoundRect(Color.White, Offset(2f*u, 4f*u), androidx.compose.ui.geometry.Size(20f*u, 16f*u),
             androidx.compose.ui.geometry.CornerRadius(4f*u))
-        drawRoundRect(outline, Offset(2f*u, 6f*u), androidx.compose.ui.geometry.Size(20f*u, 16f*u),
+        drawRoundRect(outline, Offset(2f*u, 4f*u), androidx.compose.ui.geometry.Size(20f*u, 16f*u),
             androidx.compose.ui.geometry.CornerRadius(4f*u), style = stroke)
-        drawLine(outline, Offset(8f*u, 11f*u), Offset(8f*u, 16f*u), 2.4f*u, StrokeCap.Round)
-        drawLine(outline, Offset(16f*u, 11f*u), Offset(16f*u, 16f*u), 2.4f*u, StrokeCap.Round)
+        drawLine(outline, Offset(8f*u, 9.5f*u), Offset(8f*u, 14.5f*u), 2.4f*u, StrokeCap.Round)
+        drawLine(outline, Offset(16f*u, 9.5f*u), Offset(16f*u, 14.5f*u), 2.4f*u, StrokeCap.Round)
     }
 }
 
