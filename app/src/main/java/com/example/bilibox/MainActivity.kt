@@ -3,13 +3,18 @@ package com.example.bilibox
 import android.Manifest
 import android.content.ContentUris
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.provider.MediaStore
 import android.text.format.Formatter
+import android.view.LayoutInflater
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -22,6 +27,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -49,15 +57,24 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.example.bilibox.ui.theme.BiliBoxTheme
 import com.example.bilibox.bili.BiliClient
 import com.example.bilibox.bili.BiliPlayback
@@ -65,11 +82,13 @@ import com.example.bilibox.bili.BiliQn
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -137,6 +156,13 @@ private fun BiliBoxApp() {
     var searchState by remember { mutableStateOf<SearchState>(SearchState.Idle) }
     val scope = rememberCoroutineScope()
     var selectedVideo by remember { mutableStateOf<SearchVideo?>(null) }
+    var selectedLocalVideo by remember { mutableStateOf<LocalVideo?>(null) }
+    var localPlaylist by remember { mutableStateOf<List<LocalVideo>>(emptyList()) }
+    selectedLocalVideo?.let { video ->
+        LocalVideoPlayer(video, localPlaylist, onVideoSelected = { selectedLocalVideo = it },
+            onBack = { selectedLocalVideo = null })
+        return
+    }
     val backdrop = rememberGraphicsLayer()
     Box(Modifier.fillMaxSize().background(Color(0xFFF4F6FA))) {
         Box(Modifier.fillMaxSize().drawWithContent {
@@ -144,8 +170,10 @@ private fun BiliBoxApp() {
             drawLayer(backdrop)
         }) {
             // The scrollable page is captured once and shared by both glass surfaces.
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .statusBarsPadding().padding(horizontal = 24.dp)) {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    .statusBarsPadding().padding(horizontal = 24.dp)
+            ) {
                 Header()
                 when (selected) {
                     0 -> {
@@ -193,6 +221,10 @@ private fun BiliBoxApp() {
                             source = librarySource,
                             onSourceChange = { librarySource = it },
                             hasSavedVideo = saved,
+                            onVideoSelected = { video, playlist ->
+                                localPlaylist = playlist
+                                selectedLocalVideo = video
+                            },
                         )
                     }
                     else -> MyPage(if (saved) 1 else 0, session) { session = it }
@@ -209,7 +241,12 @@ private fun BiliBoxApp() {
 }
 
 @Composable
-private fun LibraryPage(source: Int, onSourceChange: (Int) -> Unit, hasSavedVideo: Boolean) {
+private fun LibraryPage(
+    source: Int,
+    onSourceChange: (Int) -> Unit,
+    hasSavedVideo: Boolean,
+    onVideoSelected: (LocalVideo, List<LocalVideo>) -> Unit,
+) {
     LibrarySourceSwitcher(source, onSourceChange)
     Spacer(Modifier.height(24.dp))
     if (source == 0) {
@@ -219,12 +256,12 @@ private fun LibraryPage(source: Int, onSourceChange: (Int) -> Unit, hasSavedVide
             EmptyCard("还没有哔哩哔哩下载", "从哔哩哔哩下载的视频会出现在这里。")
         }
     } else {
-        LocalVideoPage()
+        LocalVideoPage(onVideoSelected)
     }
 }
 
 @Composable
-private fun LocalVideoPage() {
+private fun LocalVideoPage(onVideoSelected: (LocalVideo, List<LocalVideo>) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var scanState by remember { mutableStateOf<LocalVideoScanState>(LocalVideoScanState.NeedsPermission) }
@@ -290,7 +327,7 @@ private fun LocalVideoPage() {
                 EmptyCard("没有找到本地视频", "把视频保存到本机后，点击“重新扫描”即可显示。")
             } else {
                 state.videos.forEachIndexed { index, video ->
-                    LocalVideoRow(context, video)
+                    LocalVideoRow(context, video, onClick = { onVideoSelected(video, state.videos) })
                     if (index != state.videos.lastIndex) Spacer(Modifier.height(10.dp))
                 }
             }
@@ -299,12 +336,13 @@ private fun LocalVideoPage() {
 }
 
 @Composable
-private fun LocalVideoRow(context: Context, video: LocalVideo) {
+private fun LocalVideoRow(context: Context, video: LocalVideo, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(Color.White.copy(alpha = .78f))
+            .clickable(onClick = onClick)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -324,6 +362,588 @@ private fun LocalVideoRow(context: Context, video: LocalVideo) {
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LocalVideoPlayer(
+    video: LocalVideo,
+    playlist: List<LocalVideo>,
+    onVideoSelected: (LocalVideo) -> Unit,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    val fullScreen = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val player = remember(video.uri) {
+        createCompatiblePlayer(context)
+    }
+    var position by remember(video.uri) { mutableLongStateOf(0L) }
+    var duration by remember(video.uri) { mutableLongStateOf(video.durationMs) }
+    var isPlaying by remember(video.uri) { mutableStateOf(true) }
+    var scrubbing by remember(video.uri) { mutableStateOf(false) }
+    var scrubPosition by remember(video.uri) { mutableFloatStateOf(0f) }
+    var speed by remember(video.uri) { mutableFloatStateOf(1f) }
+    var speedMenuExpanded by remember(video.uri) { mutableStateOf(false) }
+    var episodesExpanded by remember(video.uri) { mutableStateOf(false) }
+    var playbackError by remember(video.uri) { mutableStateOf<String?>(null) }
+    var playbackState by remember(video.uri) { mutableIntStateOf(Player.STATE_IDLE) }
+    var detailsTab by remember(video.uri) { mutableIntStateOf(0) }
+    var controlsVisible by remember(video.uri) { mutableStateOf(true) }
+    var liked by remember(video.uri) { mutableStateOf(false) }
+    var saved by remember(video.uri) { mutableStateOf(false) }
+
+    DisposableEffect(activity) {
+        val originalOrientation = activity?.requestedOrientation
+        val controller = activity?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
+        val lightStatusBars = controller?.isAppearanceLightStatusBars
+        val lightNavigationBars = controller?.isAppearanceLightNavigationBars
+        val barsBehavior = controller?.systemBarsBehavior
+        onDispose {
+            if (originalOrientation != null) activity?.requestedOrientation = originalOrientation
+            controller?.show(WindowInsetsCompat.Type.systemBars())
+            if (lightStatusBars != null) controller?.isAppearanceLightStatusBars = lightStatusBars
+            if (lightNavigationBars != null) controller?.isAppearanceLightNavigationBars = lightNavigationBars
+            if (barsBehavior != null) controller?.systemBarsBehavior = barsBehavior
+        }
+    }
+    LaunchedEffect(activity, fullScreen) {
+        speedMenuExpanded = false
+        episodesExpanded = false
+        activity?.let {
+            WindowCompat.getInsetsController(it.window, it.window.decorView).apply {
+                isAppearanceLightStatusBars = false
+                isAppearanceLightNavigationBars = !fullScreen
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                if (fullScreen) hide(WindowInsetsCompat.Type.systemBars())
+                else show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
+
+    fun toggleOrientation() {
+        controlsVisible = true
+        activity?.requestedOrientation = if (fullScreen) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    }
+
+    fun navigateBack() {
+        if (fullScreen) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        else onBack()
+    }
+
+    fun togglePlayback() {
+        if (player.playbackState == Player.STATE_ENDED) player.seekTo(0L)
+        player.playWhenReady = !player.isPlaying
+        controlsVisible = true
+    }
+
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                val detail = (error.cause?.message ?: error.message)?.takeIf { it.isNotBlank() }
+                playbackError = "${error.errorCodeName}${detail?.let { "：$it" }.orEmpty()}"
+            }
+
+            override fun onPlaybackStateChanged(state: Int) {
+                playbackState = state
+                if (state == Player.STATE_READY) playbackError = null
+            }
+        }
+        player.addListener(listener)
+        player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri))
+        player.prepare()
+        player.playWhenReady = true
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
+    }
+    LaunchedEffect(player, playbackState) {
+        if (playbackState == Player.STATE_BUFFERING) {
+            delay(12_000)
+            if (player.playbackState == Player.STATE_BUFFERING && playbackError == null) {
+                playbackError = "加载超时，请检查文件是否可读取或编码是否受支持"
+            }
+        }
+    }
+    LaunchedEffect(player) {
+        while (true) {
+            duration = player.duration.takeIf { it > 0 } ?: video.durationMs
+            if (!scrubbing) position = player.currentPosition.coerceAtLeast(0L)
+            isPlaying = player.isPlaying
+            speed = player.playbackParameters.speed
+            delay(250)
+        }
+    }
+    LaunchedEffect(controlsVisible, isPlaying, scrubbing, speedMenuExpanded, episodesExpanded) {
+        if (controlsVisible && isPlaying && !scrubbing && !speedMenuExpanded && !episodesExpanded) {
+            delay(4_000)
+            controlsVisible = false
+        }
+    }
+    BackHandler {
+        when {
+            episodesExpanded -> episodesExpanded = false
+            speedMenuExpanded -> speedMenuExpanded = false
+            else -> navigateBack()
+        }
+    }
+
+    Column(Modifier.fillMaxSize().background(Color.Black)
+        .then(if (fullScreen) Modifier else Modifier.statusBarsPadding())) {
+        Box(
+            (if (fullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            AndroidView(
+                factory = { viewContext -> createTexturePlayerView(viewContext, player) },
+                update = { it.player = player },
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(Modifier.fillMaxSize().pointerInput(player) {
+                detectTapGestures(
+                    onTap = { controlsVisible = !controlsVisible },
+                    onDoubleTap = { togglePlayback() }
+                )
+            })
+            if (playbackError != null) {
+                Text(
+                    "视频暂时无法解码\n请尝试低分辨率视频，或换设备播放",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(20.dp)
+                )
+            } else if (playbackState != Player.STATE_READY) {
+                Text(
+                    if (playbackState == Player.STATE_BUFFERING) "正在加载视频…" else "等待视频加载",
+                    color = Color.White.copy(alpha = .82f),
+                    fontSize = 13.sp
+                )
+            }
+            if (controlsVisible) {
+                Column(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .7f))))
+                        .then(if (fullScreen) Modifier.displayCutoutPadding().navigationBarsPadding()
+                            .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 8.dp)
+                            else Modifier.padding(start = 6.dp, end = 6.dp, top = 12.dp))
+                ) {
+                    val seekBar: @Composable (Modifier) -> Unit = { modifier ->
+                        LocalVideoSeekBar(
+                            position = if (scrubbing) scrubPosition else position.toFloat(),
+                            duration = duration,
+                            onSeek = { scrubbing = true; scrubPosition = it },
+                            onSeekFinished = {
+                                player.seekTo(scrubPosition.toLong())
+                                position = scrubPosition.toLong()
+                                scrubbing = false
+                            },
+                            modifier = modifier
+                        )
+                    }
+                    if (fullScreen) seekBar(Modifier.fillMaxWidth())
+                    Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { togglePlayback() },
+                            modifier = Modifier.size(48.dp).semantics {
+                                contentDescription = if (isPlaying) "暂停" else "播放"
+                            }
+                        ) {
+                            PlaybackIcon(isPlaying)
+                        }
+                        if (fullScreen) {
+                            Spacer(Modifier.weight(1f))
+                            TextButton(onClick = { episodesExpanded = true },
+                                contentPadding = PaddingValues(horizontal = 16.dp)) {
+                                Text("选集", color = Color.White, fontSize = 16.sp)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Box {
+                                TextButton(onClick = { speedMenuExpanded = true },
+                                    contentPadding = PaddingValues(horizontal = 16.dp)) {
+                                    Text(if (speed == 1f) "倍速" else "${speed}x", color = Color.White,
+                                        fontSize = 16.sp, modifier = Modifier.semantics { contentDescription = "倍速" })
+                                }
+                                PlaybackSpeedMenu(speedMenuExpanded, speed, dark = true,
+                                    onDismiss = { speedMenuExpanded = false }, onSpeedSelected = {
+                                        player.setPlaybackSpeed(it)
+                                        speed = it
+                                        speedMenuExpanded = false
+                                    })
+                            }
+                        } else {
+                            seekBar(Modifier.weight(1f))
+                            Text(
+                                "${formatPlaybackTime(if (scrubbing) scrubPosition.toLong() else position)}/${formatPlaybackTime(duration, unknownWhenZero = true)}",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                modifier = Modifier.padding(start = 8.dp, end = 2.dp)
+                            )
+                            IconButton(
+                                onClick = { toggleOrientation() },
+                                modifier = Modifier.size(48.dp).semantics { contentDescription = "切换横屏" }
+                            ) {
+                                FullscreenIcon(fullScreen = false)
+                            }
+                        }
+                    }
+                }
+            }
+            if (controlsVisible) Row(
+                Modifier.align(Alignment.TopStart).fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .48f), Color.Transparent)))
+                    .then(if (fullScreen) Modifier.displayCutoutPadding() else Modifier)
+                    .padding(horizontal = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { navigateBack() }, modifier = Modifier.semantics { contentDescription = "返回" }) {
+                    Canvas(Modifier.size(24.dp)) {
+                        drawPath(Path().apply {
+                            moveTo(size.width * .63f, size.height * .15f)
+                            lineTo(size.width * .28f, size.height * .5f)
+                            lineTo(size.width * .63f, size.height * .85f)
+                        }, Color.White, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    }
+                }
+                Text(if (fullScreen) video.name else "", color = Color.White, fontSize = 14.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                if (!fullScreen) Box {
+                    IconButton(onClick = { speedMenuExpanded = true }, modifier = Modifier.semantics { contentDescription = "更多播放设置" }) {
+                        Canvas(Modifier.size(24.dp)) {
+                            listOf(.22f, .5f, .78f).forEach { x ->
+                                drawCircle(Color.White, 1.6.dp.toPx(), Offset(size.width * x, size.height * .5f))
+                            }
+                        }
+                    }
+                    PlaybackSpeedMenu(speedMenuExpanded, speed, dark = false,
+                        onDismiss = { speedMenuExpanded = false }, onSpeedSelected = {
+                            player.setPlaybackSpeed(it)
+                            speed = it
+                            speedMenuExpanded = false
+                        })
+                }
+            }
+            if (fullScreen && episodesExpanded) {
+                LocalVideoEpisodes(playlist, video, onDismiss = { episodesExpanded = false },
+                    onVideoSelected = {
+                        episodesExpanded = false
+                        controlsVisible = true
+                        onVideoSelected(it)
+                    })
+            }
+        }
+
+        if (!fullScreen) Column(
+            Modifier.weight(1f).fillMaxWidth().background(Color.White)
+                .verticalScroll(rememberScrollState()).navigationBarsPadding()
+        ) {
+            Row(
+                Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf("简介", "评论").forEachIndexed { index, label ->
+                    Column(
+                        Modifier.fillMaxHeight().clickable { detailsTab = index }.padding(horizontal = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(label, color = if (detailsTab == index) Pink else Muted, fontSize = 15.sp,
+                            fontWeight = if (detailsTab == index) FontWeight.SemiBold else FontWeight.Normal)
+                        Spacer(Modifier.height(5.dp))
+                        Box(Modifier.width(30.dp).height(2.dp).background(if (detailsTab == index) Pink else Color.Transparent, CircleShape))
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Text("本地视频", color = Muted, fontSize = 12.sp)
+            }
+            HorizontalDivider(color = Color(0xFFE9EAEC), thickness = 1.dp)
+
+            if (detailsTab == 0) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
+                    Text(video.name, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "本地视频 · ${Formatter.formatFileSize(context, video.sizeBytes)} · ${formatVideoDuration(duration)}",
+                        color = Muted,
+                        fontSize = 12.sp
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        LocalVideoAction(0, if (liked) "已点赞" else "点赞", liked) { liked = !liked }
+                        LocalVideoAction(1, "投币", false, enabled = false) { }
+                        LocalVideoAction(2, if (saved) "已收藏" else "收藏", saved) { saved = !saved }
+                        LocalVideoAction(3, "分享", false) {
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "video/*"
+                                putExtra(Intent.EXTRA_STREAM, video.uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "分享视频"))
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(top = 14.dp), color = Color(0xFFE9EAEC), thickness = 1.dp)
+                    Spacer(Modifier.height(14.dp))
+                    Text("视频信息", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    Text("${video.name}\n${Formatter.formatFileSize(context, video.sizeBytes)}", color = Muted, fontSize = 12.sp, lineHeight = 19.sp)
+                    if (playbackError != null) {
+                        Spacer(Modifier.height(12.dp))
+                        Text("播放失败：${playbackError}", color = Color(0xFFB42318), fontSize = 12.sp)
+                        TextButton(onClick = {
+                            playbackError = null
+                            player.stop()
+                            player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri))
+                            player.prepare()
+                            player.playWhenReady = true
+                        }) { Text("重试", color = Pink) }
+                    }
+                }
+            } else {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
+                    Text("评论", color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Text("本地视频暂时没有评论", color = Muted, fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LocalVideoSeekBar(
+    position: Float,
+    duration: Long,
+    onSeek: (Float) -> Unit,
+    onSeekFinished: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Slider(
+        value = position.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
+        onValueChange = onSeek,
+        onValueChangeFinished = onSeekFinished,
+        valueRange = 0f..duration.coerceAtLeast(1L).toFloat(),
+        enabled = duration > 0,
+        modifier = modifier.semantics { contentDescription = "播放进度" },
+        thumb = { TelevisionSeekThumb() },
+        track = { sliderState ->
+            SliderDefaults.Track(
+                sliderState = sliderState,
+                modifier = Modifier.height(2.dp),
+                thumbTrackGapSize = 0.dp,
+                drawStopIndicator = null,
+                colors = SliderDefaults.colors(
+                    activeTrackColor = Color(0xFFFF6699),
+                    inactiveTrackColor = Color.White.copy(alpha = .45f)
+                )
+            )
+        }
+    )
+}
+
+@Composable
+private fun PlaybackSpeedMenu(
+    expanded: Boolean,
+    speed: Float,
+    dark: Boolean,
+    onDismiss: () -> Unit,
+    onSpeedSelected: (Float) -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss,
+        containerColor = if (dark) Color(0xFF242424) else Color.White) {
+        listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { option ->
+            DropdownMenuItem(
+                text = { Text("倍速 ${option}x", color = when {
+                    speed == option -> Pink
+                    dark -> Color.White
+                    else -> Ink
+                }) },
+                onClick = { onSpeedSelected(option) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocalVideoEpisodes(
+    playlist: List<LocalVideo>,
+    currentVideo: LocalVideo,
+    onDismiss: () -> Unit,
+    onVideoSelected: (LocalVideo) -> Unit,
+) {
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = playlist.indexOfFirst { it.uri == currentVideo.uri }.coerceAtLeast(0)
+    )
+    Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .35f))
+            .clickable(onClick = onDismiss).semantics { contentDescription = "关闭选集" })
+        Column(
+            Modifier.align(Alignment.CenterEnd).width(320.dp).fillMaxHeight()
+                .background(Color(0xF5181818))
+                .pointerInput(Unit) { detectTapGestures(onTap = {}) }
+                .displayCutoutPadding().navigationBarsPadding()
+        ) {
+            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text("选集", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text("  ${playlist.size} 个视频", color = Color.White.copy(alpha = .5f), fontSize = 12.sp)
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = "收起选集" }) {
+                    Text("×", color = Color.White.copy(alpha = .7f), fontSize = 26.sp)
+                }
+            }
+            LazyColumn(Modifier.weight(1f).selectableGroup(), state = listState,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                itemsIndexed(playlist, key = { _, item -> item.uri.toString() }) { index, item ->
+                    val selected = item.uri == currentVideo.uri
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                            .background(if (selected) Pink.copy(alpha = .14f) else Color.White.copy(alpha = .05f))
+                            .selectable(selected = selected, role = Role.RadioButton,
+                                onClick = { onVideoSelected(item) }).padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("${index + 1}", color = if (selected) Pink else Color.White.copy(alpha = .5f),
+                            fontSize = 13.sp, modifier = Modifier.width(28.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(item.name, color = if (selected) Pink else Color.White, fontSize = 14.sp,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Spacer(Modifier.height(5.dp))
+                            Text(if (selected) "正在播放" else formatVideoDuration(item.durationMs),
+                                color = if (selected) Pink else Color.White.copy(alpha = .45f), fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaybackIcon(playing: Boolean) {
+    Canvas(Modifier.size(26.dp)) {
+        val u = size.width / 26f
+        if (playing) {
+            listOf(5f, 16f).forEach { x ->
+                drawRoundRect(Color.White, Offset(x * u, 3f * u),
+                    androidx.compose.ui.geometry.Size(5f * u, 20f * u),
+                    androidx.compose.ui.geometry.CornerRadius(1.2f * u))
+            }
+        } else {
+            drawPath(Path().apply {
+                moveTo(5f * u, 2f * u)
+                quadraticTo(2f * u, .5f * u, 2f * u, 4f * u)
+                lineTo(2f * u, 22f * u)
+                quadraticTo(2f * u, 25.5f * u, 5f * u, 24f * u)
+                lineTo(23f * u, 14.8f * u)
+                quadraticTo(26f * u, 13f * u, 23f * u, 11.2f * u)
+                close()
+            }, Color.White)
+        }
+    }
+}
+
+@Composable
+private fun TelevisionSeekThumb() {
+    Canvas(Modifier.size(24.dp)) {
+        val u = size.width / 24f
+        val outline = Color(0xFF161616)
+        val stroke = Stroke(1.6f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        drawLine(outline, Offset(8f*u, 2f*u), Offset(11f*u, 6f*u), 2f*u, StrokeCap.Round)
+        drawLine(outline, Offset(17f*u, 2f*u), Offset(13f*u, 6f*u), 2f*u, StrokeCap.Round)
+        drawRoundRect(Color.White, Offset(2f*u, 6f*u), androidx.compose.ui.geometry.Size(20f*u, 16f*u),
+            androidx.compose.ui.geometry.CornerRadius(4f*u))
+        drawRoundRect(outline, Offset(2f*u, 6f*u), androidx.compose.ui.geometry.Size(20f*u, 16f*u),
+            androidx.compose.ui.geometry.CornerRadius(4f*u), style = stroke)
+        drawLine(outline, Offset(8f*u, 11f*u), Offset(8f*u, 16f*u), 2.4f*u, StrokeCap.Round)
+        drawLine(outline, Offset(16f*u, 11f*u), Offset(16f*u, 16f*u), 2.4f*u, StrokeCap.Round)
+    }
+}
+
+@Composable
+private fun FullscreenIcon(fullScreen: Boolean) {
+    Canvas(Modifier.size(24.dp)) {
+        val u = size.width / 24f
+        val corners = Path().apply {
+            if (fullScreen) {
+                moveTo(2f*u, 8f*u); lineTo(8f*u, 8f*u); lineTo(8f*u, 2f*u)
+                moveTo(16f*u, 2f*u); lineTo(16f*u, 8f*u); lineTo(22f*u, 8f*u)
+                moveTo(22f*u, 16f*u); lineTo(16f*u, 16f*u); lineTo(16f*u, 22f*u)
+                moveTo(8f*u, 22f*u); lineTo(8f*u, 16f*u); lineTo(2f*u, 16f*u)
+            } else {
+                moveTo(2f*u, 9f*u); lineTo(2f*u, 3f*u); lineTo(8f*u, 3f*u)
+                moveTo(16f*u, 3f*u); lineTo(22f*u, 3f*u); lineTo(22f*u, 9f*u)
+                moveTo(22f*u, 15f*u); lineTo(22f*u, 21f*u); lineTo(16f*u, 21f*u)
+                moveTo(8f*u, 21f*u); lineTo(2f*u, 21f*u); lineTo(2f*u, 15f*u)
+            }
+        }
+        drawPath(corners, Color.White, style = Stroke(2.2f*u, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+private tailrec fun Context.findActivity(): ComponentActivity? = when (this) {
+    is ComponentActivity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+@Composable
+private fun RowScope.LocalVideoAction(index: Int, label: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+    val tint = if (selected) Pink else Color(0xFF62666D).copy(alpha = if (enabled) 1f else .4f)
+    Column(
+        Modifier.weight(1f).clickable(enabled = enabled, onClick = onClick).padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Canvas(Modifier.size(26.dp)) {
+            val u = size.width / 24f
+            val stroke = Stroke(width = 1.8f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            when (index) {
+                0 -> {
+                    drawRoundRect(tint, topLeft = Offset(2*u, 10*u), size = androidx.compose.ui.geometry.Size(4*u, 11*u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(u))
+                    drawPath(Path().apply {
+                        moveTo(8*u, 10*u); lineTo(12*u, 3*u)
+                        cubicTo(16*u, 2*u, 15*u, 7*u, 14*u, 9*u)
+                        lineTo(20*u, 9*u); quadraticTo(23*u, 9*u, 22*u, 12*u)
+                        lineTo(20*u, 20*u); lineTo(8*u, 20*u); close()
+                    }, tint)
+                }
+                1 -> {
+                    drawCircle(tint, radius = 10*u, style = stroke)
+                    drawLine(tint, Offset(7*u, 8*u), Offset(17*u, 8*u), strokeWidth = 1.8f*u)
+                    drawLine(tint, Offset(12*u, 6*u), Offset(12*u, 19*u), strokeWidth = 1.8f*u)
+                    drawLine(tint, Offset(8*u, 12*u), Offset(16*u, 12*u), strokeWidth = 1.8f*u)
+                }
+                2 -> drawPath(Path().apply {
+                    for (point in 0..9) {
+                        val angle = Math.PI * point / 5 - Math.PI / 2
+                        val radius = if (point % 2 == 0) 11*u else 5*u
+                        val x = 12*u + kotlin.math.cos(angle).toFloat()*radius
+                        val y = 12*u + kotlin.math.sin(angle).toFloat()*radius
+                        if (point == 0) moveTo(x, y) else lineTo(x, y)
+                    }
+                    close()
+                }, tint)
+                3 -> drawPath(Path().apply {
+                    moveTo(3*u, 21*u); cubicTo(3*u, 11*u, 7*u, 7*u, 15*u, 7*u)
+                    lineTo(15*u, 2*u); lineTo(23*u, 11*u); lineTo(15*u, 18*u)
+                    lineTo(15*u, 13*u); quadraticTo(7*u, 13*u, 3*u, 21*u); close()
+                }, tint)
+            }
+        }
+        Spacer(Modifier.height(7.dp))
+        Text(label, color = if (selected) Pink else Muted, fontSize = 11.sp)
+    }
+}
+
+private fun createTexturePlayerView(context: Context, player: ExoPlayer): PlayerView =
+    (LayoutInflater.from(context).inflate(R.layout.video_player_view, null) as PlayerView).apply {
+        this.player = player
+        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+        keepScreenOn = true
+    }
 
 private fun hasLocalVideoPermission(context: Context): Boolean {
     val permission = if (Build.VERSION.SDK_INT >= 33) {
@@ -506,7 +1126,8 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
     }
     val exoPlayer = remember(video.bvid, session?.cookie) {
         val dataSourceFactory = DefaultDataSource.Factory(context, BiliPlayback.dataSourceFactory(session?.cookie))
-        ExoPlayer.Builder(context)
+        val renderersFactory = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
+        ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
     }
@@ -517,6 +1138,22 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
     var playbackCandidateCount by remember(video.bvid, session?.cookie) { mutableIntStateOf(1) }
     var durlFallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
+    var playbackPosition by remember(video.bvid, session?.cookie) { mutableLongStateOf(0L) }
+    var playbackDuration by remember(video.bvid, session?.cookie) { mutableLongStateOf(0L) }
+    var isPlaying by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
+    var isScrubbing by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
+    var scrubPosition by remember(video.bvid, session?.cookie) { mutableFloatStateOf(0f) }
+    var speedMenuExpanded by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
+    var playbackSpeed by remember(video.bvid, session?.cookie) { mutableFloatStateOf(1f) }
+    LaunchedEffect(exoPlayer) {
+        while (true) {
+            playbackDuration = exoPlayer.duration.takeIf { it > 0 } ?: 0L
+            if (!isScrubbing) playbackPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
+            playbackSpeed = exoPlayer.playbackParameters.speed
+            isPlaying = exoPlayer.isPlaying
+            delay(250)
+        }
+    }
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
@@ -631,17 +1268,73 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
             }
             PlaybackState.Ready -> AndroidView(
                 factory = { viewContext ->
-                    PlayerView(viewContext).apply {
-                        player = exoPlayer
-                        useController = true
-                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                        keepScreenOn = true
-                    }
+                    createTexturePlayerView(viewContext, exoPlayer)
                 },
                 update = { it.player = exoPlayer },
                 modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp))
             )
+        }
+        if (playbackState == PlaybackState.Ready) {
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Slider(
+                    value = if (isScrubbing) scrubPosition else playbackPosition.toFloat(),
+                    onValueChange = { value ->
+                        isScrubbing = true
+                        scrubPosition = value
+                    },
+                    onValueChangeFinished = {
+                        exoPlayer.seekTo(scrubPosition.toLong())
+                        playbackPosition = scrubPosition.toLong()
+                        isScrubbing = false
+                    },
+                    valueRange = 0f..playbackDuration.coerceAtLeast(1L).toFloat(),
+                    enabled = playbackDuration > 0,
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(
+                        thumbColor = Pink,
+                        activeTrackColor = Pink,
+                        inactiveTrackColor = Color(0xFFD9DEE5)
+                    )
+                )
+                Text(
+                    "${formatPlaybackTime(if (isScrubbing) scrubPosition.toLong() else playbackPosition)} / ${formatPlaybackTime(playbackDuration, unknownWhenZero = true)}",
+                    color = Muted,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = { exoPlayer.playWhenReady = !exoPlayer.playWhenReady }) {
+                    Text(if (isPlaying) "暂停" else "播放", color = Ink, fontSize = 13.sp)
+                }
+                Spacer(Modifier.weight(1f))
+                Box {
+                    TextButton(onClick = { speedMenuExpanded = true }) {
+                        Text("${playbackSpeed}x 倍速", color = Ink, fontSize = 13.sp)
+                    }
+                    DropdownMenu(
+                        expanded = speedMenuExpanded,
+                        onDismissRequest = { speedMenuExpanded = false }
+                    ) {
+                        listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
+                            DropdownMenuItem(
+                                text = { Text("${speed}x", color = if (playbackSpeed == speed) Pink else Ink) },
+                                onClick = {
+                                    exoPlayer.setPlaybackSpeed(speed)
+                                    playbackSpeed = speed
+                                    speedMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(16.dp))
         Text(
@@ -651,6 +1344,22 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
             fontSize = 11.sp
         )
     }
+}
+
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+private fun createCompatiblePlayer(context: Context): ExoPlayer {
+    val renderersFactory = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
+    return ExoPlayer.Builder(context, renderersFactory).build()
+}
+
+private fun formatPlaybackTime(positionMs: Long, unknownWhenZero: Boolean = false): String {
+    if (unknownWhenZero && positionMs <= 0L) return "--:--"
+    val totalSeconds = (positionMs.coerceAtLeast(0L) / 1000L)
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds)
+    else "%02d:%02d".format(minutes, seconds)
 }
 
 @Composable
