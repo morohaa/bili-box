@@ -8,14 +8,17 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.provider.MediaStore
 import android.provider.Settings
 import android.text.format.Formatter
+import android.util.Size
 import android.view.LayoutInflater
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -359,29 +362,85 @@ private fun LocalVideoPage(onVideoSelected: (LocalVideo, List<LocalVideo>) -> Un
 
 @Composable
 private fun LocalVideoRow(context: Context, video: LocalVideo, onClick: () -> Unit) {
+    var thumbnail by remember(video.uri) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(context, video.uri) {
+        thumbnail = withContext(Dispatchers.IO) {
+            loadLocalVideoThumbnail(context, video.uri, video.durationMs)
+        }
+    }
+
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = .78f))
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = .9f))
             .clickable(onClick = onClick)
-            .padding(14.dp),
+            .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            Modifier.size(52.dp).background(Pink.copy(alpha = .12f), RoundedCornerShape(15.dp)),
-            contentAlignment = Alignment.Center
-        ) { Text("▶", color = Pink, fontSize = 20.sp) }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(video.name, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
-            Spacer(Modifier.height(5.dp))
+            Modifier.width(116.dp).aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFFE7EBF0))
+        ) {
+            thumbnail?.let { frame ->
+                Image(
+                    bitmap = frame.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } ?: Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("▶", color = Color(0xFF8492A0), fontSize = 22.sp)
+            }
             Text(
-                "${formatVideoDuration(video.durationMs)} · ${Formatter.formatFileSize(context, video.sizeBytes)}",
-                color = Muted,
-                fontSize = 11.sp
+                formatVideoDuration(video.durationMs),
+                color = Color.White,
+                fontSize = 10.sp,
+                lineHeight = 13.sp,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)
+                    .background(Color.Black.copy(alpha = .78f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
             )
         }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                video.name,
+                color = Ink,
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                Formatter.formatFileSize(context, video.sizeBytes),
+                color = Muted,
+                fontSize = 11.sp,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+private fun loadLocalVideoThumbnail(context: Context, uri: Uri, durationMs: Long): Bitmap? {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        runCatching {
+            context.contentResolver.loadThumbnail(uri, Size(480, 270), null)
+        }.getOrNull()?.let { return it }
+    }
+
+    val retriever = MediaMetadataRetriever()
+    return try {
+        retriever.setDataSource(context, uri)
+        val frameTimeUs = (durationMs.coerceAtLeast(0L) / 5L) * 1_000L
+        retriever.getScaledFrameAtTime(frameTimeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 480, 270)
+    } catch (_: Exception) {
+        null
+    } finally {
+        runCatching { retriever.release() }
     }
 }
 
