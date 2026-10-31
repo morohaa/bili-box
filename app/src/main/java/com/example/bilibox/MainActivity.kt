@@ -1514,7 +1514,7 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
         BiliClient().also { it.cookieHeader = session?.cookie }
     }
     val exoPlayer = remember(video.bvid, session?.cookie) {
-        val dataSourceFactory = DefaultDataSource.Factory(context, BiliPlayback.dataSourceFactory(session?.cookie))
+        val dataSourceFactory = DefaultDataSource.Factory(context, BiliPlayback.dataSourceFactory(session?.cookie, video.bvid))
         val renderersFactory = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
         ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
@@ -1539,7 +1539,7 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
                 if (data != null && nextIndex < playbackCandidateCount) {
                     playbackCandidateIndex = nextIndex
                     playbackState = PlaybackState.Loading
-                    BiliPlayback.attach(exoPlayer, data, preferredQn = BiliQn.P1080, candidateIndex = nextIndex, cookie = session?.cookie)
+                    BiliPlayback.attach(exoPlayer, data, preferredQn = BiliQn.P1080, candidateIndex = nextIndex, cookie = session?.cookie, bvid = video.bvid)
                     return
                 }
                 // DASH uses separate audio/video URLs. If every CDN pair is rejected,
@@ -1558,7 +1558,7 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
                             playbackData = fallback
                             playbackCandidateIndex = 0
                             playbackCandidateCount = BiliPlayback.candidateCount(fallback, preferredQn = BiliQn.P720)
-                            BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P720, cookie = session?.cookie)
+                            BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P720, cookie = session?.cookie, bvid = video.bvid)
                         } catch (error: CancellationException) {
                             throw error
                         } catch (error: Exception) {
@@ -1595,7 +1595,7 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
             playbackData = play
             playbackCandidateIndex = 0
             playbackCandidateCount = BiliPlayback.candidateCount(play, preferredQn = BiliQn.P1080)
-            BiliPlayback.attach(exoPlayer, play, preferredQn = BiliQn.P1080, candidateIndex = 0, cookie = session?.cookie)
+            BiliPlayback.attach(exoPlayer, play, preferredQn = BiliQn.P1080, candidateIndex = 0, cookie = session?.cookie, bvid = video.bvid)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {

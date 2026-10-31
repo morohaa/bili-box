@@ -14,22 +14,33 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 object BiliPlayback {
     private const val UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
-    fun dataSourceFactory(cookie: String? = null): DataSource.Factory = DefaultHttpDataSource.Factory()
-        .setUserAgent(UA)
-        .setDefaultRequestProperties(buildMap {
-            put("Referer", "https://www.bilibili.com/")
-            put("Origin", "https://www.bilibili.com")
-            put("Accept", "*/*")
-            cookie?.takeIf { it.isNotBlank() }?.let { put("Cookie", it) }
-        })
-        .setAllowCrossProtocolRedirects(true)
-        .setConnectTimeoutMs(10_000)
-        .setReadTimeoutMs(20_000)
+    fun dataSourceFactory(cookie: String? = null, bvid: String? = null): DataSource.Factory {
+        val referer = bvid?.takeIf { it.isNotBlank() }
+            ?.let { "https://www.bilibili.com/video/$it" }
+            ?: "https://www.bilibili.com/"
+        return DefaultHttpDataSource.Factory()
+            .setUserAgent(UA)
+            .setDefaultRequestProperties(buildMap {
+                put("Referer", referer)
+                put("Origin", "https://www.bilibili.com")
+                put("Accept", "*/*")
+                cookie?.takeIf { it.isNotBlank() }?.let { put("Cookie", it) }
+            })
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(10_000)
+            .setReadTimeoutMs(20_000)
+    }
 
     fun candidateCount(data: PlayData, preferredQn: Int = BiliQn.P1080): Int = candidates(data, preferredQn).size
 
-    fun buildMediaSource(data: PlayData, preferredQn: Int = BiliQn.P1080, candidateIndex: Int = 0, cookie: String? = null): MediaSource {
-        val factory = ProgressiveMediaSource.Factory(dataSourceFactory(cookie))
+    fun buildMediaSource(
+        data: PlayData,
+        preferredQn: Int = BiliQn.P1080,
+        candidateIndex: Int = 0,
+        cookie: String? = null,
+        bvid: String? = null,
+    ): MediaSource {
+        val factory = ProgressiveMediaSource.Factory(dataSourceFactory(cookie, bvid))
         val candidate = candidates(data, preferredQn).getOrNull(candidateIndex)
             ?: throw BiliException(-1, "playurl 没有返回任何可播放地址")
         if (candidate.audioUrl == null) return factory.createMediaSource(MediaItem.fromUri(candidate.videoUrl))
@@ -42,8 +53,15 @@ object BiliPlayback {
         return MergingMediaSource(videoSource, audioSource)
     }
 
-    fun attach(player: ExoPlayer, data: PlayData, preferredQn: Int = BiliQn.P1080, candidateIndex: Int = 0, cookie: String? = null) {
-        player.setMediaSource(buildMediaSource(data, preferredQn, candidateIndex, cookie))
+    fun attach(
+        player: ExoPlayer,
+        data: PlayData,
+        preferredQn: Int = BiliQn.P1080,
+        candidateIndex: Int = 0,
+        cookie: String? = null,
+        bvid: String? = null,
+    ) {
+        player.setMediaSource(buildMediaSource(data, preferredQn, candidateIndex, cookie, bvid))
         player.prepare()
         player.playWhenReady = true
     }
