@@ -89,7 +89,7 @@ private sealed interface SearchState {
 
 private sealed interface PlaybackState {
     data object Loading : PlaybackState
-    data class Ready(val streamUrl: String) : PlaybackState
+    data object Ready : PlaybackState
     data class Error(val message: String) : PlaybackState
 }
 
@@ -266,14 +266,27 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
             .build()
     }
     var playbackState by remember(video.bvid, session?.cookie) { mutableStateOf<PlaybackState>(PlaybackState.Loading) }
+    var streamUrls by remember(video.bvid, session?.cookie) { mutableStateOf<List<String>>(emptyList()) }
+    var streamIndex by remember(video.bvid, session?.cookie) { mutableIntStateOf(0) }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
+    val currentStreamUrls by rememberUpdatedState(streamUrls)
+    val currentStreamIndex by rememberUpdatedState(streamIndex)
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_READY) playbackState = PlaybackState.Ready(video.bvid)
+                if (state == Player.STATE_READY) playbackState = PlaybackState.Ready
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                val nextIndex = currentStreamIndex + 1
+                if (nextIndex < currentStreamUrls.size) {
+                    streamIndex = nextIndex
+                    playbackState = PlaybackState.Loading
+                    exoPlayer.setMediaItem(MediaItem.fromUri(currentStreamUrls[nextIndex]))
+                    exoPlayer.prepare()
+                    exoPlayer.playWhenReady = true
+                    return
+                }
                 val detail = error.cause?.message?.takeIf { it.isNotBlank() }
                 playbackState = PlaybackState.Error("播放器无法读取视频流：${error.errorCodeName}${detail?.let { "（$it）" }.orEmpty()}")
             }
@@ -287,8 +300,11 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
     LaunchedEffect(video.bvid, session?.cookie, retryToken) {
         playbackState = PlaybackState.Loading
         try {
-            val streamUrl = withContext(Dispatchers.IO) { resolveBilibiliStream(video.bvid, session?.cookie) }
-            exoPlayer.setMediaItem(MediaItem.fromUri(streamUrl))
+            val urls = withContext(Dispatchers.IO) { resolveBilibiliStreams(video.bvid, session?.cookie) }
+            if (urls.isEmpty()) throw IllegalStateException("B 站没有返回可用的视频流")
+            streamUrls = urls
+            streamIndex = 0
+            exoPlayer.setMediaItem(MediaItem.fromUri(urls.first()))
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
         } catch (cancelled: CancellationException) {
@@ -334,7 +350,7 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
                 Spacer(Modifier.height(12.dp))
                 TextButton(onClick = { retryToken++ }) { Text("重试", color = Color.White) }
             }
-            is PlaybackState.Ready -> AndroidView(
+            PlaybackState.Ready -> AndroidView(
                 factory = { viewContext ->
                     PlayerView(viewContext).apply {
                         player = exoPlayer
@@ -436,7 +452,7 @@ private suspend fun searchBilibiliVideos(keyword: String): List<SearchVideo> = w
     }
 }
 
-private fun resolveBilibiliStream(bvid: String, cookie: String?): String {
+private fun resolveBilibiliStreams(bvid: String, cookie: String?): List<String> {
     val view = biliApiJson(
         "https://api.bilibili.com/x/web-interface/view?bvid=${URLEncoder.encode(bvid, Charsets.UTF_8.name())}",
         cookie
@@ -448,6 +464,7 @@ private fun resolveBilibiliStream(bvid: String, cookie: String?): String {
 
     val qualities = if (cookie.isNullOrBlank()) listOf(32) else listOf(80, 64, 32)
     var lastMessage = "B 站没有返回可用的视频流"
+    val streams = linkedSetOf<String>()
     for (quality in qualities) {
         val playUrl = "https://api.bilibili.com/x/player/playurl?bvid=${URLEncoder.encode(bvid, Charsets.UTF_8.name())}&cid=$cid&qn=$quality&fnval=0&fourk=0"
         val play = biliApiJson(playUrl, cookie)
@@ -458,15 +475,27 @@ private fun resolveBilibiliStream(bvid: String, cookie: String?): String {
         }
         val data = play.optJSONObject("data")
         val durl = data?.optJSONArray("durl")
-        val stream = durl?.optJSONObject(0)?.optString("url")
-        if (!stream.isNullOrBlank()) return stream.replaceFirst("http://", "https://")
-        lastMessage = "${qualityLabel(quality)} 暂无兼容视频流"
+        val firstSegment = durl?.optJSONObject(0)
+        if (firstSegment != null) {
+            firstSegment.optString("url").normalizedStreamUrl()?.let(streams::add)
+            val backups = firstSegment.optJSONArray("backup_url")
+            if (backups != null) {
+                for (backupIndex in 0 until backups.length()) {
+                    backups.optString(backupIndex).normalizedStreamUrl()?.let(streams::add)
+                }
+            }
+        }
+        if (firstSegment == null) lastMessage = "${qualityLabel(quality)} 暂无兼容视频流"
     }
+    if (streams.isNotEmpty()) return streams.toList()
     throw IllegalStateException(
         if (cookie.isNullOrBlank()) "$lastMessage；登录后可尝试更高画质和受限视频"
         else "$lastMessage；请确认账号有权观看该视频"
     )
 }
+
+private fun String?.normalizedStreamUrl(): String? =
+    this?.trim()?.takeIf { it.isNotBlank() }?.replaceFirst("http://", "https://")
 
 private fun qualityLabel(quality: Int): String = when (quality) {
     80 -> "1080P"
