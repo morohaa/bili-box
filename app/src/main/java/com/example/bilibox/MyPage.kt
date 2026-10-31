@@ -33,6 +33,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -49,7 +50,7 @@ private data class BiliSession(val username: String, val avatarUrl: String, val 
 private sealed interface LoginUiState {
     data object SignedOut : LoginUiState
     data object CreatingQr : LoginUiState
-    data class WaitingForScan(val key: String, val bitmap: ImageBitmap, val status: String) : LoginUiState
+    data class WaitingForScan(val key: String, val bitmap: ImageBitmap, val status: String, val cookie: String) : LoginUiState
     data class Failed(val message: String) : LoginUiState
 }
 
@@ -109,8 +110,8 @@ internal fun MyPage(savedCount: Int) {
         if (creating == 0) return@LaunchedEffect
         state = LoginUiState.CreatingQr
         state = try {
-            val (key, qrUrl) = withContext(Dispatchers.IO) { createLoginQr() }
-            LoginUiState.WaitingForScan(key, createQrImage(qrUrl), "请使用哔哩哔哩 App 扫码")
+            val ticket = withContext(Dispatchers.IO) { createLoginQr() }
+            LoginUiState.WaitingForScan(ticket.key, createQrImage(ticket.url), "请使用哔哩哔哩 App 扫码", ticket.cookie)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -123,7 +124,7 @@ internal fun MyPage(savedCount: Int) {
         while (true) {
             delay(2000)
             try {
-                when (val result = withContext(Dispatchers.IO) { pollLoginQr(waiting.key) }) {
+                when (val result = withContext(Dispatchers.IO) { pollLoginQr(waiting.key, waiting.cookie) }) {
                     QrPollResult.Pending -> Unit
                     QrPollResult.Scanned -> state = waiting.copy(status = "已扫码，请在哔哩哔哩 App 确认登录")
                     QrPollResult.Expired -> state = LoginUiState.Failed("二维码已过期，请重新获取")
@@ -232,7 +233,7 @@ private fun InfoRow(title: String, value: String) {
     HorizontalDivider(color = Color(0xFFE7EBEF))
 }
 
-private data class QrTicket(val key: String, val url: String)
+private data class QrTicket(val key: String, val url: String, val cookie: String)
 
 private sealed interface QrPollResult {
     data object Pending : QrPollResult
@@ -248,12 +249,15 @@ private fun createLoginQr(): QrTicket {
     val key = data.optString("qrcode_key")
     val url = data.optString("url")
     if (key.isBlank() || url.isBlank()) error("B 站没有返回有效二维码")
-    return QrTicket(key, url)
+    return QrTicket(key, url, response.cookies)
 }
 
-private fun pollLoginQr(key: String): QrPollResult {
+private fun pollLoginQr(key: String, initialCookie: String): QrPollResult {
     val encodedKey = URLEncoder.encode(key, Charsets.UTF_8.name())
-    val response = biliLoginRequest("https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key=$encodedKey")
+    val response = biliLoginRequest(
+        "https://passport.bilibili.com/x/passport-login/web/qrcode/poll?qrcode_key=$encodedKey",
+        cookie = initialCookie.ifBlank { null }
+    )
     val root = response.json
     val code = root.optInt("code", -1)
     return when (code) {
@@ -261,8 +265,9 @@ private fun pollLoginQr(key: String): QrPollResult {
         86090 -> QrPollResult.Scanned
         86038 -> QrPollResult.Expired
         0 -> {
-            val cookie = response.cookies
-            if (cookie.isBlank()) throw IllegalStateException("登录已确认，但 B 站未返回会话凭证")
+            val data = root.optJSONObject("data")
+            val cookie = mergeCookies(initialCookie, response.cookies, cookieFromCallbackUrl(data?.optString("url").orEmpty()))
+            if (!hasLoginCookies(cookie)) throw IllegalStateException("无法验证登录状态，请刷新二维码后重试")
             val nav = biliLoginRequest("https://api.bilibili.com/x/web-interface/nav", cookie = cookie).json
             val account = nav.optJSONObject("data")
             if (nav.optInt("code", -1) != 0 || account?.optBoolean("isLogin", false) != true) {
@@ -290,7 +295,7 @@ private fun biliLoginRequest(endpoint: String, cookie: String? = null, includeCo
         val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         if (status !in 200..299) throw IllegalStateException("B 站登录服务暂不可用（HTTP $status）")
         val cookies = if (includeCookies) connection.headerFields.entries
-            .filter { it.key.equals("Set-Cookie", ignoreCase = true) }
+            .filter { it.key?.equals("Set-Cookie", ignoreCase = true) == true }
             .flatMap { it.value.orEmpty() }
             .map { it.substringBefore(';').trim() }
             .filter { it.contains('=') }
@@ -300,6 +305,37 @@ private fun biliLoginRequest(endpoint: String, cookie: String? = null, includeCo
     } finally {
         connection.disconnect()
     }
+}
+
+private val loginCookieNames = setOf("DedeUserID", "DedeUserID__ckMd5", "SESSDATA", "bili_jct", "sid")
+
+private fun cookieFromCallbackUrl(callbackUrl: String): String {
+    if (callbackUrl.isBlank()) return ""
+    val query = runCatching { URL(callbackUrl).query.orEmpty() }.getOrDefault("")
+    return query.split('&').asSequence()
+        .mapNotNull { pair ->
+            val separator = pair.indexOf('=')
+            if (separator <= 0) return@mapNotNull null
+            val name = URLDecoder.decode(pair.substring(0, separator), Charsets.UTF_8.name())
+            if (name !in loginCookieNames) return@mapNotNull null
+            val value = URLDecoder.decode(pair.substring(separator + 1), Charsets.UTF_8.name())
+            "$name=$value"
+        }
+        .joinToString("; ")
+}
+
+private fun mergeCookies(vararg cookieSources: String): String {
+    val values = linkedMapOf<String, String>()
+    cookieSources.flatMap { it.split(';') }
+        .map { it.trim() }
+        .filter { it.contains('=') }
+        .forEach { value -> values[value.substringBefore('=').trim()] = value.substringAfter('=').trim() }
+    return values.entries.joinToString("; ") { "${it.key}=${it.value}" }
+}
+
+private fun hasLoginCookies(cookie: String): Boolean {
+    val names = cookie.split(';').mapNotNull { it.trim().substringBefore('=').takeIf(String::isNotBlank) }.toSet()
+    return "SESSDATA" in names && "bili_jct" in names
 }
 
 private fun createQrImage(content: String): ImageBitmap {
