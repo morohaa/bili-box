@@ -31,8 +31,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -96,24 +94,6 @@ internal fun OnlineEpisodeCard(
     }
 }
 
-@Composable
-internal fun OnlineAutoPlaySwitch() {
-    var enabled by remember { mutableStateOf(true) }
-    Switch(
-        checked = enabled,
-        onCheckedChange = { enabled = it },
-        modifier = Modifier.size(width = 34.dp, height = 22.dp)
-            .semantics { contentDescription = "自动连播" },
-        colors = SwitchDefaults.colors(
-            checkedThumbColor = Color.White,
-            checkedTrackColor = OnlinePink,
-            uncheckedThumbColor = OnlineMuted,
-            uncheckedTrackColor = OnlineDivider,
-            uncheckedBorderColor = OnlineDivider
-        )
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun OnlineEpisodesBottomSheet(
@@ -144,9 +124,6 @@ internal fun OnlineEpisodesBottomSheet(
                     Text("视频选集", color = OnlineText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Text("($selectedPage/${pages.size})", color = OnlineMuted, fontSize = 12.sp)
                 }
-                Text("自动连播", color = OnlineSecondary, fontSize = 11.sp)
-                Spacer(Modifier.width(4.dp))
-                OnlineAutoPlaySwitch()
                 TextButton(onClick = { gridMode = !gridMode }) {
                     Text(if (gridMode) "列表" else "宫格", color = OnlinePink, fontSize = 12.sp)
                 }
@@ -211,12 +188,6 @@ private fun OnlineSheetEpisodeRow(page: Page, selected: Boolean, onClick: () -> 
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                if (selected) "正在播放" else "点击播放",
-                color = OnlineMuted,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 3.dp)
             )
         }
         Text(

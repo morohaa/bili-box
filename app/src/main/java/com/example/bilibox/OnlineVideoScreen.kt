@@ -242,40 +242,6 @@ private fun OnlineVideoDetails(
                     ChevronDownIcon(Modifier.size(18.dp).rotate(if (expanded) 180f else 0f), OnlineMuted)
                 }
             }
-            info?.pages?.takeIf { it.size > 1 }?.let { pages ->
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("正片", color = OnlineText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.width(5.dp))
-                    Text("($selectedPage/${pages.size})", color = OnlineMuted, fontSize = 12.sp)
-                    Spacer(Modifier.weight(1f))
-                    Text("自动连播", color = OnlineSecondary, fontSize = 11.sp)
-                    Spacer(Modifier.width(6.dp))
-                    OnlineAutoPlaySwitch()
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        "共 ${pages.size}P · 查看全部 ›",
-                        color = OnlinePink,
-                        fontSize = 11.5.sp,
-                        modifier = Modifier.clickable(role = Role.Button, onClick = onOpenEpisodes)
-                            .semantics { contentDescription = "查看全部选集" }
-                    )
-                }
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 10.dp).horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    pages.forEach { page ->
-                        OnlineEpisodeCard(
-                            page = page,
-                            selected = page.page == selectedPage,
-                            onClick = { onPageSelected(page.page) }
-                        )
-                    }
-                }
-            }
             Row(
                 Modifier.fillMaxWidth().padding(top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -326,6 +292,37 @@ private fun OnlineVideoDetails(
                     putExtra(Intent.EXTRA_TEXT, "$title https://www.bilibili.com/video/${video.bvid}")
                 }
                 context.startActivity(Intent.createChooser(intent, "分享视频"))
+            }
+        }
+        info?.pages?.takeIf { it.size > 1 }?.let { pages ->
+            Row(
+                Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("正片", color = OnlineText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.width(5.dp))
+                Text("($selectedPage/${pages.size})", color = OnlineMuted, fontSize = 12.sp)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "查看全部 ›",
+                    color = OnlinePink,
+                    fontSize = 11.5.sp,
+                    modifier = Modifier.clickable(role = Role.Button, onClick = onOpenEpisodes)
+                        .semantics { contentDescription = "查看全部选集" }
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 12.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                pages.forEach { page ->
+                    OnlineEpisodeCard(
+                        page = page,
+                        selected = page.page == selectedPage,
+                        onClick = { onPageSelected(page.page) }
+                    )
+                }
             }
         }
         HorizontalDivider(color = OnlineDivider)
