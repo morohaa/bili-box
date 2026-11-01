@@ -34,6 +34,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -129,10 +131,14 @@ import kotlinx.coroutines.CancellationException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private val Ink = Color(0xFF24313D)
 private val Pink = Color(0xFFEF7196)
 private val Muted = Color(0xFF82909D)
+private val playbackSpeedOptions = listOf(3f, 2.5f, 2.25f, 2f, 1.75f, 1.5f, 1.25f, 1f, .75f, .5f)
+private val playbackSpeedQuickOptions = listOf(.5f, 1f, 1.25f, 1.5f, 2f, 3f)
 private val OnlineSurface = Color.White
 private val OnlineText = Color(0xFF18191C)
 private val OnlineMuted = Color(0xFF9499A0)
@@ -913,8 +919,7 @@ internal fun VideoPlayerScreen(
                     ))))
                 Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .then(if (fullScreen) Modifier.displayCutoutPadding().navigationBarsPadding()
-                            .padding(start = 18.dp, end = 18.dp, top = 12.dp)
+                        .then(if (fullScreen) Modifier.padding(top = 12.dp)
                             else Modifier.padding(horizontal = 6.dp))
                 ) {
                     val seekBar: @Composable (Modifier) -> Unit = { modifier ->
@@ -933,15 +938,22 @@ internal fun VideoPlayerScreen(
                     }
                     val showPause = playWhenReady && playbackState != Player.STATE_ENDED
                     if (fullScreen) {
-                        PlaybackTimeLabel(
-                            position = if (scrubbing) scrubPosition.toLong() else position,
-                            duration = duration,
-                            modifier = Modifier.padding(start = 9.dp, bottom = 2.dp)
-                        )
-                        Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 18.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             seekBar(Modifier.fillMaxWidth())
                         }
-                        Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier.fillMaxWidth().height(48.dp)
+                                .padding(start = 18.dp, end = 36.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            PlaybackTimeLabel(
+                                position = if (scrubbing) scrubPosition.toLong() else position,
+                                duration = duration,
+                                modifier = Modifier.padding(start = 9.dp, end = 10.dp)
+                            )
                             Box(
                                 modifier = Modifier.size(48.dp).semantics {
                                     contentDescription = if (showPause) "暂停" else "播放"
@@ -971,12 +983,6 @@ internal fun VideoPlayerScreen(
                                         modifier = Modifier.semantics { contentDescription = "倍速" }
                                     )
                                 }
-                                PlaybackSpeedMenu(speedMenuExpanded, speed, dark = true,
-                                    onDismiss = { speedMenuExpanded = false }, onSpeedSelected = {
-                                        player.setPlaybackSpeed(it)
-                                        speed = it
-                                        speedMenuExpanded = false
-                                    })
                             }
                         }
                     } else {
@@ -1069,11 +1075,29 @@ internal fun VideoPlayerScreen(
             }
             val episodeContent = episodes
             if (fullScreen && !screenLocked && episodeContent != null) {
-                EpisodeDrawerVisibility(visible = episodesExpanded) {
+                PlayerDrawerVisibility(visible = episodesExpanded) {
                     episodeContent.invoke {
                         episodesExpanded = false
                         controlsVisible = true
                     }
+                }
+            }
+            if (fullScreen && !screenLocked) {
+                PlayerDrawerVisibility(visible = speedMenuExpanded) {
+                    PlaybackSpeedDrawer(
+                        speed = speed,
+                        onDismiss = { speedMenuExpanded = false },
+                        onSpeedSelected = {
+                            player.setPlaybackSpeed(it)
+                            speed = it
+                            speedMenuExpanded = false
+                        },
+                        onSpeedChanged = {
+                            player.setPlaybackSpeed(it)
+                            speed = it
+                        },
+                        sideDrawer = true
+                    )
                 }
             }
         }
@@ -1236,7 +1260,7 @@ private fun PlaybackSpeedMenu(
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss,
         containerColor = if (dark) Color(0xFF242424) else Color.White) {
-        listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { option ->
+        playbackSpeedOptions.forEach { option ->
             DropdownMenuItem(
                 text = { Text("倍速 ${option}x", color = when {
                     speed == option -> Pink
@@ -1250,21 +1274,300 @@ private fun PlaybackSpeedMenu(
 }
 
 @Composable
-private fun EpisodeDrawerVisibility(
+private fun PlayerDrawerVisibility(
     visible: Boolean,
+    fromBottom: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     androidx.compose.animation.AnimatedVisibility(
         visible = visible,
         modifier = Modifier.fillMaxSize(),
-        enter = fadeIn(tween(180)) + slideInHorizontally(
-            initialOffsetX = { it }, animationSpec = tween(260, easing = FastOutSlowInEasing)
-        ),
-        exit = fadeOut(tween(140)) + slideOutHorizontally(
-            targetOffsetX = { it }, animationSpec = tween(220, easing = FastOutSlowInEasing)
-        )
+        enter = if (fromBottom) {
+            fadeIn(tween(180)) + slideInVertically(
+                initialOffsetY = { it }, animationSpec = tween(260, easing = FastOutSlowInEasing)
+            )
+        } else {
+            fadeIn(tween(180)) + slideInHorizontally(
+                initialOffsetX = { it }, animationSpec = tween(260, easing = FastOutSlowInEasing)
+            )
+        },
+        exit = if (fromBottom) {
+            fadeOut(tween(140)) + slideOutVertically(
+                targetOffsetY = { it }, animationSpec = tween(220, easing = FastOutSlowInEasing)
+            )
+        } else {
+            fadeOut(tween(140)) + slideOutHorizontally(
+                targetOffsetX = { it }, animationSpec = tween(220, easing = FastOutSlowInEasing)
+            )
+        }
     ) {
         content()
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlaybackSpeedDrawer(
+    speed: Float,
+    onDismiss: () -> Unit,
+    onSpeedSelected: (Float) -> Unit,
+    onSpeedChanged: (Float) -> Unit,
+    sideDrawer: Boolean = true,
+) {
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier.fillMaxSize().background(Color.Transparent)
+                .clickable(onClick = onDismiss)
+                .semantics { contentDescription = "关闭倍速选择" }
+        )
+        Column(
+            Modifier.align(if (sideDrawer) Alignment.CenterEnd else Alignment.BottomCenter)
+                .then(
+                    if (sideDrawer) {
+                        Modifier.width(360.dp).fillMaxHeight()
+                            .padding(end = 8.dp, top = 8.dp, bottom = 8.dp)
+                            .navigationBarsPadding()
+                    } else {
+                        Modifier.widthIn(max = 540.dp).fillMaxWidth()
+                            .padding(start = 14.dp, top = 0.dp, end = 14.dp, bottom = 72.dp)
+                            .navigationBarsPadding()
+                    }
+                )
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xD614161E))
+                .border(
+                    1.dp,
+                    Color.White.copy(alpha = .08f),
+                    RoundedCornerShape(16.dp)
+                )
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.Top
+        ) {
+            val shownSpeed = speed.coerceIn(.25f, 3f)
+            val speedText = String.format(Locale.US, "%.2f", shownSpeed)
+            val snapAnchors = listOf(.5f, 1f, 1.25f, 1.5f, 2f, 3f)
+            fun quantizeSpeed(raw: Float): Float {
+                val stepped = (raw * 20f).roundToInt().coerceIn(5, 60) / 20f
+                return snapAnchors.firstOrNull { abs(it - stepped) <= .02f } ?: stepped
+            }
+            val animationTransition = rememberInfiniteTransition(label = "倍速播放动效")
+            val animationProgress by animationTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(900, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "倍速播放动效进度"
+            )
+
+            // The first row mirrors the HTML panel: readout on the left and a compact
+            // animated fast-forward mark on the right.
+            Row(
+                Modifier.fillMaxWidth().height(82.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Box(
+                    Modifier.background(Color.White.copy(alpha = .05f), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color.White.copy(alpha = .1f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(speedText, color = Pink, fontSize = 28.sp, fontWeight = FontWeight.Bold,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                        Text("x", color = Pink, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(start = 3.dp, bottom = 5.dp))
+                    }
+                }
+                Box(Modifier.size(148.dp).height(58.dp), contentAlignment = Alignment.Center) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        val centerY = size.height / 2f
+                        repeat(3) { index ->
+                            val phase = (animationProgress + index * .24f) % 1f
+                            val x = size.width * .18f + phase * size.width * .72f
+                            val alpha = (1f - phase).coerceIn(.12f, .9f)
+                            val path = Path().apply {
+                                moveTo(x - 9.dp.toPx(), centerY - 13.dp.toPx())
+                                lineTo(x + 8.dp.toPx(), centerY)
+                                lineTo(x - 9.dp.toPx(), centerY + 13.dp.toPx())
+                                close()
+                            }
+                            drawPath(path, Pink.copy(alpha = alpha))
+                        }
+                        drawLine(
+                            Color.White.copy(alpha = .28f),
+                            Offset(size.width * .08f, centerY + 20.dp.toPx()),
+                            Offset(size.width * .92f, centerY + 20.dp.toPx()),
+                            strokeWidth = 1.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                    }
+                    Text("倍速播放", color = Color.White.copy(alpha = .62f), fontSize = 11.sp,
+                        modifier = Modifier.align(Alignment.BottomCenter))
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(40.dp)
+                        .semantics { contentDescription = "收起倍速选择" }
+                ) {
+                    Canvas(Modifier.size(16.dp)) {
+                        val stroke = Stroke(2.dp.toPx(), cap = StrokeCap.Round)
+                        drawLine(
+                            Color.White.copy(alpha = .72f),
+                            Offset(2.dp.toPx(), 2.dp.toPx()),
+                            Offset(size.width - 2.dp.toPx(), size.height - 2.dp.toPx()),
+                            stroke.width,
+                            StrokeCap.Round
+                        )
+                        drawLine(
+                            Color.White.copy(alpha = .72f),
+                            Offset(size.width - 2.dp.toPx(), 2.dp.toPx()),
+                            Offset(2.dp.toPx(), size.height - 2.dp.toPx()),
+                            stroke.width,
+                            StrokeCap.Round
+                        )
+                    }
+                }
+            }
+            // Progress track with the two precise 0.05x step controls on either side.
+            Row(
+                Modifier.fillMaxWidth().height(56.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                    Box(
+                        Modifier.height(40.dp).width(62.dp).clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = .08f))
+                            .border(1.dp, Color.White.copy(alpha = .1f), RoundedCornerShape(12.dp))
+                            .clickable {
+                                onSpeedChanged(quantizeSpeed(shownSpeed - .05f))
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("-0.05", color = Color.White, fontSize = 13.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                    }
+                    Slider(
+                        value = shownSpeed,
+                        onValueChange = { value ->
+                            onSpeedChanged(quantizeSpeed(value))
+                        },
+                        valueRange = .25f..3f,
+                        steps = 54,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.Transparent,
+                            activeTrackColor = Color.Transparent,
+                            inactiveTrackColor = Color.Transparent,
+                            activeTickColor = Color.Transparent,
+                            inactiveTickColor = Color.Transparent
+                        ),
+                        thumb = {
+                            Box(
+                                Modifier.size(34.dp)
+                                    .background(Pink, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(Modifier.size(24.dp).background(Color.White, CircleShape)) {
+                                    Box(Modifier.size(8.dp).background(Pink, CircleShape))
+                                }
+                            }
+                        },
+                        track = { sliderState ->
+                            Canvas(Modifier.fillMaxWidth().height(24.dp)) {
+                                val trackHeight = 10.dp.toPx()
+                                val centerY = size.height / 2f
+                                val progress = ((sliderState.value - .25f) / 2.75f).coerceIn(0f, 1f)
+                                drawRoundRect(
+                                    color = Color.White.copy(alpha = .18f),
+                                    topLeft = Offset(0f, centerY - trackHeight / 2f),
+                                    size = androidx.compose.ui.geometry.Size(size.width, trackHeight),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(trackHeight / 2f)
+                                )
+                                drawRoundRect(
+                                    color = Pink,
+                                    topLeft = Offset(0f, centerY - trackHeight / 2f),
+                                    size = androidx.compose.ui.geometry.Size(size.width * progress, trackHeight),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(trackHeight / 2f)
+                                )
+                                listOf(.5f, 1f, 1.25f, 1.5f, 2f, 3f).forEach { anchor ->
+                                    val x = size.width * ((anchor - .25f) / 2.75f)
+                                    drawCircle(
+                                        color = if (anchor <= sliderState.value) Color.White.copy(alpha = .9f)
+                                        else Color.White.copy(alpha = .34f),
+                                        radius = 4.dp.toPx(),
+                                        center = Offset(x, centerY)
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                            .semantics { contentDescription = "自定义倍速 0.25x 到 3.0x" }
+                    )
+                    Box(
+                        Modifier.height(40.dp).width(62.dp).clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = .08f))
+                            .border(1.dp, Color.White.copy(alpha = .1f), RoundedCornerShape(12.dp))
+                            .clickable {
+                                onSpeedChanged(quantizeSpeed(shownSpeed + .05f))
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("+0.05", color = Color.White, fontSize = 13.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                    }
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 0.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Spacer(Modifier.width(62.dp))
+                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
+                        listOf("0.25x", "1.0x", "2.0x", "3.0x").forEach { label ->
+                            Text(label, color = Color.White.copy(alpha = .48f), fontSize = 10.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                        }
+                    }
+                    Spacer(Modifier.width(62.dp))
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(bottom = 10.dp),
+                color = Color.White.copy(alpha = .1f)
+            )
+            // Keep the common presets together on one final row.
+            Row(
+                Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    playbackSpeedQuickOptions.forEach { option ->
+                        val selected = speed == option
+                        Box(
+                            Modifier.weight(1f).height(42.dp).clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (selected) Pink.copy(alpha = .2f)
+                                    else Color.White.copy(alpha = .05f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (selected) Pink else Color.White.copy(alpha = .1f),
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .clickable(role = Role.Button) { onSpeedSelected(option) }
+                                .semantics {
+                                    contentDescription = "选择倍速 ${option}x"
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                if (option == 1f) "1.0x" else "${option}x",
+                                color = if (selected) Pink else Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+            }
+        }
     }
 }
 
