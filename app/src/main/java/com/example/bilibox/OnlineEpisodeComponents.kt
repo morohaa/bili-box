@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -115,15 +116,15 @@ internal fun OnlineEpisodesBottomSheet(
                 .clip(CircleShape).background(OnlineDivider))
         }
     ) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 8.dp)) {
+        Column(
+            Modifier.fillMaxWidth().fillMaxHeight(.70f)
+                .navigationBarsPadding().padding(bottom = 8.dp)
+        ) {
             Row(
                 Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text("视频选集", color = OnlineText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("($selectedPage/${pages.size})", color = OnlineMuted, fontSize = 12.sp)
-                }
+                Spacer(Modifier.weight(1f))
                 TextButton(onClick = { gridMode = !gridMode }) {
                     Text(if (gridMode) "列表" else "宫格", color = OnlinePink, fontSize = 12.sp)
                 }

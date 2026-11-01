@@ -758,6 +758,18 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         onBack = onBack,
         onRetry = { retryToken++ },
         episodes = episodePicker,
+        episodeOverlay = {
+            if (!LocalConfiguration.current.orientation.let { it == Configuration.ORIENTATION_LANDSCAPE } &&
+                episodesSheetVisible && episodePages != null
+            ) {
+                OnlineEpisodesBottomSheet(
+                    pages = episodePages,
+                    selectedPage = selectedPage,
+                    onDismiss = { episodesSheetVisible = false },
+                    onPageSelected = { selectedPage = it }
+                )
+            }
+        },
         detailsBackground = OnlineSurface,
         showDetailTabs = false,
         details = { _ ->
@@ -771,14 +783,6 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                     onPageSelected = { selectedPage = it },
                     onOpenEpisodes = { episodesSheetVisible = true }
                 )
-                if (episodesSheetVisible && episodePages != null) {
-                    OnlineEpisodesBottomSheet(
-                        pages = episodePages,
-                        selectedPage = selectedPage,
-                        onDismiss = { episodesSheetVisible = false },
-                        onPageSelected = { selectedPage = it }
-                    )
-                }
             }
         }
     )

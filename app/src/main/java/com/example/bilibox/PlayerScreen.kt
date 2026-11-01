@@ -298,6 +298,7 @@ internal fun VideoPlayerScreen(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     episodes: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
+    episodeOverlay: (@Composable () -> Unit)? = null,
     detailsBackground: Color = Color.White,
     showDetailTabs: Boolean = true,
     details: @Composable (duration: Long) -> Unit,
@@ -521,8 +522,9 @@ internal fun VideoPlayerScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().background(Color.Black)
-        .then(if (fullScreen) Modifier else Modifier.statusBarsPadding())) {
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().background(Color.Black)
+            .then(if (fullScreen) Modifier else Modifier.statusBarsPadding())) {
         Box(
             (if (fullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                 .background(Color.Black),
@@ -791,6 +793,8 @@ internal fun VideoPlayerScreen(
                 }
             }
         }
+        }
+        episodeOverlay?.invoke()
     }
 }
 
