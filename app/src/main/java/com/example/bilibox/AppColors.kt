@@ -138,8 +138,6 @@ import kotlin.math.roundToInt
 internal val Ink = Color(0xFF24313D)
 internal val Pink = Color(0xFFEF7196)
 internal val Muted = Color(0xFF82909D)
-internal val playbackSpeedOptions = listOf(3f, 2.5f, 2.25f, 2f, 1.75f, 1.5f, 1.25f, 1f, .75f, .5f)
-internal val playbackSpeedQuickOptions = listOf(.5f, 1f, 1.25f, 1.5f, 2f, 3f)
 internal val OnlineSurface = Color.White
 internal val OnlineText = Color(0xFF18191C)
 internal val OnlineMuted = Color(0xFF9499A0)

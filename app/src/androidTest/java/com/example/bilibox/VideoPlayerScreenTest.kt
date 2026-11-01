@@ -74,10 +74,43 @@ class VideoPlayerScreenTest {
         compose.runOnIdle { assertEquals(1, retries) }
         compose.onNodeWithText("正在获取视频流…").assertExists()
         assertSame(initialSurface, findPlayerView())
-        compose.onNodeWithContentDescription("更多播放设置").performClick()
-        compose.onNodeWithText("倍速 1.5x").performClick()
+        compose.onNodeWithText("倍速").performClick()
+        compose.onNodeWithText("1.5x").performClick()
         compose.onNodeWithText("评论", useUnmergedTree = true).performClick()
         compose.onNodeWithText("暂不支持查看在线评论").assertExists()
+    }
+
+    @Test
+    fun fullscreenSpeedPanelAppliesPresetsAndCloses() {
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            val landscape = Configuration(LocalConfiguration.current).apply {
+                orientation = Configuration.ORIENTATION_LANDSCAPE
+            }
+            CompositionLocalProvider(LocalConfiguration provides landscape) {
+                VideoPlayerScreen(
+                    player = player,
+                    title = "搜索视频",
+                    sourceLabel = "哔哩哔哩",
+                    commentMessage = "暂不支持查看在线评论",
+                    onBack = {},
+                    onRetry = {},
+                    details = { Text("搜索视频简介") }
+                )
+            }
+        }
+        compose.onNodeWithText("倍速").performClick()
+        compose.onNodeWithContentDescription("收起倍速面板").assertExists()
+        compose.onNodeWithText("1.50").assertDoesNotExist()
+        compose.onNodeWithText("1.5x").performClick()
+        // The side drawer is a live control: it stays open so the runner can be
+        // watched, and the readout reflects the freshly picked speed.
+        compose.onNodeWithText("1.50").assertExists()
+        compose.onNodeWithText("快跑中").assertExists()
+        compose.onNodeWithContentDescription("收起倍速面板").performClick()
+        compose.onNodeWithContentDescription("收起倍速面板").assertDoesNotExist()
     }
 
     @Test
