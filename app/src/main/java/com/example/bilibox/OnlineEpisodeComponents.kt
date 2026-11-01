@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items as lazyItems
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -96,23 +95,17 @@ internal fun OnlineEpisodesBottomSheet(
     onDismiss: () -> Unit,
     onPageSelected: (Int) -> Unit,
 ) {
-    var gridMode by remember { mutableStateOf(false) }
+    var gridMode by remember { mutableStateOf(true) }
     Column(
         Modifier.fillMaxSize()
-            .clip(RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
+            .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
             .background(Color.White)
     ) {
-        Box(
-            Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(Modifier.size(width = 40.dp, height = 4.dp)
-                .clip(CircleShape).background(OnlineDivider))
-        }
         Row(
-            Modifier.fillMaxWidth().height(44.dp).padding(start = 24.dp, end = 16.dp),
+            Modifier.fillMaxWidth().height(48.dp).padding(start = 16.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Text("分集", color = OnlineText, fontSize = 18.sp, fontWeight = FontWeight.Medium)
             Spacer(Modifier.weight(1f))
             TextButton(onClick = { gridMode = !gridMode }) {
                 Text(if (gridMode) "列表" else "宫格", color = OnlinePink, fontSize = 12.sp)
@@ -131,7 +124,7 @@ internal fun OnlineEpisodesBottomSheet(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 gridItems(pages, key = { it.cid }) { page ->
-                    OnlineSheetEpisodeRow(page, page.page == selectedPage) {
+                    OnlineSheetEpisodeRow(page, page.page == selectedPage, grid = true) {
                         onPageSelected(page.page)
                         onDismiss()
                     }
@@ -155,17 +148,23 @@ internal fun OnlineEpisodesBottomSheet(
 }
 
 @Composable
-private fun OnlineSheetEpisodeRow(page: Page, selected: Boolean, onClick: () -> Unit) {
+private fun OnlineSheetEpisodeRow(
+    page: Page,
+    selected: Boolean,
+    grid: Boolean = false,
+    onClick: () -> Unit,
+) {
     Row(
-        Modifier.fillMaxWidth().height(64.dp)
-            .clip(RoundedCornerShape(18.dp))
+        Modifier.fillMaxWidth().height(if (grid) 80.dp else 64.dp)
+            .clip(RoundedCornerShape(if (grid) 10.dp else 18.dp))
             .background(if (selected) OnlinePink.copy(alpha = .10f) else OnlineDivider)
-            .border(1.dp, if (selected) OnlinePink else OnlineDivider, RoundedCornerShape(18.dp))
+            .border(1.dp, if (selected) OnlinePink else OnlineDivider,
+                RoundedCornerShape(if (grid) 10.dp else 18.dp))
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = if (grid) 12.dp else 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (selected) {
+        if (selected && !grid) {
             EqualizerBars()
             Spacer(Modifier.width(9.dp))
         }
@@ -175,7 +174,7 @@ private fun OnlineSheetEpisodeRow(page: Page, selected: Boolean, onClick: () -> 
                 color = if (selected) OnlinePink else OnlineText,
                 fontSize = 13.sp,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1,
+                maxLines = if (grid) 2 else 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
