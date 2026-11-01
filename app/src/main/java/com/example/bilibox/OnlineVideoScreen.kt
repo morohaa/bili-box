@@ -623,6 +623,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     var autoPlayNext by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(true) }
     var episodesInGridView by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(false) }
     var creatorCard by remember(video.bvid, session?.cookie) { mutableStateOf<com.example.bilibox.bili.UserCardData?>(null) }
+    val episodePlayCache = remember(video.bvid, session?.cookie) { EpisodePlayCache() }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
     suspend fun tryHtml5Fallback(): String? {
         html5FallbackTried = true
@@ -814,19 +815,25 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         playbackCid = 0L
         exoPlayer.stop()
         try {
-            client.warmUp()
-            val info = client.videoInfo(video.bvid)
-            videoInfo = info
-            if (info.owner.mid > 0) {
-                scope.launch {
-                    creatorCard = runCatching { client.userCard(info.owner.mid) }.getOrNull()
+            // View + creator data do not change between parts; only playurl
+            // needs a fresh request when switching episodes.
+            val info = videoInfo ?: run {
+                client.warmUp()
+                client.videoInfo(video.bvid).also { loaded ->
+                    videoInfo = loaded
+                    if (loaded.owner.mid > 0) {
+                        scope.launch {
+                            creatorCard = runCatching { client.userCard(loaded.owner.mid) }.getOrNull()
+                        }
+                    }
                 }
             }
             val page = info.pages.firstOrNull { it.page == selectedPage }
                 ?: info.pages.firstOrNull()?.also { selectedPage = it.page }
             val cid = page?.cid ?: info.cid
             if (cid <= 0) throw IllegalStateException("B 站没有返回视频分 P 信息")
-            val play = client.playUrl(info.bvid.ifBlank { video.bvid }, cid, qn = BiliQn.P1080)
+            val play = episodePlayCache.take(cid)
+                ?: client.playUrl(info.bvid.ifBlank { video.bvid }, cid, qn = BiliQn.P1080)
             playbackCid = cid
             playbackData = play
             playbackCandidateIndex = 0
@@ -855,6 +862,33 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         }
         exoPlayer.addListener(listener)
         onDispose { exoPlayer.removeListener(listener) }
+    }
+    LaunchedEffect(exoPlayer, selectedPage, autoPlayNext, episodePages) {
+        if (!autoPlayNext) return@LaunchedEffect
+        val parts = episodePages ?: return@LaunchedEffect
+        val currentIndex = parts.indexOfFirst { it.page == selectedPage }
+        val nextPart = parts.getOrNull(currentIndex + 1) ?: return@LaunchedEffect
+        while (true) {
+            delay(1_000)
+            val duration = exoPlayer.duration
+            val position = exoPlayer.currentPosition
+            if (duration <= 0L || position <= 0L) continue
+            if (duration - position > NEXT_PART_PREFETCH_AHEAD_MS) continue
+            if (episodePlayCache.containsFresh(nextPart.cid)) break
+            try {
+                val play = client.playUrl(
+                    bvid = video.bvid,
+                    cid = nextPart.cid,
+                    qn = BiliQn.P1080,
+                )
+                episodePlayCache.put(nextPart.cid, play)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // The regular fetch when the current part ends is the fallback.
+            }
+            break
+        }
     }
     val episodePicker: (@Composable (onDismiss: () -> Unit) -> Unit)? =
         if (episodePages == null) null else { onDismiss ->
