@@ -29,6 +29,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -42,6 +47,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -99,6 +105,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.bilibox.ui.theme.BiliBoxTheme
 import com.example.bilibox.bili.BiliClient
+import com.example.bilibox.bili.Page
 import com.example.bilibox.bili.BiliPlayback
 import com.example.bilibox.bili.BiliQn
 import com.example.bilibox.bili.VideoInfo
@@ -1060,10 +1067,13 @@ internal fun VideoPlayerScreen(
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
-            if (fullScreen && episodesExpanded && !screenLocked) {
-                episodes?.invoke {
-                    episodesExpanded = false
-                    controlsVisible = true
+            val episodeContent = episodes
+            if (fullScreen && !screenLocked && episodeContent != null) {
+                EpisodeDrawerVisibility(visible = episodesExpanded) {
+                    episodeContent.invoke {
+                        episodesExpanded = false
+                        controlsVisible = true
+                    }
                 }
             }
         }
@@ -1240,6 +1250,25 @@ private fun PlaybackSpeedMenu(
 }
 
 @Composable
+private fun EpisodeDrawerVisibility(
+    visible: Boolean,
+    content: @Composable () -> Unit,
+) {
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        modifier = Modifier.fillMaxSize(),
+        enter = fadeIn(tween(180)) + slideInHorizontally(
+            initialOffsetX = { it }, animationSpec = tween(260, easing = FastOutSlowInEasing)
+        ),
+        exit = fadeOut(tween(140)) + slideOutHorizontally(
+            targetOffsetX = { it }, animationSpec = tween(220, easing = FastOutSlowInEasing)
+        )
+    ) {
+        content()
+    }
+}
+
+@Composable
 private fun LocalVideoEpisodes(
     playlist: List<LocalVideo>,
     currentVideo: LocalVideo,
@@ -1253,45 +1282,59 @@ private fun LocalVideoEpisodes(
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .35f))
             .clickable(onClick = onDismiss).semantics { contentDescription = "关闭选集" })
         Column(
-            Modifier.align(Alignment.CenterEnd).width(320.dp).fillMaxHeight()
-                .background(Color(0xF5181818))
+            Modifier.align(Alignment.CenterEnd).width(360.dp).fillMaxHeight()
+                .background(Color(0xF2121318))
+                .border(1.dp, Color.White.copy(alpha = .08f), RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) }
-                .displayCutoutPadding().navigationBarsPadding()
+                .navigationBarsPadding()
         ) {
-            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp),
+            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp).height(56.dp),
                 verticalAlignment = Alignment.CenterVertically) {
-                Text("选集", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Text("  ${playlist.size} 个视频", color = Color.White.copy(alpha = .5f), fontSize = 12.sp)
+                Text("分集(${playlist.size}P)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = "收起选集" }) {
-                    Text("×", color = Color.White.copy(alpha = .7f), fontSize = 26.sp)
+                    Text("×", color = Color.White.copy(alpha = .72f), fontSize = 24.sp)
                 }
             }
+            HorizontalDivider(color = Color.White.copy(alpha = .08f))
             LazyColumn(Modifier.weight(1f).selectableGroup(), state = listState,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 itemsIndexed(playlist, key = { _, item -> item.uri.toString() }) { index, item ->
-                    val selected = item.uri == currentVideo.uri
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                            .background(if (selected) Pink.copy(alpha = .14f) else Color.White.copy(alpha = .05f))
-                            .selectable(selected = selected, role = Role.RadioButton,
-                                onClick = { onVideoSelected(item) }).padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("${index + 1}", color = if (selected) Pink else Color.White.copy(alpha = .5f),
-                            fontSize = 13.sp, modifier = Modifier.width(28.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(item.name, color = if (selected) Pink else Color.White, fontSize = 14.sp,
-                                maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Spacer(Modifier.height(5.dp))
-                            Text(if (selected) "正在播放" else formatVideoDuration(item.durationMs),
-                                color = if (selected) Pink else Color.White.copy(alpha = .45f), fontSize = 11.sp)
-                        }
-                    }
+                    LocalEpisodeRow(index, item, item.uri == currentVideo.uri) { onVideoSelected(item) }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LocalEpisodeRow(index: Int, item: LocalVideo, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp))
+            .background(if (selected) Pink.copy(alpha = .18f) else Color.White.copy(alpha = .05f))
+            .border(1.dp, if (selected) Pink.copy(alpha = .8f) else Color.Transparent, RoundedCornerShape(11.dp))
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (selected) EqualizerBars()
+        Text(
+            "P${index + 1} ${item.name}${if (selected) " (当前播放)" else ""}",
+            color = if (selected) Pink else Color.White,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).padding(start = if (selected) 4.dp else 0.dp)
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            formatVideoDuration(item.durationMs),
+            color = if (selected) Pink else Color.White.copy(alpha = .45f),
+            fontSize = 11.sp,
+            maxLines = 1
+        )
     }
 }
 
@@ -1373,6 +1416,8 @@ private fun OnlineVideoDetails(
     info: VideoInfo?,
     creatorCard: com.example.bilibox.bili.UserCardData?,
     context: Context,
+    selectedPage: Int,
+    onPageSelected: (Int) -> Unit,
 ) {
     var following by rememberSaveable(video.bvid) { mutableStateOf(false) }
     var liked by rememberSaveable(video.bvid) { mutableStateOf(false) }
@@ -1469,6 +1514,46 @@ private fun OnlineVideoDetails(
                     contentAlignment = Alignment.Center
                 ) {
                     ChevronDownIcon(Modifier.size(18.dp).rotate(if (expanded) 180f else 0f), OnlineMuted)
+                }
+            }
+            info?.pages?.takeIf { it.size > 1 }?.let { pages ->
+                val selected = pages.firstOrNull { it.page == selectedPage }
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("分P", color = OnlineSecondary, fontSize = 12.sp)
+                    Spacer(Modifier.width(10.dp))
+                    Row(
+                        Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        pages.forEach { page ->
+                            val isSelected = page.page == selectedPage
+                            Text(
+                                "P${page.page} ${page.part.ifBlank { "第 ${page.page} 部分" }}",
+                                modifier = Modifier.clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSelected) OnlinePink.copy(alpha = .12f) else OnlineDivider)
+                                    .clickable(role = Role.Button) { onPageSelected(page.page) }
+                                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                                    .semantics { contentDescription = "播放第 ${page.page} P" },
+                                color = if (isSelected) OnlinePink else OnlineSecondary,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+                selected?.let { page ->
+                    Text(
+                        "当前播放：P${page.page} ${page.part}",
+                        color = OnlineMuted,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 5.dp)
+                    )
                 }
             }
             Row(
@@ -1936,10 +2021,28 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
     var playbackCandidateIndex by remember(video.bvid, session?.cookie) { mutableIntStateOf(0) }
     var playbackCandidateCount by remember(video.bvid, session?.cookie) { mutableIntStateOf(1) }
     var playbackRefreshTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
+    var dashFallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
     var durlFallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
+    var html5FallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
     var videoInfo by remember(video.bvid, session?.cookie) { mutableStateOf<VideoInfo?>(null) }
+    var selectedPage by rememberSaveable(video.bvid, session?.cookie) { mutableIntStateOf(1) }
     var creatorCard by remember(video.bvid, session?.cookie) { mutableStateOf<com.example.bilibox.bili.UserCardData?>(null) }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
+    suspend fun tryHtml5Fallback(): String? {
+        html5FallbackTried = true
+        return try {
+            val fallback = client.playUrlHtml5(video.bvid, playbackCid, qn = BiliQn.P1080)
+            playbackData = fallback
+            playbackCandidateIndex = 0
+            playbackCandidateCount = BiliPlayback.candidateCount(fallback, preferredQn = BiliQn.P1080)
+            BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P1080, cookie = session?.cookie, bvid = video.bvid)
+            null
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            error.message ?: "HTML5 单文件流也不可用"
+        }
+    }
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
@@ -1995,7 +2098,53 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
                             } catch (error2: CancellationException) {
                                 throw error2
                             } catch (error2: Exception) {
-                                playbackState = PlaybackState.Error("播放器无法读取视频流：${error2.message ?: "单文件流也不可用"}")
+                                val html5Error = tryHtml5Fallback()
+                                if (html5Error != null) {
+                                    playbackState = PlaybackState.Error("播放器无法读取视频流：${error2.message ?: "单文件流也不可用"}；HTML5 回退失败：$html5Error")
+                                }
+                            }
+                        }
+                    }
+                    return
+                }
+                if (!dashFallbackTried && !durlFallbackTried && playbackCid > 0) {
+                    dashFallbackTried = true
+                    playbackState = PlaybackState.Loading
+                    scope.launch {
+                        try {
+                            val fallback = client.playUrl(
+                                bvid = video.bvid,
+                                cid = playbackCid,
+                                qn = BiliQn.P720,
+                                fnval = BiliClient.FNVAL_DASH_ALL,
+                            )
+                            playbackData = fallback
+                            playbackCandidateIndex = 0
+                            playbackCandidateCount = BiliPlayback.candidateCount(fallback, preferredQn = BiliQn.P720)
+                            durlFallbackTried = fallback.dash == null
+                            BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P720, cookie = session?.cookie, bvid = video.bvid)
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (_: Exception) {
+                            durlFallbackTried = true
+                            try {
+                                val fallback = client.playUrl(
+                                    bvid = video.bvid,
+                                    cid = playbackCid,
+                                    qn = BiliQn.P720,
+                                    fnval = BiliClient.FNVAL_DURL,
+                                )
+                                playbackData = fallback
+                                playbackCandidateIndex = 0
+                                playbackCandidateCount = BiliPlayback.candidateCount(fallback, preferredQn = BiliQn.P720)
+                                BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P720, cookie = session?.cookie, bvid = video.bvid)
+                            } catch (error: CancellationException) {
+                                throw error
+                            } catch (error: Exception) {
+                                val html5Error = tryHtml5Fallback()
+                                if (html5Error != null) {
+                                    playbackState = PlaybackState.Error("播放器无法读取视频流：${error.message ?: "低清晰度视频流也不可用"}；HTML5 回退失败：$html5Error")
+                                }
                             }
                         }
                     }
@@ -2021,7 +2170,20 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
                         } catch (error: CancellationException) {
                             throw error
                         } catch (error: Exception) {
-                            playbackState = PlaybackState.Error("播放器无法读取视频流：${error.message ?: "单文件流也不可用"}")
+                            val html5Error = tryHtml5Fallback()
+                            if (html5Error != null) {
+                                playbackState = PlaybackState.Error("播放器无法读取视频流：${error.message ?: "单文件流也不可用"}；HTML5 回退失败：$html5Error")
+                            }
+                        }
+                    }
+                    return
+                }
+                if (!html5FallbackTried && playbackCid > 0) {
+                    playbackState = PlaybackState.Loading
+                    scope.launch {
+                        val fallbackError = tryHtml5Fallback()
+                        if (fallbackError != null) {
+                            playbackState = PlaybackState.Error("播放器无法读取视频流：$fallbackError")
                         }
                     }
                     return
@@ -2046,10 +2208,15 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
             exoPlayer.release()
         }
     }
-    LaunchedEffect(video.bvid, session?.cookie, retryToken) {
+    LaunchedEffect(video.bvid, session?.cookie, retryToken, selectedPage) {
         playbackState = PlaybackState.Loading
         playbackRefreshTried = false
+        dashFallbackTried = false
         durlFallbackTried = false
+        html5FallbackTried = false
+        playbackData = null
+        playbackCid = 0L
+        exoPlayer.stop()
         try {
             client.warmUp()
             val info = client.videoInfo(video.bvid)
@@ -2059,7 +2226,9 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
                     creatorCard = runCatching { client.userCard(info.owner.mid) }.getOrNull()
                 }
             }
-            val cid = info.pages.firstOrNull()?.cid ?: info.cid
+            val page = info.pages.firstOrNull { it.page == selectedPage }
+                ?: info.pages.firstOrNull()?.also { selectedPage = it.page }
+            val cid = page?.cid ?: info.cid
             if (cid <= 0) throw IllegalStateException("B 站没有返回视频分 P 信息")
             val play = client.playUrl(info.bvid.ifBlank { video.bvid }, cid, qn = BiliQn.P1080)
             playbackCid = cid
@@ -2073,6 +2242,11 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
             playbackState = PlaybackState.Error(error.message ?: "无法获取视频播放地址")
         }
     }
+    val episodePages = videoInfo?.pages?.takeIf { it.size > 1 }
+    val episodePicker: (@Composable (onDismiss: () -> Unit) -> Unit)? =
+        if (episodePages == null) null else { onDismiss ->
+            OnlineVideoEpisodes(episodePages, selectedPage, onDismiss) { selectedPage = it.page }
+        }
     VideoPlayerScreen(
         player = exoPlayer,
         title = video.title,
@@ -2082,12 +2256,92 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
         commentMessage = "暂不支持查看在线评论",
         onBack = onBack,
         onRetry = { retryToken++ },
+        episodes = episodePicker,
         detailsBackground = OnlineSurface,
         showDetailTabs = false,
-        details = {
-            OnlineVideoDetails(video, videoInfo, creatorCard, context)
+        details = { _ ->
+            OnlineVideoDetails(video, videoInfo, creatorCard, context, selectedPage) { selectedPage = it }
         }
     )
+}
+
+@Composable
+internal fun OnlineVideoEpisodes(
+    pages: List<Page>,
+    selectedPage: Int,
+    onDismiss: () -> Unit,
+    onPageSelected: (Page) -> Unit,
+) {
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = pages.indexOfFirst { it.page == selectedPage }.coerceAtLeast(0)
+    )
+    Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .35f))
+            .clickable(onClick = onDismiss).semantics { contentDescription = "关闭选集" })
+        Column(
+            Modifier.align(Alignment.CenterEnd).width(360.dp).fillMaxHeight()
+                .background(Color(0xF2121318))
+                .border(1.dp, Color.White.copy(alpha = .08f), RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
+                .pointerInput(Unit) { detectTapGestures(onTap = {}) }
+                .navigationBarsPadding()
+        ) {
+            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp).height(56.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text("分集(${pages.size}P)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = "收起选集" }) {
+                    Text("×", color = Color.White.copy(alpha = .72f), fontSize = 24.sp)
+                }
+            }
+            HorizontalDivider(color = Color.White.copy(alpha = .08f))
+            LazyColumn(Modifier.weight(1f).selectableGroup(), state = listState,
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                itemsIndexed(pages, key = { _, page -> page.cid }) { _, page ->
+                    OnlineEpisodeRow(page, page.page == selectedPage) { onPageSelected(page); onDismiss() }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnlineEpisodeRow(page: Page, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp))
+            .background(if (selected) OnlinePink.copy(alpha = .18f) else Color.White.copy(alpha = .05f))
+            .border(1.dp, if (selected) OnlinePink else Color.Transparent, RoundedCornerShape(11.dp))
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (selected) EqualizerBars()
+        Text(
+            "P${page.page} ${page.part.ifBlank { "第 ${page.page} 部分" }}${if (selected) " (当前播放)" else ""}",
+            color = if (selected) OnlinePink else Color.White,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).padding(start = if (selected) 4.dp else 0.dp)
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            formatPlaybackTime(page.duration * 1_000L),
+            color = if (selected) OnlinePink else Color.White.copy(alpha = .45f),
+            fontSize = 11.sp,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun EqualizerBars() {
+    Row(Modifier.width(20.dp).height(16.dp), verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        val heights = listOf(8.dp, 13.dp, 10.dp)
+        heights.forEach { height -> Box(Modifier.width(3.dp).height(height).clip(RoundedCornerShape(2.dp)).background(OnlinePink)) }
+    }
 }
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)

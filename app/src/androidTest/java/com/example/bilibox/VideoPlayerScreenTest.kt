@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performClick
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.bilibox.bili.Page
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Rule
@@ -102,6 +103,32 @@ class VideoPlayerScreenTest {
         compose.onNodeWithContentDescription("截取视频画面").assertDoesNotExist()
         compose.onNodeWithContentDescription("解锁屏幕").performClick()
         compose.onNodeWithContentDescription("截取视频画面").assertExists()
+    }
+
+    @Test
+    fun onlineEpisodePickerSelectsTheRequestedPartAndDismisses() {
+        val pages = listOf(
+            Page(cid = 101, page = 1, part = "第一集", duration = 60),
+            Page(cid = 202, page = 2, part = "第二集", duration = 90),
+        )
+        var selectedPage = 1
+        var visible by mutableStateOf(true)
+        compose.setContent {
+            if (visible) {
+                OnlineVideoEpisodes(
+                    pages = pages,
+                    selectedPage = selectedPage,
+                    onDismiss = { visible = false },
+                    onPageSelected = { selectedPage = it.page }
+                )
+            }
+        }
+
+        compose.onNodeWithText("第二集", substring = true).performClick()
+        compose.runOnIdle {
+            assertEquals(2, selectedPage)
+            assertEquals(false, visible)
+        }
     }
 
     private fun findPlayerView(): PlayerView {

@@ -125,6 +125,26 @@ class BiliClient(
             // by Bilibili, while logged-in requests remain compatible.
             "try_look" to "1",
         )
+        return requestPlayData(params)
+    }
+
+    /** Requests the single-file MP4 stream whose HTML5 platform avoids Referer anti-hotlink checks. */
+    suspend fun playUrlHtml5(bvid: String, cid: Long, qn: Int = BiliQn.P1080): PlayData {
+        val params = mapOf(
+            "bvid" to bvid,
+            "cid" to cid.toString(),
+            "qn" to qn.toString(),
+            "fnval" to FNVAL_DURL.toString(),
+            "fnver" to "0",
+            "fourk" to "0",
+            "platform" to "html5",
+            "high_quality" to "1",
+            "try_look" to "1",
+        )
+        return requestPlayData(params)
+    }
+
+    private suspend fun requestPlayData(params: Map<String, String>): PlayData {
         var response = getJson<PlayData>(signedPlayUrl(params, false))
         if (response.code == CODE_RISK || response.code == CODE_SIGN_EXPIRED) {
             buvid3 = null
