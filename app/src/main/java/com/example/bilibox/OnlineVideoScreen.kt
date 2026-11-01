@@ -114,6 +114,7 @@ import com.example.bilibox.bili.BiliClient
 import com.example.bilibox.bili.Page
 import com.example.bilibox.bili.BiliPlayback
 import com.example.bilibox.bili.BiliQn
+import com.example.bilibox.bili.PlayData
 import com.example.bilibox.bili.VideoInfo
 import com.example.bilibox.bili.VideoSearchItem
 import androidx.media3.common.PlaybackException
@@ -619,11 +620,19 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     var html5FallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
     var videoInfo by remember(video.bvid, session?.cookie) { mutableStateOf<VideoInfo?>(null) }
     var selectedPage by rememberSaveable(video.bvid, session?.cookie) { mutableIntStateOf(1) }
+    var selectedQn by rememberSaveable(video.bvid, session?.cookie) { mutableIntStateOf(BiliQn.P1080) }
+    // The quality the server actually started, which can be lower than the requested one.
+    var actualQn by rememberSaveable(video.bvid, session?.cookie) { mutableIntStateOf(0) }
+    // Selecting the same quality again must still be able to retry a clamped stream.
+    var qualityRequestToken by remember(video.bvid, session?.cookie) { mutableIntStateOf(0) }
+    var qualityResumeMs by remember(video.bvid, session?.cookie) { mutableLongStateOf(0L) }
+    var qualityResumePlaying by remember(video.bvid, session?.cookie) { mutableStateOf(true) }
     var episodesSheetVisible by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(false) }
     var autoPlayNext by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(true) }
     var episodesInGridView by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(false) }
     var creatorCard by remember(video.bvid, session?.cookie) { mutableStateOf<com.example.bilibox.bili.UserCardData?>(null) }
-    val episodePlayCache = remember(video.bvid, session?.cookie) { EpisodePlayCache() }
+    // Cache entries belong to one quality, so do not reuse 1080P urls after a quality change.
+    val episodePlayCache = remember(video.bvid, session?.cookie, selectedQn) { EpisodePlayCache() }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
     suspend fun tryHtml5Fallback(): String? {
         html5FallbackTried = true
@@ -805,7 +814,11 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
             exoPlayer.release()
         }
     }
-    LaunchedEffect(video.bvid, session?.cookie, retryToken, selectedPage) {
+    LaunchedEffect(video.bvid, session?.cookie, retryToken, selectedPage, selectedQn, qualityRequestToken) {
+        val resumeAtMs = qualityResumeMs
+        val resumePlaying = qualityResumePlaying
+        qualityResumeMs = 0L
+        qualityResumePlaying = true
         playbackState = PlaybackState.Loading
         playbackRefreshTried = false
         dashFallbackTried = false
@@ -833,17 +846,24 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
             val cid = page?.cid ?: info.cid
             if (cid <= 0) throw IllegalStateException("B 站没有返回视频分 P 信息")
             val play = episodePlayCache.take(cid)
-                ?: client.playUrl(info.bvid.ifBlank { video.bvid }, cid, qn = BiliQn.P1080)
+                ?: client.playUrl(info.bvid.ifBlank { video.bvid }, cid, qn = selectedQn)
             playbackCid = cid
             playbackData = play
             playbackCandidateIndex = 0
-            playbackCandidateCount = BiliPlayback.candidateCount(play, preferredQn = BiliQn.P1080)
-            BiliPlayback.attach(exoPlayer, play, preferredQn = BiliQn.P1080, candidateIndex = 0, cookie = session?.cookie, bvid = video.bvid)
+            playbackCandidateCount = BiliPlayback.candidateCount(play, preferredQn = selectedQn)
+            BiliPlayback.attach(exoPlayer, play, preferredQn = selectedQn, candidateIndex = 0, cookie = session?.cookie, bvid = video.bvid)
+            if (resumeAtMs > 0L) exoPlayer.seekTo(resumeAtMs)
+            if (!resumePlaying) exoPlayer.playWhenReady = false
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
             playbackState = PlaybackState.Error(error.message ?: "无法获取视频播放地址")
         }
+    }
+    // Fallback paths can lower the stream too, so derive the badge from every
+    // successful playurl response instead of only the primary request.
+    LaunchedEffect(playbackData) {
+        playbackData?.quality?.takeIf { it > 0 }?.let { actualQn = it }
     }
     val episodePages = videoInfo?.pages?.takeIf { it.size > 1 }
     val latestEpisodePages by rememberUpdatedState(episodePages)
@@ -863,7 +883,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         exoPlayer.addListener(listener)
         onDispose { exoPlayer.removeListener(listener) }
     }
-    LaunchedEffect(exoPlayer, selectedPage, autoPlayNext, episodePages) {
+    LaunchedEffect(exoPlayer, selectedPage, autoPlayNext, episodePages, selectedQn) {
         if (!autoPlayNext) return@LaunchedEffect
         val parts = episodePages ?: return@LaunchedEffect
         val currentIndex = parts.indexOfFirst { it.page == selectedPage }
@@ -879,7 +899,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                 val play = client.playUrl(
                     bvid = video.bvid,
                     cid = nextPart.cid,
-                    qn = BiliQn.P1080,
+                    qn = selectedQn,
                 )
                 episodePlayCache.put(nextPart.cid, play)
             } catch (cancelled: CancellationException) {
@@ -912,6 +932,15 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
             )
         }
     } else null
+    val qualityOptions = remember(playbackData, actualQn) { buildQualityOptions(playbackData, actualQn) }
+    // Show what is actually playing; fall back to the requested value while loading.
+    val effectiveQuality = actualQn.takeIf { qn -> qn > 0 && qualityOptions.any { it.qn == qn } }
+        ?: qualityOptions.firstOrNull { it.qn == selectedQn }?.qn
+        ?: qualityOptions.maxByOrNull { it.qn }?.qn
+    val nextPage = videoInfo?.pages?.let { pages ->
+        val currentIndex = pages.indexOfFirst { it.page == selectedPage }
+        if (currentIndex >= 0) pages.getOrNull(currentIndex + 1) else null
+    }
     VideoPlayerScreen(
         player = exoPlayer,
         title = video.title,
@@ -921,6 +950,22 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         commentMessage = "暂不支持查看在线评论",
         onBack = onBack,
         onRetry = { retryToken++ },
+        onNextEpisode = nextPage?.let { page -> { selectedPage = page.page } },
+        qualityOptions = qualityOptions,
+        selectedQuality = effectiveQuality,
+        onQualitySelected = { qn ->
+            if (qn == actualQn) {
+                // Already streaming at this quality; just keep the requested value in sync.
+                selectedQn = qn
+            } else {
+                qualityResumeMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+                qualityResumePlaying = exoPlayer.playWhenReady
+                selectedQn = qn
+                // The selected qn may already match while the server clamped the
+                // stream, so use a token to force a fresh playurl request.
+                qualityRequestToken++
+            }
+        },
         episodes = episodePicker,
         episodeOverlay = episodeOverlayContent,
         episodeOverlayVisible = episodeOverlayVisible,
@@ -1023,5 +1068,30 @@ internal fun EqualizerBars() {
         horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         val heights = listOf(8.dp, 13.dp, 10.dp)
         heights.forEach { height -> Box(Modifier.width(3.dp).height(height).clip(RoundedCornerShape(2.dp)).background(OnlinePink)) }
+    }
+}
+
+/**
+ * Maps the playurl `accept_quality` list to the compact labels used by the
+ * fullscreen quality drawer. Anonymous playback is reliable up to 1080P; the
+ * 4K/8K/Dolby tiers need account privileges and are intentionally hidden for
+ * now instead of offering an option that cannot start.
+ */
+private fun buildQualityOptions(play: PlayData?, actualQn: Int): List<PlayerQualityOption> {
+    val accepted = (play?.acceptQuality.orEmpty() + listOf(actualQn))
+        .filter { it in BiliQn.P360..BiliQn.P1080 }
+        .distinct()
+    val qns = accepted.ifEmpty {
+        listOf(BiliQn.P1080, BiliQn.P720, BiliQn.P480, BiliQn.P360)
+    }.sortedDescending()
+    return qns.map { qn ->
+        when (qn) {
+            74 -> PlayerQualityOption(qn, "720P 60帧", "高帧率")
+            BiliQn.P1080 -> PlayerQualityOption(qn, "1080P", "高清 · 推荐")
+            BiliQn.P720 -> PlayerQualityOption(qn, "720P", "高清 · 省流")
+            BiliQn.P480 -> PlayerQualityOption(qn, "480P", "清晰")
+            BiliQn.P360 -> PlayerQualityOption(qn, "360P", "流畅")
+            else -> PlayerQualityOption(qn, "${qn}P", "")
+        }
     }
 }

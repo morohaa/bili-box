@@ -141,6 +141,14 @@ private data class PlayerGestureFeedbackState(
     val level: Float
 )
 
+/** A selectable video stream quality shown in the fullscreen quality drawer. */
+internal data class PlayerQualityOption(
+    val qn: Int,
+    val label: String,
+    val description: String = "",
+    val badge: String? = null,
+)
+
 private fun readScreenBrightness(activity: ComponentActivity): Float {
     val override = activity.window.attributes.screenBrightness
     if (override >= 0f) return override.coerceIn(0f, 1f)
@@ -231,6 +239,8 @@ internal fun LocalVideoPlayer(
             }
         }
     }
+    val currentIndex = playlist.indexOfFirst { it.uri == video.uri }
+    val nextVideo = if (currentIndex >= 0) playlist.getOrNull(currentIndex + 1) else null
     VideoPlayerScreen(
         player = player,
         title = video.name,
@@ -247,6 +257,7 @@ internal fun LocalVideoPlayer(
             player.prepare()
             player.playWhenReady = true
         },
+        onNextEpisode = nextVideo?.let { next -> { onVideoSelected(next) } },
         episodes = { dismiss ->
             LocalVideoEpisodes(playlist, video, onDismiss = dismiss, onVideoSelected = {
                 dismiss()
@@ -302,6 +313,10 @@ internal fun VideoPlayerScreen(
     episodeOverlay: (@Composable () -> Unit)? = null,
     episodeOverlayVisible: Boolean = episodeOverlay != null,
     episodeOverlayDismiss: (() -> Unit)? = null,
+    onNextEpisode: (() -> Unit)? = null,
+    qualityOptions: List<PlayerQualityOption> = emptyList(),
+    selectedQuality: Int? = null,
+    onQualitySelected: ((Int) -> Unit)? = null,
     detailsBackground: Color = Color.White,
     showDetailTabs: Boolean = true,
     details: @Composable (duration: Long) -> Unit,
@@ -320,6 +335,7 @@ internal fun VideoPlayerScreen(
     var speed by remember(player) { mutableFloatStateOf(1f) }
     var speedMenuExpanded by remember(player) { mutableStateOf(false) }
     var episodesExpanded by remember(player) { mutableStateOf(false) }
+    var qualityMenuExpanded by remember(player) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableIntStateOf(player.playbackState) }
     var detailsTab by remember(player) { mutableIntStateOf(0) }
     var controlsVisible by remember(player) { mutableStateOf(true) }
@@ -359,6 +375,7 @@ internal fun VideoPlayerScreen(
     LaunchedEffect(activity, fullScreen) {
         speedMenuExpanded = false
         episodesExpanded = false
+        qualityMenuExpanded = false
         if (!fullScreen) screenLocked = false
         activity?.let {
             WindowCompat.getInsetsController(it.window, it.window.decorView).apply {
@@ -398,6 +415,7 @@ internal fun VideoPlayerScreen(
         controlsVisible = true
         speedMenuExpanded = false
         episodesExpanded = false
+        qualityMenuExpanded = false
         if (screenLocked) {
             orientationBeforeLock = activity?.requestedOrientation
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
@@ -504,8 +522,9 @@ internal fun VideoPlayerScreen(
             delay(250)
         }
     }
-    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, episodesExpanded) {
-        if (controlsVisible && (isPlaying || screenLocked) && !scrubbing && !speedMenuExpanded && !episodesExpanded) {
+    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, episodesExpanded, qualityMenuExpanded) {
+        if (controlsVisible && (isPlaying || screenLocked) && !scrubbing &&
+            !speedMenuExpanded && !episodesExpanded && !qualityMenuExpanded) {
             delay(4_000)
             controlsVisible = false
         }
@@ -520,6 +539,7 @@ internal fun VideoPlayerScreen(
         when {
             screenLocked -> controlsVisible = true
             episodeOverlayDismiss != null -> episodeOverlayDismiss()
+            qualityMenuExpanded -> qualityMenuExpanded = false
             episodesExpanded -> episodesExpanded = false
             speedMenuExpanded -> speedMenuExpanded = false
             else -> navigateBack()
@@ -565,13 +585,14 @@ internal fun VideoPlayerScreen(
                     .background(Brush.verticalGradient(listOf(
                         Color.Black.copy(alpha = .75f), Color.Black.copy(alpha = .3f), Color.Transparent
                     ))))
-                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(if (fullScreen) 128.dp else 64.dp)
+                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(if (fullScreen) 150.dp else 64.dp)
                     .background(Brush.verticalGradient(listOf(
-                        Color.Transparent, Color.Black.copy(alpha = .4f), Color.Black.copy(alpha = .85f)
+                        Color.Transparent, Color.Black.copy(alpha = .4f), Color.Black.copy(alpha = .88f)
                     ))))
                 Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .then(if (fullScreen) Modifier.padding(top = 12.dp)
+                        .then(if (fullScreen) Modifier
+                            .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 6.dp)
                             else Modifier.padding(horizontal = 6.dp))
                 ) {
                     val seekBar: @Composable (Modifier) -> Unit = { modifier ->
@@ -590,51 +611,82 @@ internal fun VideoPlayerScreen(
                     }
                     val showPause = playWhenReady && playbackState != Player.STATE_ENDED
                     if (fullScreen) {
+                        val currentQualityLabel = qualityOptions
+                            .firstOrNull { it.qn == selectedQuality }?.label
+                            ?: qualityOptions.maxByOrNull { it.qn }?.label.orEmpty()
                         Row(
-                            Modifier.fillMaxWidth().height(24.dp).padding(horizontal = 18.dp),
+                            Modifier.fillMaxWidth().height(26.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             seekBar(Modifier.fillMaxWidth())
                         }
                         Row(
-                            Modifier.fillMaxWidth().height(48.dp)
-                                .padding(start = 18.dp, end = 36.dp),
+                            Modifier.fillMaxWidth().height(46.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Left: play/pause, next part and the tabular timestamp.
+                            PlayerBarIconButton(
+                                contentDescription = if (showPause) "暂停" else "播放",
+                                onClick = { togglePlayback() }
+                            ) {
+                                PlaybackIcon(showPause, Modifier.size(22.dp))
+                            }
+                            // Keep the next-episode icon in the bar even for
+                            // single-part videos, where tapping explains why it
+                            // has nowhere to go.
+                            PlayerBarIconButton(
+                                contentDescription = "下一集",
+                                onClick = {
+                                    val next = onNextEpisode
+                                    if (next != null) next()
+                                    else Toast.makeText(context, "已经是最后一集", Toast.LENGTH_SHORT).show()
+                                }
+                            ) {
+                                NextEpisodeIcon(Modifier.size(18.dp))
+                            }
                             PlaybackTimeLabel(
                                 position = if (scrubbing) scrubPosition.toLong() else position,
                                 duration = duration,
-                                modifier = Modifier.padding(start = 9.dp, end = 10.dp)
+                                modifier = Modifier.padding(start = 6.dp, end = 4.dp)
                             )
-                            Box(
-                                modifier = Modifier.size(48.dp).semantics {
-                                    contentDescription = if (showPause) "暂停" else "播放"
-                                }.clickable(role = Role.Button, onClick = { togglePlayback() }),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                PlaybackIcon(showPause, Modifier.padding(start = 4.dp).size(26.dp))
+                            Spacer(Modifier.width(12.dp))
+                            // Center: danmaku hub placeholder, capped so the
+                            // send field does not stretch across the whole bar.
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                DanmakuPlaceholderBar(
+                                    onPlaceholderClick = {
+                                        Toast.makeText(context, "弹幕功能正在开发中，敬请期待", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth()
+                                )
                             }
-                            Spacer(Modifier.weight(1f))
+                            Spacer(Modifier.width(12.dp))
+                            // Right: episodes, speed and quality. The fullscreen
+                            // exit is intentionally left to the top-left back arrow.
                             if (episodes != null) {
-                                TextButton(
-                                    onClick = { episodesExpanded = true },
-                                    contentPadding = PaddingValues(horizontal = 10.dp)
-                                ) {
-                                    Text("选集", color = Color.White, fontSize = 12.sp)
+                                PlayerBarAction("选集", contentDescription = "选集") {
+                                    speedMenuExpanded = false
+                                    qualityMenuExpanded = false
+                                    episodesExpanded = true
                                 }
                             }
-                            Box {
-                                TextButton(
-                                    onClick = { speedMenuExpanded = true },
-                                    contentPadding = PaddingValues(horizontal = 10.dp)
-                                ) {
-                                    Text(
-                                        if (speed == 1f) "倍速" else "${speed}x",
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.semantics { contentDescription = "倍速" }
-                                    )
-                                }
+                            PlayerBarAction(
+                                text = if (speed == 1f) "倍速" else "${speed}x",
+                                contentDescription = "倍速"
+                            ) {
+                                episodesExpanded = false
+                                qualityMenuExpanded = false
+                                speedMenuExpanded = true
+                            }
+                            if (qualityOptions.isNotEmpty()) {
+                                PlayerQualityChip(
+                                    label = currentQualityLabel,
+                                    onClick = {
+                                        episodesExpanded = false
+                                        speedMenuExpanded = false
+                                        qualityMenuExpanded = true
+                                    }
+                                )
                             }
                         }
                     } else {
@@ -749,6 +801,17 @@ internal fun VideoPlayerScreen(
                             speed = it
                         },
                         sideDrawer = true
+                    )
+                }
+                PlayerDrawerVisibility(visible = qualityMenuExpanded) {
+                    PlaybackQualityDrawer(
+                        options = qualityOptions,
+                        selectedQuality = selectedQuality,
+                        onDismiss = { qualityMenuExpanded = false },
+                        onQualitySelected = { qn ->
+                            onQualitySelected?.invoke(qn)
+                            qualityMenuExpanded = false
+                        },
                     )
                 }
             }
@@ -895,6 +958,292 @@ private fun PlaybackTimeLabel(
     )
 }
 
+@Composable
+private fun PlayerBarIconButton(
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: @Composable BoxScope.() -> Unit,
+) {
+    val description = contentDescription
+    Box(
+        modifier.size(32.dp).clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { this.contentDescription = description },
+        contentAlignment = Alignment.Center,
+        content = icon
+    )
+}
+
+@Composable
+private fun PlayerBarAction(
+    text: String,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier.height(32.dp).clip(RoundedCornerShape(8.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { this.contentDescription = contentDescription }
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            color = Color.White.copy(alpha = .92f),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun PlayerQualityChip(label: String, onClick: () -> Unit) {
+    Box(
+        Modifier.height(30.dp).clip(RoundedCornerShape(8.dp))
+            .background(OnlinePink.copy(alpha = .18f))
+            .border(1.dp, OnlinePink.copy(alpha = .55f), RoundedCornerShape(8.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = "画质 ${label.ifBlank { "选择" }}" }
+            .padding(horizontal = 9.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label.ifBlank { "画质" },
+            color = OnlinePink,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun DanmakuPlaceholderBar(
+    onPlaceholderClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier.height(32.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        // Master switch pill from the reference bar, kept as a visible placeholder.
+        Row(
+            Modifier.height(30.dp).clip(RoundedCornerShape(8.dp))
+                .background(Color.White.copy(alpha = .12f))
+                .clickable(role = Role.Button, onClick = onPlaceholderClick)
+                .semantics { contentDescription = "弹幕开关（开发中）" }
+                .padding(horizontal = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("弹", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(3.dp))
+            Box(
+                Modifier.size(13.dp).background(OnlinePink, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("✓", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                    lineHeight = 8.sp)
+            }
+        }
+        // Danmaku settings pill (弹 + gear).
+        Row(
+            Modifier.height(30.dp).clip(RoundedCornerShape(8.dp))
+                .background(Color.White.copy(alpha = .12f))
+                .clickable(role = Role.Button, onClick = onPlaceholderClick)
+                .semantics { contentDescription = "弹幕设置（开发中）" }
+                .padding(horizontal = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("弹", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(3.dp))
+            Canvas(Modifier.size(13.dp)) {
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val radius = size.minDimension / 2f
+                drawCircle(OnlinePink, radius * .42f, center,
+                    style = Stroke(1.4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                repeat(8) { index ->
+                    val angle = Math.toRadians(index * 45.0)
+                    val cos = kotlin.math.cos(angle).toFloat()
+                    val sin = kotlin.math.sin(angle).toFloat()
+                    drawLine(
+                        OnlinePink,
+                        Offset(center.x + cos * radius * .56f, center.y + sin * radius * .56f),
+                        Offset(center.x + cos * radius * .9f, center.y + sin * radius * .9f),
+                        strokeWidth = 1.8.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
+                drawCircle(OnlinePink, radius * .12f, center)
+            }
+        }
+        // Frosted input pill, matching the "发个友善的弹幕…" entry.
+        Row(
+            Modifier.weight(1f).height(30.dp).clip(CircleShape)
+                .background(Color.White.copy(alpha = .14f))
+                .border(1.dp, Color.White.copy(alpha = .08f), CircleShape)
+                .clickable(role = Role.Button, onClick = onPlaceholderClick)
+                .semantics { contentDescription = "发送弹幕（开发中）" }
+                .padding(start = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "发个友善的弹幕见证当下…",
+                color = Color.White.copy(alpha = .68f),
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                "发送",
+                color = OnlinePink,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun NextEpisodeIcon(modifier: Modifier = Modifier.size(18.dp)) {
+    Canvas(modifier) {
+        val u = size.width / 24f
+        drawPath(Path().apply {
+            moveTo(5f * u, 5.5f * u)
+            lineTo(15f * u, 12f * u)
+            lineTo(5f * u, 18.5f * u)
+            close()
+        }, Color.White)
+        drawRoundRect(
+            Color.White,
+            Offset(17.5f * u, 5f * u),
+            androidx.compose.ui.geometry.Size(2.5f * u, 14f * u),
+            androidx.compose.ui.geometry.CornerRadius(1f * u)
+        )
+    }
+}
+
+@Composable
+private fun PlaybackQualityDrawer(
+    options: List<PlayerQualityOption>,
+    selectedQuality: Int?,
+    onDismiss: () -> Unit,
+    onQualitySelected: (Int) -> Unit,
+) {
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier.fillMaxSize().background(Color.Transparent)
+                .clickable(onClick = onDismiss)
+                .semantics { contentDescription = "关闭清晰度选择" }
+        )
+        Column(
+            Modifier.align(Alignment.CenterEnd)
+                .width(360.dp).fillMaxHeight()
+                .padding(end = 8.dp, top = 8.dp, bottom = 8.dp)
+                .navigationBarsPadding()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xF214161E))
+                .border(1.dp, Color.White.copy(alpha = .08f), RoundedCornerShape(16.dp))
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth().height(44.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("清晰度与音质", color = Color.White, fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold)
+                    Text("切换后保持当前播放进度", color = Color.White.copy(alpha = .45f),
+                        fontSize = 10.5.sp, modifier = Modifier.padding(top = 2.dp))
+                }
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(36.dp)
+                        .semantics { contentDescription = "收起清晰度选择" }
+                ) {
+                    Text("×", color = Color.White.copy(alpha = .72f), fontSize = 22.sp)
+                }
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(bottom = 8.dp),
+                color = Color.White.copy(alpha = .08f)
+            )
+            Column(
+                Modifier.weight(1f).verticalScroll(rememberScrollState()).selectableGroup(),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                options.forEach { option ->
+                    val selected = option.qn == selectedQuality
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (selected) OnlinePink.copy(alpha = .16f)
+                                else Color.White.copy(alpha = .05f)
+                            )
+                            .border(
+                                1.dp,
+                                if (selected) OnlinePink.copy(alpha = .75f) else Color.Transparent,
+                                RoundedCornerShape(12.dp)
+                            )
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { onQualitySelected(option.qn) }
+                            )
+                            .semantics { contentDescription = "选择清晰度 ${option.label}" }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    option.label,
+                                    color = if (selected) OnlinePink else Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                option.badge?.let { badge ->
+                                    Spacer(Modifier.width(6.dp))
+                                    Box(
+                                        Modifier.clip(RoundedCornerShape(4.dp))
+                                            .background(OnlinePink.copy(alpha = .22f))
+                                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                                    ) {
+                                        Text(badge, color = OnlinePink, fontSize = 9.sp,
+                                            fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+                            }
+                            if (option.description.isNotBlank()) {
+                                Text(
+                                    option.description,
+                                    color = Color.White.copy(alpha = .45f),
+                                    fontSize = 10.sp,
+                                    modifier = Modifier.padding(top = 1.dp)
+                                )
+                            }
+                        }
+                        if (selected) {
+                            Box(
+                                Modifier.clip(RoundedCornerShape(20.dp))
+                                    .background(OnlinePink)
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text("播放中", color = Color.White, fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VideoSeekBar(
@@ -1016,7 +1365,7 @@ private fun PlaybackSpeedDrawer(
                     }
                 )
                 .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xD614161E))
+                .background(Color(0xF214161E))
                 .border(
                     1.dp,
                     Color.White.copy(alpha = .08f),

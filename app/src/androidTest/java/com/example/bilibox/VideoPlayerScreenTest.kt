@@ -105,6 +105,9 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("倍速").assertExists()
         compose.onNodeWithText("选集").assertDoesNotExist()
         compose.onNodeWithContentDescription("退出全屏").assertDoesNotExist()
+        compose.onNodeWithContentDescription("下一集").assertExists()
+        compose.onNodeWithContentDescription("画质 选择").assertDoesNotExist()
+        compose.onNodeWithContentDescription("弹幕开关（开发中）").assertExists()
         compose.onNodeWithContentDescription("切换横屏").assertDoesNotExist()
         compose.onNodeWithContentDescription("播放进度").assertExists()
         compose.onNodeWithText("00:00 / --:--").assertExists()
@@ -114,6 +117,49 @@ class VideoPlayerScreenTest {
         compose.onNodeWithContentDescription("截取视频画面").assertDoesNotExist()
         compose.onNodeWithContentDescription("解锁屏幕").performClick()
         compose.onNodeWithContentDescription("截取视频画面").assertExists()
+    }
+
+    @Test
+    fun fullscreenQualitySheetAndNextEpisodeButtonWork() {
+        var pickedQuality = -1
+        var nextEpisodes = 0
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            val landscape = Configuration(LocalConfiguration.current).apply {
+                orientation = Configuration.ORIENTATION_LANDSCAPE
+            }
+            CompositionLocalProvider(LocalConfiguration provides landscape) {
+                VideoPlayerScreen(
+                    player = player,
+                    title = "搜索视频",
+                    sourceLabel = "哔哩哔哩",
+                    commentMessage = "暂不支持查看在线评论",
+                    onBack = {},
+                    onRetry = {},
+                    onNextEpisode = { nextEpisodes++ },
+                    qualityOptions = listOf(
+                        PlayerQualityOption(80, "1080P", "高清 · 推荐"),
+                        PlayerQualityOption(64, "720P", "高清 · 省流"),
+                        PlayerQualityOption(32, "480P", "清晰"),
+                    ),
+                    selectedQuality = 80,
+                    onQualitySelected = { pickedQuality = it },
+                    details = { Text("搜索视频简介") }
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("下一集").performClick()
+        compose.runOnIdle { assertEquals(1, nextEpisodes) }
+        compose.onNodeWithText("1080P").assertExists()
+        compose.onNodeWithContentDescription("画质 1080P").performClick()
+        compose.onNodeWithText("清晰度与音质").assertExists()
+        compose.onNodeWithContentDescription("选择清晰度 720P").performClick()
+        compose.runOnIdle { assertEquals(64, pickedQuality) }
+        compose.waitForIdle()
+        compose.onNodeWithText("清晰度与音质").assertDoesNotExist()
     }
 
     @Test
