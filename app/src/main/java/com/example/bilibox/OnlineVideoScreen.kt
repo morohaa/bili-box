@@ -143,6 +143,7 @@ private fun OnlineVideoDetails(
     context: Context,
     selectedPage: Int,
     onPageSelected: (Int) -> Unit,
+    onOpenEpisodes: () -> Unit,
 ) {
     var following by rememberSaveable(video.bvid) { mutableStateOf(false) }
     var liked by rememberSaveable(video.bvid) { mutableStateOf(false) }
@@ -242,43 +243,37 @@ private fun OnlineVideoDetails(
                 }
             }
             info?.pages?.takeIf { it.size > 1 }?.let { pages ->
-                val selected = pages.firstOrNull { it.page == selectedPage }
                 Row(
-                    Modifier.fillMaxWidth().padding(top = 12.dp),
+                    Modifier.fillMaxWidth().padding(top = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("分P", color = OnlineSecondary, fontSize = 12.sp)
+                    Text("正片", color = OnlineText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.width(5.dp))
+                    Text("($selectedPage/${pages.size})", color = OnlineMuted, fontSize = 12.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text("自动连播", color = OnlineSecondary, fontSize = 11.sp)
+                    Spacer(Modifier.width(6.dp))
+                    OnlineAutoPlaySwitch()
                     Spacer(Modifier.width(10.dp))
-                    Row(
-                        Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        pages.forEach { page ->
-                            val isSelected = page.page == selectedPage
-                            Text(
-                                "P${page.page} ${page.part.ifBlank { "第 ${page.page} 部分" }}",
-                                modifier = Modifier.clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSelected) OnlinePink.copy(alpha = .12f) else OnlineDivider)
-                                    .clickable(role = Role.Button) { onPageSelected(page.page) }
-                                    .padding(horizontal = 10.dp, vertical = 7.dp)
-                                    .semantics { contentDescription = "播放第 ${page.page} P" },
-                                color = if (isSelected) OnlinePink else OnlineSecondary,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-                selected?.let { page ->
                     Text(
-                        "当前播放：P${page.page} ${page.part}",
-                        color = OnlineMuted,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 5.dp)
+                        "共 ${pages.size}P · 查看全部 ›",
+                        color = OnlinePink,
+                        fontSize = 11.5.sp,
+                        modifier = Modifier.clickable(role = Role.Button, onClick = onOpenEpisodes)
+                            .semantics { contentDescription = "查看全部选集" }
                     )
+                }
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 10.dp).horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    pages.forEach { page ->
+                        OnlineEpisodeCard(
+                            page = page,
+                            selected = page.page == selectedPage,
+                            onClick = { onPageSelected(page.page) }
+                        )
+                    }
                 }
             }
             Row(
@@ -534,6 +529,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     var html5FallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
     var videoInfo by remember(video.bvid, session?.cookie) { mutableStateOf<VideoInfo?>(null) }
     var selectedPage by rememberSaveable(video.bvid, session?.cookie) { mutableIntStateOf(1) }
+    var episodesSheetVisible by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(false) }
     var creatorCard by remember(video.bvid, session?.cookie) { mutableStateOf<com.example.bilibox.bili.UserCardData?>(null) }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
     suspend fun tryHtml5Fallback(): String? {
@@ -768,7 +764,25 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         detailsBackground = OnlineSurface,
         showDetailTabs = false,
         details = { _ ->
-            OnlineVideoDetails(video, videoInfo, creatorCard, context, selectedPage) { selectedPage = it }
+            Box(Modifier.fillMaxWidth()) {
+                OnlineVideoDetails(
+                    video = video,
+                    info = videoInfo,
+                    creatorCard = creatorCard,
+                    context = context,
+                    selectedPage = selectedPage,
+                    onPageSelected = { selectedPage = it },
+                    onOpenEpisodes = { episodesSheetVisible = true }
+                )
+                if (episodesSheetVisible && episodePages != null) {
+                    OnlineEpisodesBottomSheet(
+                        pages = episodePages,
+                        selectedPage = selectedPage,
+                        onDismiss = { episodesSheetVisible = false },
+                        onPageSelected = { selectedPage = it }
+                    )
+                }
+            }
         }
     )
 }
