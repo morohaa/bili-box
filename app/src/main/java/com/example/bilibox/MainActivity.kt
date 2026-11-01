@@ -29,6 +29,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,13 +61,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -89,9 +101,11 @@ import com.example.bilibox.ui.theme.BiliBoxTheme
 import com.example.bilibox.bili.BiliClient
 import com.example.bilibox.bili.BiliPlayback
 import com.example.bilibox.bili.BiliQn
+import com.example.bilibox.bili.VideoInfo
 import com.example.bilibox.bili.VideoSearchItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -112,6 +126,12 @@ import java.util.Locale
 private val Ink = Color(0xFF24313D)
 private val Pink = Color(0xFFEF7196)
 private val Muted = Color(0xFF82909D)
+private val OnlineSurface = Color.White
+private val OnlineText = Color(0xFF18191C)
+private val OnlineMuted = Color(0xFF9499A0)
+private val OnlineSecondary = Color(0xFF61666D)
+private val OnlinePink = Color(0xFFFB7299)
+private val OnlineDivider = Color(0xFFF1F2F3)
 
 private data class SearchVideo(
     val title: String,
@@ -619,6 +639,8 @@ internal fun VideoPlayerScreen(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     episodes: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
+    detailsBackground: Color = Color.White,
+    showDetailTabs: Boolean = true,
     details: @Composable (duration: Long) -> Unit,
 ) {
     val context = LocalContext.current
@@ -626,8 +648,10 @@ internal fun VideoPlayerScreen(
     val fullScreen = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val audioManager = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     var position by remember(player) { mutableLongStateOf(player.currentPosition.coerceAtLeast(0L)) }
+    var bufferedPosition by remember(player) { mutableLongStateOf(player.bufferedPosition.coerceAtLeast(0L)) }
     var duration by remember(player) { mutableLongStateOf(defaultDurationMs) }
     var isPlaying by remember(player) { mutableStateOf(player.isPlaying) }
+    var playWhenReady by remember(player) { mutableStateOf(player.playWhenReady) }
     var scrubbing by remember(player) { mutableStateOf(false) }
     var scrubPosition by remember(player) { mutableFloatStateOf(0f) }
     var speed by remember(player) { mutableFloatStateOf(1f) }
@@ -676,7 +700,7 @@ internal fun VideoPlayerScreen(
         activity?.let {
             WindowCompat.getInsetsController(it.window, it.window.decorView).apply {
                 isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = !fullScreen
+                isAppearanceLightNavigationBars = !fullScreen && detailsBackground == Color.White
                 systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 if (fullScreen) hide(WindowInsetsCompat.Type.systemBars())
                 else show(WindowInsetsCompat.Type.systemBars())
@@ -697,8 +721,12 @@ internal fun VideoPlayerScreen(
 
     fun togglePlayback() {
         if (screenLocked) return
-        if (player.playbackState == Player.STATE_ENDED) player.seekTo(0L)
-        player.playWhenReady = !player.isPlaying
+        if (player.playbackState == Player.STATE_ENDED) {
+            player.seekTo(0L)
+            player.playWhenReady = true
+        } else {
+            player.playWhenReady = !player.playWhenReady
+        }
         controlsVisible = true
     }
 
@@ -792,6 +820,7 @@ internal fun VideoPlayerScreen(
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onRenderedFirstFrame() { hasVideoFrame = true }
+            override fun onPlayWhenReadyChanged(ready: Boolean, reason: Int) { playWhenReady = ready }
             override fun onPlaybackStateChanged(state: Int) {
                 playbackState = state
                 if (state == Player.STATE_IDLE) hasVideoFrame = false
@@ -806,6 +835,7 @@ internal fun VideoPlayerScreen(
         while (true) {
             duration = player.duration.takeIf { it > 0 } ?: defaultDurationMs
             if (!scrubbing) position = player.currentPosition.coerceAtLeast(0L)
+            bufferedPosition = player.bufferedPosition.coerceAtLeast(0L)
             isPlaying = player.isPlaying
             speed = player.playbackParameters.speed
             delay(250)
@@ -860,25 +890,31 @@ internal fun VideoPlayerScreen(
                     Text("暂时无法播放", color = Color.White, fontSize = 14.sp)
                     TextButton(onClick = onRetry) { Text("重试", color = Pink) }
                 }
-            } else if (loadingMessage != null || playbackState != Player.STATE_READY) {
-                Text(
-                    loadingMessage ?: if (playbackState == Player.STATE_BUFFERING) "正在加载视频…" else "等待视频加载",
-                    color = Color.White.copy(alpha = .82f),
-                    fontSize = 13.sp
+            } else if (loadingMessage != null || playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_IDLE) {
+                BiliLoadingIndicator(
+                    message = loadingMessage ?: if (playbackState == Player.STATE_BUFFERING) "正在缓冲…" else "等待视频加载"
                 )
             }
             if (controlsVisible && !screenLocked) {
+                Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(56.dp)
+                    .background(Brush.verticalGradient(listOf(
+                        Color.Black.copy(alpha = .75f), Color.Black.copy(alpha = .3f), Color.Transparent
+                    ))))
+                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(if (fullScreen) 128.dp else 64.dp)
+                    .background(Brush.verticalGradient(listOf(
+                        Color.Transparent, Color.Black.copy(alpha = .4f), Color.Black.copy(alpha = .85f)
+                    ))))
                 Column(
                     Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .7f))))
                         .then(if (fullScreen) Modifier.displayCutoutPadding().navigationBarsPadding()
                             .padding(start = 18.dp, end = 18.dp, top = 12.dp)
-                            else Modifier.padding(start = 6.dp, end = 6.dp, top = 12.dp))
+                            else Modifier.padding(horizontal = 6.dp))
                 ) {
                     val seekBar: @Composable (Modifier) -> Unit = { modifier ->
                         VideoSeekBar(
                             position = if (scrubbing) scrubPosition else position.toFloat(),
                             duration = duration,
+                            bufferedPosition = bufferedPosition,
                             onSeek = { scrubbing = true; scrubPosition = it },
                             onSeekFinished = {
                                 player.seekTo(scrubPosition.toLong())
@@ -888,43 +924,45 @@ internal fun VideoPlayerScreen(
                             modifier = modifier
                         )
                     }
+                    val showPause = playWhenReady && playbackState != Player.STATE_ENDED
                     if (fullScreen) {
-                        Text(
-                            "${formatPlaybackTime(if (scrubbing) scrubPosition.toLong() else position)}/${formatPlaybackTime(duration, unknownWhenZero = true)}",
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            lineHeight = 20.sp,
-                            maxLines = 1,
-                            modifier = Modifier.padding(start = 13.dp)
+                        PlaybackTimeLabel(
+                            position = if (scrubbing) scrubPosition.toLong() else position,
+                            duration = duration,
+                            modifier = Modifier.padding(start = 9.dp, bottom = 2.dp)
                         )
-                        Spacer(Modifier.height(10.dp))
-                        // The track adds half the 18dp thumb width to this inset:
-                        // 4 + 9 = 13dp, matching the play triangle's leading edge.
-                        seekBar(Modifier.fillMaxWidth().padding(start = 4.dp))
-                    }
-                    Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = { togglePlayback() },
-                            modifier = Modifier.size(48.dp).semantics {
-                                contentDescription = if (isPlaying) "暂停" else "播放"
-                            }
-                        ) {
-                            PlaybackIcon(isPlaying)
+                        Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                            seekBar(Modifier.fillMaxWidth())
                         }
-                        if (fullScreen) {
+                        Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier.size(48.dp).semantics {
+                                    contentDescription = if (showPause) "暂停" else "播放"
+                                }.clickable(role = Role.Button, onClick = { togglePlayback() }),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                PlaybackIcon(showPause, Modifier.padding(start = 4.dp).size(26.dp))
+                            }
                             Spacer(Modifier.weight(1f))
                             if (episodes != null) {
-                                TextButton(onClick = { episodesExpanded = true },
-                                    contentPadding = PaddingValues(horizontal = 16.dp)) {
-                                    Text("选集", color = Color.White, fontSize = 14.sp)
+                                TextButton(
+                                    onClick = { episodesExpanded = true },
+                                    contentPadding = PaddingValues(horizontal = 10.dp)
+                                ) {
+                                    Text("选集", color = Color.White, fontSize = 12.sp)
                                 }
-                                Spacer(Modifier.width(12.dp))
                             }
                             Box {
-                                TextButton(onClick = { speedMenuExpanded = true },
-                                    contentPadding = PaddingValues(horizontal = 16.dp)) {
-                                    Text(if (speed == 1f) "倍速" else "${speed}x", color = Color.White,
-                                        fontSize = 14.sp, modifier = Modifier.semantics { contentDescription = "倍速" })
+                                TextButton(
+                                    onClick = { speedMenuExpanded = true },
+                                    contentPadding = PaddingValues(horizontal = 10.dp)
+                                ) {
+                                    Text(
+                                        if (speed == 1f) "倍速" else "${speed}x",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.semantics { contentDescription = "倍速" }
+                                    )
                                 }
                                 PlaybackSpeedMenu(speedMenuExpanded, speed, dark = true,
                                     onDismiss = { speedMenuExpanded = false }, onSpeedSelected = {
@@ -933,20 +971,28 @@ internal fun VideoPlayerScreen(
                                         speedMenuExpanded = false
                                     })
                             }
-                        } else {
+                        }
+                    } else {
+                        Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { togglePlayback() },
+                                modifier = Modifier.size(40.dp).semantics {
+                                    contentDescription = if (showPause) "暂停" else "播放"
+                                }
+                            ) {
+                                PlaybackIcon(showPause, Modifier.size(18.dp))
+                            }
                             seekBar(Modifier.weight(1f))
-                            Text(
-                                "${formatPlaybackTime(if (scrubbing) scrubPosition.toLong() else position)}/${formatPlaybackTime(duration, unknownWhenZero = true)}",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                maxLines = 1,
-                                modifier = Modifier.padding(start = 8.dp, end = 2.dp)
+                            PlaybackTimeLabel(
+                                position = if (scrubbing) scrubPosition.toLong() else position,
+                                duration = duration,
+                                modifier = Modifier.padding(start = 10.dp)
                             )
                             IconButton(
                                 onClick = { toggleOrientation() },
-                                modifier = Modifier.size(48.dp).semantics { contentDescription = "切换横屏" }
+                                modifier = Modifier.size(40.dp).semantics { contentDescription = "切换横屏" }
                             ) {
-                                FullscreenIcon(fullScreen = false)
+                                FullscreenIcon(fullScreen = false, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -954,13 +1000,14 @@ internal fun VideoPlayerScreen(
             }
             if (controlsVisible && !screenLocked) Row(
                 Modifier.align(Alignment.TopStart).fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .48f), Color.Transparent)))
                     .then(if (fullScreen) Modifier.displayCutoutPadding() else Modifier)
+                    .height(if (fullScreen) 48.dp else 44.dp)
                     .padding(horizontal = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { navigateBack() }, modifier = Modifier.semantics { contentDescription = "返回" }) {
-                    Canvas(Modifier.size(24.dp)) {
+                IconButton(onClick = { navigateBack() }, modifier = Modifier.size(if (fullScreen) 48.dp else 40.dp)
+                    .semantics { contentDescription = "返回" }) {
+                    Canvas(Modifier.size(if (fullScreen) 24.dp else 20.dp)) {
                         drawPath(Path().apply {
                             moveTo(size.width * .63f, size.height * .15f)
                             lineTo(size.width * .28f, size.height * .5f)
@@ -970,20 +1017,24 @@ internal fun VideoPlayerScreen(
                 }
                 Text(if (fullScreen) title else "", color = Color.White, fontSize = 14.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                if (!fullScreen) Box {
-                    IconButton(onClick = { speedMenuExpanded = true }, modifier = Modifier.semantics { contentDescription = "更多播放设置" }) {
-                        Canvas(Modifier.size(24.dp)) {
-                            listOf(.22f, .5f, .78f).forEach { x ->
-                                drawCircle(Color.White, 1.6.dp.toPx(), Offset(size.width * x, size.height * .5f))
+                Box {
+                    if (!fullScreen) {
+                        IconButton(onClick = { speedMenuExpanded = true }, modifier = Modifier.size(40.dp)
+                            .semantics { contentDescription = "更多播放设置" }) {
+                            Canvas(Modifier.size(20.dp)) {
+                                listOf(.22f, .5f, .78f).forEach { x ->
+                                    drawCircle(Color.White, size.width * 1.75f / 24f,
+                                        Offset(size.width * x, size.height * .5f))
+                                }
                             }
                         }
+                        PlaybackSpeedMenu(speedMenuExpanded, speed, dark = false,
+                            onDismiss = { speedMenuExpanded = false }, onSpeedSelected = {
+                                player.setPlaybackSpeed(it)
+                                speed = it
+                                speedMenuExpanded = false
+                            })
                     }
-                    PlaybackSpeedMenu(speedMenuExpanded, speed, dark = false,
-                        onDismiss = { speedMenuExpanded = false }, onSpeedSelected = {
-                            player.setPlaybackSpeed(it)
-                            speed = it
-                            speedMenuExpanded = false
-                        })
                 }
             }
             if (fullScreen && controlsVisible) {
@@ -1018,31 +1069,33 @@ internal fun VideoPlayerScreen(
         }
 
         if (!fullScreen) Column(
-            Modifier.weight(1f).fillMaxWidth().background(Color.White)
+            Modifier.weight(1f).fillMaxWidth().background(detailsBackground)
                 .verticalScroll(rememberScrollState()).navigationBarsPadding()
         ) {
-            Row(
-                Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                listOf("简介", "评论").forEachIndexed { index, label ->
-                    Column(
-                        Modifier.fillMaxHeight().clickable { detailsTab = index }.padding(horizontal = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text(label, color = if (detailsTab == index) Pink else Muted, fontSize = 15.sp,
-                            fontWeight = if (detailsTab == index) FontWeight.SemiBold else FontWeight.Normal)
-                        Spacer(Modifier.height(5.dp))
-                        Box(Modifier.width(30.dp).height(2.dp).background(if (detailsTab == index) Pink else Color.Transparent, CircleShape))
+            if (showDetailTabs) {
+                Row(
+                    Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf("简介", "评论").forEachIndexed { index, label ->
+                        Column(
+                            Modifier.fillMaxHeight().clickable { detailsTab = index }.padding(horizontal = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(label, color = if (detailsTab == index) Pink else Muted, fontSize = 15.sp,
+                                fontWeight = if (detailsTab == index) FontWeight.SemiBold else FontWeight.Normal)
+                            Spacer(Modifier.height(5.dp))
+                            Box(Modifier.width(30.dp).height(2.dp).background(if (detailsTab == index) Pink else Color.Transparent, CircleShape))
+                        }
                     }
+                    Spacer(Modifier.weight(1f))
+                    Text(sourceLabel, color = Muted, fontSize = 12.sp)
                 }
-                Spacer(Modifier.weight(1f))
-                Text(sourceLabel, color = Muted, fontSize = 12.sp)
+                HorizontalDivider(color = if (detailsBackground == Color.White) Color(0xFFE9EAEC) else Color.White.copy(alpha = .08f), thickness = 1.dp)
             }
-            HorizontalDivider(color = Color(0xFFE9EAEC), thickness = 1.dp)
 
-            if (detailsTab == 0) {
+            if (!showDetailTabs || detailsTab == 0) {
                 details(duration)
                 playbackError?.let { message ->
                     Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
@@ -1061,11 +1114,77 @@ internal fun VideoPlayerScreen(
     }
 }
 
+@Composable
+private fun BiliLoadingIndicator(message: String) {
+    val transition = rememberInfiniteTransition(label = "播放器缓冲")
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(1_100, easing = CubicBezierEasing(.45f, .05f, .55f, .95f))),
+        label = "粉色缓冲环旋转"
+    )
+    val televisionOffset by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = -3f,
+        animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "小电视浮动"
+    )
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.size(44.dp).rotate(rotation)) {
+                val u = size.width / 50f
+                val diameter = androidx.compose.ui.geometry.Size(40f * u, 40f * u)
+                drawCircle(Color.White.copy(alpha = .12f), radius = 20f * u,
+                    style = Stroke(3.2f * u))
+                drawArc(OnlinePink, startAngle = -90f, sweepAngle = 244f, useCenter = false,
+                    topLeft = Offset(5f * u, 5f * u), size = diameter,
+                    style = Stroke(3.2f * u, cap = StrokeCap.Round))
+            }
+            Canvas(Modifier.offset(y = televisionOffset.dp).size(20.dp)) {
+                val u = size.width / 24f
+                val tint = Color.White.copy(alpha = .9f)
+                val stroke = Stroke(1.8f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                drawPath(Path().apply {
+                    moveTo(8f * u, 3f * u); lineTo(11f * u, 6f * u); lineTo(14f * u, 3f * u)
+                }, tint, style = stroke)
+                drawRoundRect(tint, Offset(4f * u, 6f * u),
+                    androidx.compose.ui.geometry.Size(16f * u, 13f * u),
+                    androidx.compose.ui.geometry.CornerRadius(3.5f * u), style = stroke)
+                listOf(9f, 15f).forEach { x ->
+                    drawLine(tint, Offset(x * u, 11f * u), Offset(x * u, 13f * u), 1.8f * u, StrokeCap.Round)
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(message, color = Color.White.copy(alpha = .9f), fontSize = 12.sp,
+            lineHeight = 17.sp, letterSpacing = .3.sp)
+    }
+}
+
+@Composable
+private fun PlaybackTimeLabel(
+    position: Long,
+    duration: Long,
+    modifier: Modifier = Modifier,
+    fullScreen: Boolean = false,
+) {
+    Text(
+        "${formatPlaybackTime(position)} / ${formatPlaybackTime(duration, unknownWhenZero = true)}",
+        modifier = modifier,
+        color = Color.White.copy(alpha = .9f),
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Normal,
+        letterSpacing = 0.sp,
+        maxLines = 1
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VideoSeekBar(
     position: Float,
     duration: Long,
+    bufferedPosition: Long,
     onSeek: (Float) -> Unit,
     onSeekFinished: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1081,16 +1200,17 @@ private fun VideoSeekBar(
             modifier = modifier.height(24.dp).semantics { contentDescription = "播放进度" },
             thumb = { TelevisionSeekThumb() },
             track = { sliderState ->
-                SliderDefaults.Track(
-                    sliderState = sliderState,
-                    modifier = Modifier.height(2.dp),
-                    thumbTrackGapSize = 0.dp,
-                    drawStopIndicator = null,
-                    colors = SliderDefaults.colors(
-                        activeTrackColor = Color(0xFFFF6699),
-                        inactiveTrackColor = Color.White.copy(alpha = .45f)
-                    )
-                )
+                Canvas(Modifier.fillMaxWidth().height(2.5.dp)) {
+                    val played = (sliderState.value / duration.coerceAtLeast(1L)).coerceIn(0f, 1f)
+                    val buffered = (bufferedPosition.toFloat() / duration.coerceAtLeast(1L)).coerceIn(0f, 1f)
+                    val start = Offset(0f, center.y)
+                    drawLine(Color.White.copy(alpha = .3f), start, Offset(size.width, center.y),
+                        size.height, StrokeCap.Round)
+                    if (buffered > 0f) drawLine(Color.White.copy(alpha = .45f), start,
+                        Offset(size.width * buffered, center.y), size.height, StrokeCap.Round)
+                    if (played > 0f) drawLine(OnlinePink, start,
+                        Offset(size.width * played, center.y), size.height, StrokeCap.Round)
+                }
             }
         )
     }
@@ -1176,52 +1296,49 @@ private fun LocalVideoEpisodes(
 }
 
 @Composable
-private fun PlaybackIcon(playing: Boolean) {
-    Canvas(Modifier.size(26.dp)) {
-        val u = size.width / 26f
+private fun PlaybackIcon(playing: Boolean, modifier: Modifier = Modifier.size(26.dp)) {
+    Canvas(modifier) {
+        val u = size.width / 24f
         if (playing) {
-            listOf(5f, 16f).forEach { x ->
-                drawRoundRect(Color.White, Offset(x * u, 3f * u),
-                    androidx.compose.ui.geometry.Size(5f * u, 20f * u),
+            listOf(6f, 14.2f).forEach { x ->
+                drawRoundRect(Color.White, Offset(x * u, 5f * u),
+                    androidx.compose.ui.geometry.Size(3.8f * u, 14f * u),
                     androidx.compose.ui.geometry.CornerRadius(1.2f * u))
             }
         } else {
-            scale(scaleX = 1f, scaleY = .88f, pivot = center) {
-                drawPath(Path().apply {
-                    moveTo(5f * u, 2f * u)
-                    quadraticTo(2f * u, .5f * u, 2f * u, 4f * u)
-                    lineTo(2f * u, 22f * u)
-                    quadraticTo(2f * u, 25.5f * u, 5f * u, 24f * u)
-                    lineTo(23f * u, 14.8f * u)
-                    quadraticTo(26f * u, 13f * u, 23f * u, 11.2f * u)
-                    close()
-                }, Color.White)
-            }
+            drawPath(Path().apply {
+                moveTo(6.5f * u, 4.8f * u)
+                cubicTo(5.7f * u, 4.3f * u, 4.7f * u, 4.9f * u, 4.7f * u, 5.8f * u)
+                lineTo(4.7f * u, 18.2f * u)
+                cubicTo(4.7f * u, 19.1f * u, 5.7f * u, 19.7f * u, 6.5f * u, 19.2f * u)
+                lineTo(17.1f * u, 13f * u)
+                cubicTo(17.9f * u, 12.6f * u, 17.9f * u, 11.4f * u, 17.1f * u, 11f * u)
+                close()
+            }, Color.White)
         }
     }
 }
 
 @Composable
 private fun TelevisionSeekThumb() {
-    Canvas(Modifier.size(18.dp)) {
+    Canvas(Modifier.size(width = 18.dp, height = 16.dp)) {
         val u = size.width / 24f
-        val outline = Color(0xFF161616)
-        val stroke = Stroke(1.6f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        // Center the television body on the track, independently of its antennae.
-        drawLine(outline, Offset(7f*u, 1f*u), Offset(10f*u, 4f*u), 2f*u, StrokeCap.Round)
-        drawLine(outline, Offset(17f*u, 1f*u), Offset(14f*u, 4f*u), 2f*u, StrokeCap.Round)
-        drawRoundRect(Color.White, Offset(2f*u, 4f*u), androidx.compose.ui.geometry.Size(20f*u, 16f*u),
-            androidx.compose.ui.geometry.CornerRadius(4f*u))
-        drawRoundRect(outline, Offset(2f*u, 4f*u), androidx.compose.ui.geometry.Size(20f*u, 16f*u),
-            androidx.compose.ui.geometry.CornerRadius(4f*u), style = stroke)
-        drawLine(outline, Offset(8f*u, 9.5f*u), Offset(8f*u, 14.5f*u), 2.4f*u, StrokeCap.Round)
-        drawLine(outline, Offset(16f*u, 9.5f*u), Offset(16f*u, 14.5f*u), 2.4f*u, StrokeCap.Round)
+        val stroke = Stroke(1.8f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        drawLine(OnlinePink, Offset(7.5f*u, 1.5f*u), Offset(10.5f*u, 4.5f*u), 2f*u, StrokeCap.Round)
+        drawLine(OnlinePink, Offset(16.5f*u, 1.5f*u), Offset(13.5f*u, 4.5f*u), 2f*u, StrokeCap.Round)
+        drawRoundRect(Color.White, Offset(2.5f*u, 4f*u), androidx.compose.ui.geometry.Size(19f*u, 14f*u),
+            androidx.compose.ui.geometry.CornerRadius(4.5f*u))
+        drawRoundRect(OnlinePink, Offset(2.5f*u, 4f*u), androidx.compose.ui.geometry.Size(19f*u, 14f*u),
+            androidx.compose.ui.geometry.CornerRadius(4.5f*u), style = stroke)
+        listOf(8.5f, 15.5f).forEach { x ->
+            drawLine(OnlineText, Offset(x*u, 10f*u), Offset(x*u, 11.8f*u), 2f*u, StrokeCap.Round)
+        }
     }
 }
 
 @Composable
-private fun FullscreenIcon(fullScreen: Boolean) {
-    Canvas(Modifier.size(24.dp)) {
+private fun FullscreenIcon(fullScreen: Boolean, modifier: Modifier = Modifier.size(24.dp)) {
+    Canvas(modifier) {
         val u = size.width / 24f
         val corners = Path().apply {
             if (fullScreen) {
@@ -1230,13 +1347,17 @@ private fun FullscreenIcon(fullScreen: Boolean) {
                 moveTo(22f*u, 16f*u); lineTo(16f*u, 16f*u); lineTo(16f*u, 22f*u)
                 moveTo(8f*u, 22f*u); lineTo(8f*u, 16f*u); lineTo(2f*u, 16f*u)
             } else {
-                moveTo(2f*u, 9f*u); lineTo(2f*u, 3f*u); lineTo(8f*u, 3f*u)
-                moveTo(16f*u, 3f*u); lineTo(22f*u, 3f*u); lineTo(22f*u, 9f*u)
-                moveTo(22f*u, 15f*u); lineTo(22f*u, 21f*u); lineTo(16f*u, 21f*u)
-                moveTo(8f*u, 21f*u); lineTo(2f*u, 21f*u); lineTo(2f*u, 15f*u)
+                moveTo(4f*u, 9f*u); lineTo(4f*u, 5f*u)
+                quadraticTo(4f*u, 4f*u, 5f*u, 4f*u); lineTo(9f*u, 4f*u)
+                moveTo(20f*u, 9f*u); lineTo(20f*u, 5f*u)
+                quadraticTo(20f*u, 4f*u, 19f*u, 4f*u); lineTo(15f*u, 4f*u)
+                moveTo(4f*u, 15f*u); lineTo(4f*u, 19f*u)
+                quadraticTo(4f*u, 20f*u, 5f*u, 20f*u); lineTo(9f*u, 20f*u)
+                moveTo(20f*u, 15f*u); lineTo(20f*u, 19f*u)
+                quadraticTo(20f*u, 20f*u, 19f*u, 20f*u); lineTo(15f*u, 20f*u)
             }
         }
-        drawPath(corners, Color.White, style = Stroke(2.2f*u, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawPath(corners, Color.White.copy(alpha = .9f), style = Stroke(2.1f*u, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
 
@@ -1244,6 +1365,289 @@ private tailrec fun Context.findActivity(): ComponentActivity? = when (this) {
     is ComponentActivity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+@Composable
+private fun OnlineVideoDetails(
+    video: SearchVideo,
+    info: VideoInfo?,
+    creatorCard: com.example.bilibox.bili.UserCardData?,
+    context: Context,
+) {
+    var following by rememberSaveable(video.bvid) { mutableStateOf(false) }
+    var liked by rememberSaveable(video.bvid) { mutableStateOf(false) }
+    var disliked by rememberSaveable(video.bvid) { mutableStateOf(false) }
+    var coined by rememberSaveable(video.bvid) { mutableStateOf(false) }
+    var saved by rememberSaveable(video.bvid) { mutableStateOf(false) }
+    var expanded by rememberSaveable(video.bvid) { mutableStateOf(false) }
+
+    val owner = info?.owner
+    val ownerName = owner?.name?.takeIf { it.isNotBlank() }
+        ?: creatorCard?.card?.name?.takeIf { it.isNotBlank() }
+        ?: video.author
+    val avatar = normalizeImageUrl(owner?.face.orEmpty().ifBlank { creatorCard?.card?.face.orEmpty() })
+    val stat = info?.stat
+    val title = info?.title?.takeIf { it.isNotBlank() } ?: video.title
+    val publishedAt = info?.pubdate?.takeIf { it > 0 } ?: video.publishTime
+    val duration = info?.duration?.takeIf { it > 0 }?.let { formatPlaybackTime(it * 1_000L) }
+        ?: video.duration
+
+    Column(Modifier.fillMaxWidth().background(OnlineSurface)) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RemoteCover(
+                avatar,
+                Modifier.size(38.dp).border(1.dp, OnlineDivider, CircleShape).padding(1.dp),
+                shape = CircleShape
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    ownerName, color = OnlinePink, fontSize = 14.sp, lineHeight = 18.sp,
+                    fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                val creatorStats = creatorCard?.let {
+                    "${formatCompactCount(it.card.fans)} 粉丝    ${it.archiveCount} 视频"
+                } ?: "哔哩哔哩 UP 主"
+                Text(
+                    creatorStats, color = OnlineMuted, fontSize = 11.5.sp, lineHeight = 16.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            // A compact visual button with the platform's expanded touch target.
+            Box(
+                Modifier.height(38.dp).widthIn(min = 72.dp)
+                    .semantics { contentDescription = if (following) "取消关注" else "关注 UP 主" }
+                    .clickable(role = Role.Button) { following = !following },
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    Modifier.height(28.dp)
+                        .background(if (following) OnlineDivider else OnlinePink, CircleShape)
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (!following) {
+                        Canvas(Modifier.size(14.dp)) {
+                            val inset = size.width * 5f / 24f
+                            drawLine(Color.White, Offset(center.x, inset), Offset(center.x, size.height - inset),
+                                1.4.dp.toPx(), StrokeCap.Round)
+                            drawLine(Color.White, Offset(inset, center.y), Offset(size.width - inset, center.y),
+                                1.4.dp.toPx(), StrokeCap.Round)
+                        }
+                    }
+                    Text(
+                        if (following) "已关注" else "关注",
+                        color = if (following) OnlineSecondary else Color.White,
+                        fontSize = 12.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+            Row(
+                Modifier.fillMaxWidth().clickable(role = Role.Button) { expanded = !expanded }
+                    .padding(top = 4.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    title, color = OnlineText, fontSize = 15.5.sp, lineHeight = 22.sp, letterSpacing = (-0.15).sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier.padding(top = 2.dp).size(24.dp)
+                        .semantics { contentDescription = if (expanded) "收起简介" else "展开简介" },
+                    contentAlignment = Alignment.Center
+                ) {
+                    ChevronDownIcon(Modifier.size(18.dp).rotate(if (expanded) 180f else 0f), OnlineMuted)
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OnlineMetric("play", stat?.let { formatCompactCount(it.view) } ?: video.playCount)
+                OnlineMetric("comment", (stat?.danmaku ?: video.commentCount).toString())
+                Text(
+                    formatPublishDateTime(publishedAt), color = OnlineMuted,
+                    fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+                )
+                Text(duration, color = OnlineMuted, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 1)
+            }
+            if (expanded) {
+                HorizontalDivider(Modifier.padding(top = 10.dp), color = OnlineDivider)
+                Text(
+                    info?.bvid?.ifBlank { video.bvid } ?: video.bvid,
+                    color = OnlineMuted, fontSize = 11.5.sp, lineHeight = 16.sp,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                info?.desc?.takeIf { it.isNotBlank() }?.let { description ->
+                    Text(
+                        description, color = OnlineSecondary, fontSize = 12.sp, lineHeight = 19.sp,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 14.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            OnlineAction("like", "点赞", formatOptionalCount(stat?.like ?: 0L), liked) {
+                liked = !liked
+                if (liked) disliked = false
+            }
+            OnlineAction("dislike", "不喜欢", "", disliked) {
+                disliked = !disliked
+                if (disliked) liked = false
+            }
+            OnlineAction("coin", "投币", formatOptionalCount(stat?.coin ?: 0L), coined) { coined = !coined }
+            OnlineAction("favorite", "收藏", formatOptionalCount(stat?.favorite ?: 0L), saved) { saved = !saved }
+            OnlineAction("share", "分享", "", false) {
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, "$title https://www.bilibili.com/video/${video.bvid}")
+                }
+                context.startActivity(Intent.createChooser(intent, "分享视频"))
+            }
+        }
+        HorizontalDivider(color = OnlineDivider)
+    }
+}
+
+@Composable
+private fun RowScope.OnlineAction(
+    kind: String,
+    label: String,
+    value: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val iconScale = remember { Animatable(1f) }
+    val tint by animateColorAsState(
+        targetValue = if (selected) OnlinePink else OnlineSecondary,
+        animationSpec = tween(180),
+        label = "$kind 按钮颜色"
+    )
+    Column(
+        Modifier.weight(1f).semantics { contentDescription = "$label $value" }
+            .clickable(role = Role.Button) {
+                onClick()
+                scope.launch {
+                    iconScale.stop()
+                    iconScale.snapTo(1f)
+                    iconScale.animateTo(
+                        1f,
+                        keyframes {
+                            durationMillis = 380
+                            1f at 0
+                            1.26f at 152 using CubicBezierEasing(.34f, 1.56f, .64f, 1f)
+                            .92f at 285 using CubicBezierEasing(.34f, 1.56f, .64f, 1f)
+                            1f at 380 using CubicBezierEasing(.34f, 1.56f, .64f, 1f)
+                        }
+                    )
+                }
+            }.padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+            OnlineActionIcon(
+                kind,
+                tint,
+                Modifier.size(22.dp).graphicsLayer {
+                    scaleX = iconScale.value
+                    scaleY = iconScale.value
+                }
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            value.ifBlank { label }, color = tint, fontSize = 11.5.sp, lineHeight = 14.sp,
+            maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun OnlineMetric(kind: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        VideoMetaIcon(kind, Modifier.size(14.dp), OnlineMuted)
+        Spacer(Modifier.width(4.dp))
+        Text(value, color = OnlineMuted, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 1)
+    }
+}
+
+@Composable
+private fun OnlineActionIcon(kind: String, tint: Color, modifier: Modifier = Modifier) {
+    // Use the reference's 24-unit vector shapes to keep all five icons consistent.
+    val path = remember(kind) {
+        val data = when (kind) {
+            "like" -> "M14.6 3.4c-.6-.4-1.4-.2-1.8.4l-3.2 5.4c-.2.3-.5.5-.9.5H5.5C4.1 9.7 3 10.8 3 12.2v6.3C3 19.9 4.1 21 5.5 21h11.3c1.2 0 2.2-.8 2.5-1.9l1.6-6.8c.4-1.6-.8-3.1-2.5-3.1h-3.6l.8-3.8c.2-.8-.2-1.6-1-2zM7 19H5.5c-.3 0-.5-.2-.5-.5v-6.3c0-.3.2-.5.5-.5H7V19z"
+            "dislike" -> "M9.4 20.6c.6.4 1.4.2 1.8-.4l3.2-5.4c.2-.3.5-.5.9-.5h3.2c1.4 0 2.5-1.1 2.5-2.5V5.5C21 4.1 19.9 3 18.5 3H7.2C6 3 5 3.8 4.7 4.9L3.1 11.7c-.4 1.6.8 3.1 2.5 3.1h3.6l-.8 3.8c-.2.8.2 1.6 1 2zM17 5h1.5c.3 0 .5.2.5.5v6.3c0 .3-.2.5-.5.5H17V5z"
+            "favorite" -> "M12 2.8c.4 0 .8.2 1 .6l2.4 4.9 5.4.8c.9.1 1.2 1.2.6 1.8l-3.9 3.8.9 5.4c.2.9-.8 1.5-1.6 1.1L12 18.7l-4.8 2.5c-.8.4-1.8-.2-1.6-1.1l.9-5.4-3.9-3.8c-.6-.6-.3-1.7.6-1.8l5.4-.8 2.4-4.9c.2-.4.6-.6 1-.6z"
+            "share" -> "M13.8 4.2c0-.9 1.1-1.3 1.7-.7l6.2 6.2c.4.4.4 1 0 1.4l-6.2 6.2c-.6.6-1.7.2-1.7-.7v-3.1c-4.8 0-8.2 1.5-10.3 4.7-.4.6-1.4.2-1.3-.5 1.1-6.5 5.2-9.8 11.6-10.2V4.2z"
+            else -> ""
+        }
+        PathParser().parsePathString(data).toPath()
+    }
+    Canvas(modifier) {
+        scale(size.width / 24f, size.height / 24f, pivot = Offset.Zero) {
+            if (kind == "coin") {
+                drawCircle(tint, 9.2f, Offset(12f, 12f), style = Stroke(2f))
+                drawPath(Path().apply {
+                    moveTo(8.5f, 9.2f); lineTo(15.5f, 9.2f)
+                    moveTo(10f, 9.2f); lineTo(10f, 15.5f)
+                    moveTo(14f, 9.2f); lineTo(14f, 15.5f)
+                    moveTo(7.8f, 12.2f); lineTo(16.2f, 12.2f)
+                }, tint, style = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            } else {
+                drawPath(path, tint)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChevronDownIcon(modifier: Modifier = Modifier, tint: Color) {
+    Canvas(modifier) {
+        drawPath(Path().apply {
+            moveTo(size.width * .25f, size.height * .375f)
+            lineTo(size.width * .5f, size.height * .625f)
+            lineTo(size.width * .75f, size.height * .375f)
+        }, tint, style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+private fun formatOptionalCount(value: Long): String = value.takeIf { it > 0 }?.let(::formatCompactCount).orEmpty()
+
+private fun formatCompactCount(value: Long): String = when {
+    value >= 100_000_000 -> "${String.format(Locale.US, "%.1f", value / 100_000_000.0).trimEnd('0').trimEnd('.')}亿"
+    value >= 10_000 -> "${String.format(Locale.US, "%.1f", value / 10_000.0).trimEnd('0').trimEnd('.')}万"
+    else -> value.toString()
+}
+
+private fun formatPublishDateTime(timestampSeconds: Long): String {
+    if (timestampSeconds <= 0L) return "--"
+    return SimpleDateFormat("yyyy年M月d日 HH:mm", Locale.getDefault()).format(Date(timestampSeconds * 1000L))
+}
+
+private fun normalizeImageUrl(url: String): String = when {
+    url.startsWith("//") -> "https:$url"
+    url.startsWith("http://") -> url.replaceFirst("http://", "https://")
+    else -> url
 }
 
 @Composable
@@ -1297,7 +1701,7 @@ private fun RowScope.VideoAction(index: Int, label: String, selected: Boolean, e
 private fun createTexturePlayerView(context: Context, player: ExoPlayer): PlayerView =
     (LayoutInflater.from(context).inflate(R.layout.video_player_view, null) as PlayerView).apply {
         this.player = player
-        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+        setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
         keepScreenOn = true
     }
 
@@ -1531,7 +1935,10 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
     var playbackCid by remember(video.bvid, session?.cookie) { mutableLongStateOf(0L) }
     var playbackCandidateIndex by remember(video.bvid, session?.cookie) { mutableIntStateOf(0) }
     var playbackCandidateCount by remember(video.bvid, session?.cookie) { mutableIntStateOf(1) }
+    var playbackRefreshTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
     var durlFallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
+    var videoInfo by remember(video.bvid, session?.cookie) { mutableStateOf<VideoInfo?>(null) }
+    var creatorCard by remember(video.bvid, session?.cookie) { mutableStateOf<com.example.bilibox.bili.UserCardData?>(null) }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
@@ -1546,6 +1953,52 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
                     playbackCandidateIndex = nextIndex
                     playbackState = PlaybackState.Loading
                     BiliPlayback.attach(exoPlayer, data, preferredQn = BiliQn.P1080, candidateIndex = nextIndex, cookie = session?.cookie, bvid = video.bvid)
+                    return
+                }
+                // Signed CDN URLs are short-lived and a CDN can reject one
+                // host while another URL returned by a fresh playurl request
+                // is still usable. Refresh DASH once before falling back to
+                // the older single-file format.
+                if (!playbackRefreshTried && playbackCid > 0) {
+                    playbackRefreshTried = true
+                    playbackState = PlaybackState.Loading
+                    scope.launch {
+                        try {
+                            val refreshed = client.playUrl(
+                                bvid = video.bvid,
+                                cid = playbackCid,
+                                qn = BiliQn.P1080,
+                                fnval = BiliClient.FNVAL_DASH_ALL,
+                            )
+                            playbackData = refreshed
+                            playbackCandidateIndex = 0
+                            playbackCandidateCount = BiliPlayback.candidateCount(refreshed, preferredQn = BiliQn.P1080)
+                            BiliPlayback.attach(exoPlayer, refreshed, preferredQn = BiliQn.P1080, cookie = session?.cookie, bvid = video.bvid)
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (_: Exception) {
+                            // The DURL fallback below provides the next
+                            // compatibility path and its error is user-facing.
+                            playbackState = PlaybackState.Loading
+                            durlFallbackTried = true
+                            try {
+                                val fallback = client.playUrl(
+                                    bvid = video.bvid,
+                                    cid = playbackCid,
+                                    qn = BiliQn.P720,
+                                    fnval = BiliClient.FNVAL_DURL,
+                                )
+                                playbackData = fallback
+                                playbackCandidateIndex = 0
+                                playbackCandidateCount = BiliPlayback.candidateCount(fallback, preferredQn = BiliQn.P720)
+                                BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P720, cookie = session?.cookie, bvid = video.bvid)
+                            } catch (error2: CancellationException) {
+                                throw error2
+                            } catch (error2: Exception) {
+                                playbackState = PlaybackState.Error("播放器无法读取视频流：${error2.message ?: "单文件流也不可用"}")
+                            }
+                        }
+                    }
                     return
                 }
                 // DASH uses separate audio/video URLs. If every CDN pair is rejected,
@@ -1573,8 +2026,13 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
                     }
                     return
                 }
+                val httpStatus = generateSequence(error as Throwable?) { it.cause }
+                    .mapNotNull { (it as? HttpDataSource.InvalidResponseCodeException)?.responseCode }
+                    .firstOrNull()
                 val detail = error.cause?.message?.takeIf { it.isNotBlank() }
-                val message = if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && detail?.contains("403") == true) {
+                val message = if (httpStatus == 403 ||
+                    (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && detail?.contains("403") == true)
+                ) {
                     "CDN 返回 HTTP 403，当前网络出口可能被 B 站拒绝"
                 } else {
                     "播放器无法读取视频流：${error.errorCodeName}${detail?.let { "（$it）" }.orEmpty()}"
@@ -1590,10 +2048,17 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
     }
     LaunchedEffect(video.bvid, session?.cookie, retryToken) {
         playbackState = PlaybackState.Loading
+        playbackRefreshTried = false
         durlFallbackTried = false
         try {
             client.warmUp()
             val info = client.videoInfo(video.bvid)
+            videoInfo = info
+            if (info.owner.mid > 0) {
+                scope.launch {
+                    creatorCard = runCatching { client.userCard(info.owner.mid) }.getOrNull()
+                }
+            }
             val cid = info.pages.firstOrNull()?.cid ?: info.cid
             if (cid <= 0) throw IllegalStateException("B 站没有返回视频分 P 信息")
             val play = client.playUrl(info.bvid.ifBlank { video.bvid }, cid, qn = BiliQn.P1080)
@@ -1617,38 +2082,10 @@ private fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: (
         commentMessage = "暂不支持查看在线评论",
         onBack = onBack,
         onRetry = { retryToken++ },
+        detailsBackground = OnlineSurface,
+        showDetailTabs = false,
         details = {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
-                Text(video.title, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp)
-                Spacer(Modifier.height(8.dp))
-                Text("${video.author} · ${video.playCount} 次播放 · ${video.duration}",
-                    color = Muted, fontSize = 12.sp)
-                Spacer(Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    VideoMetaIcon(kind = "date", modifier = Modifier.size(width = 14.dp, height = 13.dp))
-                    Spacer(Modifier.width(5.dp))
-                    Text("发布时间  ${formatPublishDate(video.publishTime)}", color = Muted, fontSize = 12.sp)
-                }
-                Spacer(Modifier.height(16.dp))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    VideoAction(3, "分享", false) {
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, "${video.title} https://www.bilibili.com/video/${video.bvid}")
-                        }
-                        context.startActivity(Intent.createChooser(intent, "分享视频"))
-                    }
-                }
-                HorizontalDivider(Modifier.padding(top = 14.dp), color = Color(0xFFE9EAEC), thickness = 1.dp)
-                Spacer(Modifier.height(14.dp))
-                Text("视频信息", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    if (session == null) "匿名播放 · 登录后可尝试更高画质"
-                    else "已登录播放 · 使用账号权限获取视频流",
-                    color = Muted, fontSize = 12.sp, lineHeight = 19.sp
-                )
-            }
+            OnlineVideoDetails(video, videoInfo, creatorCard, context)
         }
     )
 }
@@ -1741,7 +2178,7 @@ private fun VideoMeta(icon: String, value: String) {
 }
 
 @Composable
-private fun VideoMetaIcon(kind: String, modifier: Modifier = Modifier) {
+private fun VideoMetaIcon(kind: String, modifier: Modifier = Modifier, tint: Color = Muted) {
     Canvas(modifier) {
         val strokeWidth = size.minDimension * .065f
         val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
@@ -1751,7 +2188,7 @@ private fun VideoMetaIcon(kind: String, modifier: Modifier = Modifier) {
         val bottom = size.height * .86f
         when (kind) {
             "play" -> {
-                drawRoundRect(Muted, Offset(left, top), androidx.compose.ui.geometry.Size(right - left, bottom - top),
+                drawRoundRect(tint, Offset(left, top), androidx.compose.ui.geometry.Size(right - left, bottom - top),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .18f), style = stroke)
                 val path = Path().apply {
                     moveTo(size.width * .43f, size.height * .31f)
@@ -1759,30 +2196,34 @@ private fun VideoMetaIcon(kind: String, modifier: Modifier = Modifier) {
                     lineTo(size.width * .43f, size.height * .69f)
                     close()
                 }
-                drawPath(path, Muted)
+                drawPath(path, tint)
             }
             "comment" -> {
-                drawRoundRect(Muted, Offset(left, top), androidx.compose.ui.geometry.Size(right - left, bottom - top),
+                drawRoundRect(tint, Offset(left, top), androidx.compose.ui.geometry.Size(right - left, bottom - top),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .16f), style = stroke)
-                drawCircle(Muted, size.minDimension * .055f, Offset(size.width * .31f, size.height * .4f))
-                drawLine(Muted, Offset(size.width * .43f, size.height * .4f), Offset(size.width * .7f, size.height * .4f), strokeWidth)
-                drawCircle(Muted, size.minDimension * .055f, Offset(size.width * .31f, size.height * .62f))
-                drawLine(Muted, Offset(size.width * .43f, size.height * .62f), Offset(size.width * .62f, size.height * .62f), strokeWidth)
+                drawCircle(tint, size.minDimension * .055f, Offset(size.width * .31f, size.height * .4f))
+                drawLine(tint, Offset(size.width * .43f, size.height * .4f), Offset(size.width * .7f, size.height * .4f), strokeWidth)
+                drawCircle(tint, size.minDimension * .055f, Offset(size.width * .31f, size.height * .62f))
+                drawLine(tint, Offset(size.width * .43f, size.height * .62f), Offset(size.width * .62f, size.height * .62f), strokeWidth)
             }
             "date" -> {
-                drawRoundRect(Muted, Offset(left, top + size.height * .08f),
+                drawRoundRect(tint, Offset(left, top + size.height * .08f),
                     androidx.compose.ui.geometry.Size(right - left, bottom - top - size.height * .08f),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .12f), style = stroke)
-                drawLine(Muted, Offset(left, size.height * .38f), Offset(right, size.height * .38f), strokeWidth)
-                drawLine(Muted, Offset(size.width * .34f, size.height * .08f), Offset(size.width * .34f, size.height * .3f), strokeWidth)
-                drawLine(Muted, Offset(size.width * .66f, size.height * .08f), Offset(size.width * .66f, size.height * .3f), strokeWidth)
+                drawLine(tint, Offset(left, size.height * .38f), Offset(right, size.height * .38f), strokeWidth)
+                drawLine(tint, Offset(size.width * .34f, size.height * .08f), Offset(size.width * .34f, size.height * .3f), strokeWidth)
+                drawLine(tint, Offset(size.width * .66f, size.height * .08f), Offset(size.width * .66f, size.height * .3f), strokeWidth)
             }
         }
     }
 }
 
 @Composable
-private fun RemoteCover(url: String, modifier: Modifier = Modifier) {
+private fun RemoteCover(
+    url: String,
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(12.dp),
+) {
     var bitmap by remember(url) { mutableStateOf<android.graphics.Bitmap?>(null) }
     LaunchedEffect(url) {
         bitmap = withContext(Dispatchers.IO) {
@@ -1795,7 +2236,7 @@ private fun RemoteCover(url: String, modifier: Modifier = Modifier) {
             }.getOrNull()
         }
     }
-    Box(modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFFE7EDF2)), contentAlignment = Alignment.Center) {
+    Box(modifier.clip(shape).background(Color(0xFFE7EDF2)), contentAlignment = Alignment.Center) {
         bitmap?.let { Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
         if (bitmap == null) Text("B", color = Pink.copy(alpha = .75f), fontSize = 24.sp, fontWeight = FontWeight.Black)
     }

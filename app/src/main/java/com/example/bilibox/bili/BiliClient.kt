@@ -49,6 +49,12 @@ class BiliClient(
         return response.data ?: throw BiliException(response.code, "view 返回空 data")
     }
 
+    suspend fun userCard(mid: Long): UserCardData {
+        val response = getJson<UserCardData>("$USER_CARD_URL?mid=$mid")
+        ensureOk(response)
+        return response.data ?: throw BiliException(response.code, "card 返回空 data")
+    }
+
     /** 使用 Web 端 WBI 签名搜索视频，支持排序和分页。 */
     suspend fun searchVideos(
         keyword: String,
@@ -114,6 +120,10 @@ class BiliClient(
             "fnval" to fnval.toString(),
             "fnver" to "0",
             "fourk" to "1",
+            // The Web API otherwise caps anonymous playback below 720P. This
+            // flag lets an anonymous request try the 64/80 streams documented
+            // by Bilibili, while logged-in requests remain compatible.
+            "try_look" to "1",
         )
         var response = getJson<PlayData>(signedPlayUrl(params, false))
         if (response.code == CODE_RISK || response.code == CODE_SIGN_EXPIRED) {
@@ -191,6 +201,7 @@ class BiliClient(
         const val FNVAL_DURL = 1
         private const val NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
         private const val VIEW_URL = "https://api.bilibili.com/x/web-interface/view"
+        private const val USER_CARD_URL = "https://api.bilibili.com/x/web-interface/card"
         private const val PLAY_URL = "https://api.bilibili.com/x/player/wbi/playurl"
         private const val SEARCH_URL = "https://api.bilibili.com/x/web-interface/wbi/search/type"
         private const val SPI_URL = "https://api.bilibili.com/x/frontend/finger/spi"

@@ -50,6 +50,11 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("正在获取视频流…").assertExists()
         compose.onNodeWithContentDescription("播放进度").assertExists()
         compose.onNodeWithContentDescription("切换横屏").assertExists()
+        compose.onNodeWithText("00:00 / --:--").assertExists()
+        // Playback intent must still toggle while no stream is ready to render.
+        compose.onNodeWithContentDescription("播放").performClick()
+        compose.onNodeWithContentDescription("暂停").performClick()
+        compose.onNodeWithContentDescription("播放").assertExists()
         val initialSurface = findPlayerView()
         compose.runOnIdle { error = "测试取流失败"; loading = null }
         compose.onNodeWithText("暂时无法播放").assertExists()
@@ -87,6 +92,10 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("搜索视频").assertExists()
         compose.onNodeWithText("倍速").assertExists()
         compose.onNodeWithText("选集").assertDoesNotExist()
+        compose.onNodeWithContentDescription("退出全屏").assertDoesNotExist()
+        compose.onNodeWithContentDescription("切换横屏").assertDoesNotExist()
+        compose.onNodeWithContentDescription("播放进度").assertExists()
+        compose.onNodeWithText("00:00 / --:--").assertExists()
         compose.onNodeWithContentDescription("截取视频画面").assertExists()
         compose.onNodeWithContentDescription("锁定屏幕").performClick()
         compose.onNodeWithContentDescription("解锁屏幕").assertExists()

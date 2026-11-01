@@ -38,6 +38,7 @@ data class VideoInfo(
     val pic: String = "",
     val desc: String = "",
     val duration: Int = 0,
+    val pubdate: Long = 0,
     val owner: Owner = Owner(),
     val pages: List<Page> = emptyList(),
     val stat: Stat? = null,
@@ -64,6 +65,23 @@ data class Stat(
     val danmaku: Long = 0,
     val reply: Long = 0,
     val like: Long = 0,
+    val coin: Long = 0,
+    val favorite: Long = 0,
+    val share: Long = 0,
+)
+
+@Serializable
+data class UserCardData(
+    val card: UserCard = UserCard(),
+    @SerialName("archive_count") val archiveCount: Long = 0,
+)
+
+@Serializable
+data class UserCard(
+    val mid: Long = 0,
+    val name: String = "",
+    val face: String = "",
+    val fans: Long = 0,
 )
 
 @Serializable
