@@ -299,6 +299,7 @@ internal fun VideoPlayerScreen(
     onRetry: () -> Unit,
     episodes: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     episodeOverlay: (@Composable () -> Unit)? = null,
+    episodeOverlayDismiss: (() -> Unit)? = null,
     detailsBackground: Color = Color.White,
     showDetailTabs: Boolean = true,
     details: @Composable (duration: Long) -> Unit,
@@ -516,6 +517,7 @@ internal fun VideoPlayerScreen(
     BackHandler {
         when {
             screenLocked -> controlsVisible = true
+            episodeOverlayDismiss != null -> episodeOverlayDismiss()
             episodesExpanded -> episodesExpanded = false
             speedMenuExpanded -> speedMenuExpanded = false
             else -> navigateBack()
@@ -750,52 +752,59 @@ internal fun VideoPlayerScreen(
             }
         }
 
-        if (!fullScreen) Column(
-            Modifier.weight(1f).fillMaxWidth().background(detailsBackground)
-                .verticalScroll(rememberScrollState()).navigationBarsPadding()
-        ) {
-            if (showDetailTabs) {
-                Row(
-                    Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    listOf("简介", "评论").forEachIndexed { index, label ->
-                        Column(
-                            Modifier.fillMaxHeight().clickable { detailsTab = index }.padding(horizontal = 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+        if (!fullScreen) {
+            val detailOverlay = episodeOverlay
+            Column(
+                Modifier.weight(1f).fillMaxWidth().background(detailsBackground)
+                    .then(if (detailOverlay == null) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                    .navigationBarsPadding()
+            ) {
+                if (detailOverlay != null) {
+                    detailOverlay.invoke()
+                } else {
+                    if (showDetailTabs) {
+                        Row(
+                            Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(label, color = if (detailsTab == index) Pink else Muted, fontSize = 15.sp,
-                                fontWeight = if (detailsTab == index) FontWeight.SemiBold else FontWeight.Normal)
-                            Spacer(Modifier.height(5.dp))
-                            Box(Modifier.width(30.dp).height(2.dp).background(if (detailsTab == index) Pink else Color.Transparent, CircleShape))
+                            listOf("简介", "评论").forEachIndexed { index, label ->
+                                Column(
+                                    Modifier.fillMaxHeight().clickable { detailsTab = index }.padding(horizontal = 12.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(label, color = if (detailsTab == index) Pink else Muted, fontSize = 15.sp,
+                                        fontWeight = if (detailsTab == index) FontWeight.SemiBold else FontWeight.Normal)
+                                    Spacer(Modifier.height(5.dp))
+                                    Box(Modifier.width(30.dp).height(2.dp).background(if (detailsTab == index) Pink else Color.Transparent, CircleShape))
+                                }
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Text(sourceLabel, color = Muted, fontSize = 12.sp)
+                        }
+                        HorizontalDivider(color = if (detailsBackground == Color.White) Color(0xFFE9EAEC) else Color.White.copy(alpha = .08f), thickness = 1.dp)
+                    }
+
+                    if (!showDetailTabs || detailsTab == 0) {
+                        details(duration)
+                        playbackError?.let { message ->
+                            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                                Text("播放失败：$message", color = Color(0xFFB42318), fontSize = 12.sp)
+                                TextButton(onClick = onRetry) { Text("重试", color = Pink) }
+                            }
+                        }
+                    } else {
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
+                            Text("评论", color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(8.dp))
+                            Text(commentMessage, color = Muted, fontSize = 13.sp)
                         }
                     }
-                    Spacer(Modifier.weight(1f))
-                    Text(sourceLabel, color = Muted, fontSize = 12.sp)
-                }
-                HorizontalDivider(color = if (detailsBackground == Color.White) Color(0xFFE9EAEC) else Color.White.copy(alpha = .08f), thickness = 1.dp)
-            }
-
-            if (!showDetailTabs || detailsTab == 0) {
-                details(duration)
-                playbackError?.let { message ->
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                        Text("播放失败：$message", color = Color(0xFFB42318), fontSize = 12.sp)
-                        TextButton(onClick = onRetry) { Text("重试", color = Pink) }
-                    }
-                }
-            } else {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
-                    Text("评论", color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(8.dp))
-                    Text(commentMessage, color = Muted, fontSize = 13.sp)
                 }
             }
         }
-        }
-        episodeOverlay?.invoke()
     }
+}
 }
 
 @Composable

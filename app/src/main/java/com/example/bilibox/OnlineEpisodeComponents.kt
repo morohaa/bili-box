@@ -11,10 +11,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,11 +27,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -94,7 +89,6 @@ internal fun OnlineEpisodeCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun OnlineEpisodesBottomSheet(
     pages: List<Page>,
@@ -103,61 +97,56 @@ internal fun OnlineEpisodesBottomSheet(
     onPageSelected: (Int) -> Unit,
 ) {
     var gridMode by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = Color.White,
-        tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
-        dragHandle = {
-            Box(Modifier.padding(top = 6.dp, bottom = 2.dp).size(width = 40.dp, height = 4.dp)
+    Column(
+        Modifier.fillMaxSize()
+            .clip(RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp))
+            .background(Color.White)
+    ) {
+        Box(
+            Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(Modifier.size(width = 40.dp, height = 4.dp)
                 .clip(CircleShape).background(OnlineDivider))
         }
-    ) {
-        Column(
-            Modifier.fillMaxWidth().fillMaxHeight(.70f)
-                .navigationBarsPadding().padding(bottom = 8.dp)
+        Row(
+            Modifier.fillMaxWidth().height(44.dp).padding(start = 24.dp, end = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                Modifier.fillMaxWidth().height(44.dp).padding(start = 24.dp, end = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = { gridMode = !gridMode }) {
-                    Text(if (gridMode) "列表" else "宫格", color = OnlinePink, fontSize = 12.sp)
-                }
-                TextButton(onClick = onDismiss) {
-                    Text("关闭", color = OnlineSecondary, fontSize = 12.sp)
-                }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = { gridMode = !gridMode }) {
+                Text(if (gridMode) "列表" else "宫格", color = OnlinePink, fontSize = 12.sp)
             }
-            HorizontalDivider(color = OnlineDivider)
-            if (gridMode) {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    gridItems(pages, key = { it.cid }) { page ->
-                        OnlineSheetEpisodeRow(page, page.page == selectedPage) {
-                            onPageSelected(page.page)
-                            onDismiss()
-                        }
+            TextButton(onClick = onDismiss) {
+                Text("关闭", color = OnlineSecondary, fontSize = 12.sp)
+            }
+        }
+        HorizontalDivider(color = OnlineDivider)
+        if (gridMode) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                gridItems(pages, key = { it.cid }) { page ->
+                    OnlineSheetEpisodeRow(page, page.page == selectedPage) {
+                        onPageSelected(page.page)
+                        onDismiss()
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f).selectableGroup(),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    lazyItems(pages, key = { it.cid }) { page ->
-                        OnlineSheetEpisodeRow(page, page.page == selectedPage) {
-                            onPageSelected(page.page)
-                            onDismiss()
-                        }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f).selectableGroup(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                lazyItems(pages, key = { it.cid }) { page ->
+                    OnlineSheetEpisodeRow(page, page.page == selectedPage) {
+                        onPageSelected(page.page)
+                        onDismiss()
                     }
                 }
             }
@@ -168,7 +157,7 @@ internal fun OnlineEpisodesBottomSheet(
 @Composable
 private fun OnlineSheetEpisodeRow(page: Page, selected: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().height(72.dp)
+        Modifier.fillMaxWidth().height(64.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(if (selected) OnlinePink.copy(alpha = .10f) else OnlineDivider)
             .border(1.dp, if (selected) OnlinePink else OnlineDivider, RoundedCornerShape(18.dp))

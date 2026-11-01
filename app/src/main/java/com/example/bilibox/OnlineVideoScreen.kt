@@ -748,6 +748,19 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         if (episodePages == null) null else { onDismiss ->
             OnlineVideoEpisodes(episodePages, selectedPage, onDismiss) { selectedPage = it.page }
         }
+    val episodeOverlayVisible = !LocalConfiguration.current.orientation
+        .let { it == Configuration.ORIENTATION_LANDSCAPE } &&
+        episodesSheetVisible && episodePages != null
+    val episodeOverlayContent: (@Composable () -> Unit)? = if (episodeOverlayVisible) {
+        {
+            OnlineEpisodesBottomSheet(
+                pages = episodePages!!,
+                selectedPage = selectedPage,
+                onDismiss = { episodesSheetVisible = false },
+                onPageSelected = { selectedPage = it }
+            )
+        }
+    } else null
     VideoPlayerScreen(
         player = exoPlayer,
         title = video.title,
@@ -758,18 +771,10 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         onBack = onBack,
         onRetry = { retryToken++ },
         episodes = episodePicker,
-        episodeOverlay = {
-            if (!LocalConfiguration.current.orientation.let { it == Configuration.ORIENTATION_LANDSCAPE } &&
-                episodesSheetVisible && episodePages != null
-            ) {
-                OnlineEpisodesBottomSheet(
-                    pages = episodePages,
-                    selectedPage = selectedPage,
-                    onDismiss = { episodesSheetVisible = false },
-                    onPageSelected = { selectedPage = it }
-                )
-            }
-        },
+        episodeOverlay = episodeOverlayContent,
+        episodeOverlayDismiss = if (episodeOverlayVisible) {
+            { episodesSheetVisible = false }
+        } else null,
         detailsBackground = OnlineSurface,
         showDetailTabs = false,
         details = { _ ->
