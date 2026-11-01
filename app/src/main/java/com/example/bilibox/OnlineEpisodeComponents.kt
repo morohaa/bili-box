@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -104,7 +103,7 @@ internal fun OnlineEpisodesBottomSheet(
     onPageSelected: (Int) -> Unit,
 ) {
     var gridMode by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -112,7 +111,7 @@ internal fun OnlineEpisodesBottomSheet(
         tonalElevation = 0.dp,
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = {
-            Box(Modifier.padding(top = 10.dp, bottom = 4.dp).size(width = 40.dp, height = 4.dp)
+            Box(Modifier.padding(top = 6.dp, bottom = 2.dp).size(width = 40.dp, height = 4.dp)
                 .clip(CircleShape).background(OnlineDivider))
         }
     ) {
@@ -121,7 +120,7 @@ internal fun OnlineEpisodesBottomSheet(
                 .navigationBarsPadding().padding(bottom = 8.dp)
         ) {
             Row(
-                Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
+                Modifier.fillMaxWidth().height(44.dp).padding(start = 24.dp, end = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Spacer(Modifier.weight(1f))
@@ -136,7 +135,7 @@ internal fun OnlineEpisodesBottomSheet(
             if (gridMode) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 430.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -150,7 +149,7 @@ internal fun OnlineEpisodesBottomSheet(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 470.dp).selectableGroup(),
+                    modifier = Modifier.fillMaxWidth().weight(1f).selectableGroup(),
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
