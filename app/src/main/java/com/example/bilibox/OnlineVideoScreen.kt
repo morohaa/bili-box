@@ -52,11 +52,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -87,6 +90,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
@@ -142,6 +146,8 @@ private fun OnlineVideoDetails(
     creatorCard: com.example.bilibox.bili.UserCardData?,
     context: Context,
     selectedPage: Int,
+    autoPlayNext: Boolean,
+    onAutoPlayNextChange: (Boolean) -> Unit,
     onPageSelected: (Int) -> Unit,
     onOpenEpisodes: () -> Unit,
 ) {
@@ -295,37 +301,124 @@ private fun OnlineVideoDetails(
             }
         }
         info?.pages?.takeIf { it.size > 1 }?.let { pages ->
-            Row(
-                Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("正片", color = OnlineText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.width(5.dp))
-                Text("($selectedPage/${pages.size})", color = OnlineMuted, fontSize = 12.sp)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "查看全部 ›",
-                    color = OnlinePink,
-                    fontSize = 11.5.sp,
-                    modifier = Modifier.clickable(role = Role.Button, onClick = onOpenEpisodes)
-                        .semantics { contentDescription = "查看全部选集" }
-                )
-            }
-            Row(
-                Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 12.dp)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                pages.forEach { page ->
-                    OnlineEpisodeCard(
-                        page = page,
-                        selected = page.page == selectedPage,
-                        onClick = { onPageSelected(page.page) }
-                    )
-                }
-            }
+            OnlineEpisodesSection(
+                pages = pages,
+                selectedPage = selectedPage,
+                autoPlayNext = autoPlayNext,
+                onAutoPlayNextChange = onAutoPlayNextChange,
+                onPageSelected = onPageSelected,
+                onOpenEpisodes = onOpenEpisodes,
+            )
         }
         HorizontalDivider(color = OnlineDivider)
+    }
+}
+
+/** Horizontal "正片" picker shown on the online video detail page. */
+@Composable
+internal fun OnlineEpisodesSection(
+    pages: List<Page>,
+    selectedPage: Int,
+    autoPlayNext: Boolean,
+    onAutoPlayNextChange: (Boolean) -> Unit,
+    onPageSelected: (Int) -> Unit,
+    onOpenEpisodes: () -> Unit,
+) {
+    val pageIndex = pages.indexOfFirst { it.page == selectedPage }
+    Row(
+        Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("正片", color = OnlineText, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.width(5.dp))
+        Text(
+            "(${if (pageIndex >= 0) pageIndex + 1 else selectedPage}/${pages.size})",
+            color = OnlineMuted,
+            fontSize = 12.sp,
+            style = TextStyle(fontFeatureSettings = "tnum"),
+            maxLines = 1,
+        )
+        Spacer(Modifier.width(8.dp))
+        OnlineAutoPlayChip(autoPlayNext, onAutoPlayNextChange)
+        Spacer(Modifier.weight(1f))
+        Row(
+            Modifier.clip(RoundedCornerShape(6.dp))
+                .clickable(role = Role.Button, onClick = onOpenEpisodes)
+                .semantics { contentDescription = "查看全部选集" }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "共${pages.size}P · 查看全部",
+                color = OnlineMuted,
+                fontSize = 11.5.sp,
+                maxLines = 1,
+            )
+            Spacer(Modifier.width(2.dp))
+            OnlineChevronRight(color = OnlineMuted, modifier = Modifier.size(12.dp))
+        }
+    }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = pageIndex.coerceAtLeast(0)
+    )
+    LaunchedEffect(selectedPage) {
+        if (pageIndex >= 0) listState.animateScrollToItem(pageIndex)
+    }
+    LazyRow(
+        state = listState,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+        contentPadding = PaddingValues(top = 10.dp, bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        items(pages, key = { it.cid }) { page ->
+            OnlineEpisodeCard(
+                page = page,
+                selected = page.page == selectedPage,
+                onClick = { onPageSelected(page.page) }
+            )
+        }
+    }
+}
+
+/** Compact auto-play-next chip used in the "正片" section header. */
+@Composable
+private fun OnlineAutoPlayChip(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.height(24.dp)
+            .clip(CircleShape)
+            .background(OnlineDivider)
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .semantics { contentDescription = "自动连播" }
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(6.dp).clip(CircleShape)
+                .background(if (checked) OnlinePink else Color(0xFFB9BEC5))
+        )
+        Spacer(Modifier.width(4.dp))
+        Text("自动连播", color = OnlineSecondary, fontSize = 10.5.sp, maxLines = 1)
+    }
+}
+
+@Composable
+private fun OnlineChevronRight(color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val stroke = 1.4.dp.toPx()
+        drawLine(
+            color,
+            Offset(size.width * .38f, size.height * .26f),
+            Offset(size.width * .66f, size.height * .5f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color,
+            Offset(size.width * .66f, size.height * .5f),
+            Offset(size.width * .38f, size.height * .74f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round,
+        )
     }
 }
 
@@ -527,6 +620,8 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     var videoInfo by remember(video.bvid, session?.cookie) { mutableStateOf<VideoInfo?>(null) }
     var selectedPage by rememberSaveable(video.bvid, session?.cookie) { mutableIntStateOf(1) }
     var episodesSheetVisible by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(false) }
+    var autoPlayNext by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(true) }
+    var episodesInGridView by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(false) }
     var creatorCard by remember(video.bvid, session?.cookie) { mutableStateOf<com.example.bilibox.bili.UserCardData?>(null) }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
     suspend fun tryHtml5Fallback(): String? {
@@ -744,18 +839,40 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         }
     }
     val episodePages = videoInfo?.pages?.takeIf { it.size > 1 }
+    val latestEpisodePages by rememberUpdatedState(episodePages)
+    val latestSelectedPage by rememberUpdatedState(selectedPage)
+    val latestAutoPlayNext by rememberUpdatedState(autoPlayNext)
+    DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state != Player.STATE_ENDED || !latestAutoPlayNext) return
+                val parts = latestEpisodePages ?: return
+                val index = parts.indexOfFirst { it.page == latestSelectedPage }
+                if (index in 0 until parts.lastIndex) {
+                    selectedPage = parts[index + 1].page
+                }
+            }
+        }
+        exoPlayer.addListener(listener)
+        onDispose { exoPlayer.removeListener(listener) }
+    }
     val episodePicker: (@Composable (onDismiss: () -> Unit) -> Unit)? =
         if (episodePages == null) null else { onDismiss ->
             OnlineVideoEpisodes(episodePages, selectedPage, onDismiss) { selectedPage = it.page }
         }
-    val episodeOverlayVisible = !LocalConfiguration.current.orientation
-        .let { it == Configuration.ORIENTATION_LANDSCAPE } &&
+    val episodeOverlayVisible = LocalConfiguration.current.orientation
+        .let { it != Configuration.ORIENTATION_LANDSCAPE } &&
         episodesSheetVisible && episodePages != null
-    val episodeOverlayContent: (@Composable () -> Unit)? = if (episodeOverlayVisible) {
+    val overlayPages = episodePages
+    val episodeOverlayContent: (@Composable () -> Unit)? = if (overlayPages != null) {
         {
             OnlineEpisodesBottomSheet(
-                pages = episodePages!!,
+                pages = overlayPages,
                 selectedPage = selectedPage,
+                autoPlayNext = autoPlayNext,
+                onAutoPlayNextChange = { autoPlayNext = it },
+                gridView = episodesInGridView,
+                onGridViewChange = { episodesInGridView = it },
                 onDismiss = { episodesSheetVisible = false },
                 onPageSelected = { selectedPage = it }
             )
@@ -772,6 +889,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         onRetry = { retryToken++ },
         episodes = episodePicker,
         episodeOverlay = episodeOverlayContent,
+        episodeOverlayVisible = episodeOverlayVisible,
         episodeOverlayDismiss = if (episodeOverlayVisible) {
             { episodesSheetVisible = false }
         } else null,
@@ -785,6 +903,8 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                     creatorCard = creatorCard,
                     context = context,
                     selectedPage = selectedPage,
+                    autoPlayNext = autoPlayNext,
+                    onAutoPlayNextChange = { autoPlayNext = it },
                     onPageSelected = { selectedPage = it },
                     onOpenEpisodes = { episodesSheetVisible = true }
                 )
@@ -794,7 +914,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
 }
 
 @Composable
-private fun OnlineVideoEpisodes(
+internal fun OnlineVideoEpisodes(
     pages: List<Page>,
     selectedPage: Int,
     onDismiss: () -> Unit,

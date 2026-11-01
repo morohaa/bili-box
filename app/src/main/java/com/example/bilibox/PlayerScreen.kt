@@ -68,6 +68,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
@@ -299,6 +300,7 @@ internal fun VideoPlayerScreen(
     onRetry: () -> Unit,
     episodes: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     episodeOverlay: (@Composable () -> Unit)? = null,
+    episodeOverlayVisible: Boolean = episodeOverlay != null,
     episodeOverlayDismiss: (() -> Unit)? = null,
     detailsBackground: Color = Color.White,
     showDetailTabs: Boolean = true,
@@ -753,15 +755,14 @@ internal fun VideoPlayerScreen(
         }
 
         if (!fullScreen) {
-            val detailOverlay = episodeOverlay
-            Column(
+            val overlayVisible = episodeOverlayVisible && episodeOverlay != null
+            Box(
                 Modifier.weight(1f).fillMaxWidth().background(detailsBackground)
-                    .then(if (detailOverlay == null) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-                    .navigationBarsPadding()
+                    .navigationBarsPadding().clipToBounds()
             ) {
-                if (detailOverlay != null) {
-                    detailOverlay.invoke()
-                } else {
+                Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                ) {
                     if (showDetailTabs) {
                         Row(
                             Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp),
@@ -801,10 +802,32 @@ internal fun VideoPlayerScreen(
                         }
                     }
                 }
+
+                val overlay = episodeOverlay
+                if (overlay != null) {
+                    PlayerDetailsOverlay(visible = overlayVisible) { overlay() }
+                }
             }
         }
     }
 }
+}
+
+@Composable
+private fun PlayerDetailsOverlay(visible: Boolean, overlay: @Composable () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(
+            initialOffsetY = { it },
+            animationSpec = tween(300, easing = CubicBezierEasing(.22f, 1f, .36f, 1f))
+        ) + fadeIn(animationSpec = tween(180)),
+        exit = slideOutVertically(
+            targetOffsetY = { it },
+            animationSpec = tween(240, easing = FastOutSlowInEasing)
+        ) + fadeOut(animationSpec = tween(140)),
+    ) {
+        overlay()
+    }
 }
 
 @Composable
