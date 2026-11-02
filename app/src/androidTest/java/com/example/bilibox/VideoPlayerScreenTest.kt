@@ -339,6 +339,73 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("搜索视频简介").assertExists()
     }
 
+    @Test
+    fun listenModeDisablesVideoCollapsesAndRestores() {
+        lateinit var player: ExoPlayer
+        compose.setContent {
+            val context = LocalContext.current
+            player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            VideoPlayerScreen(
+                player = player,
+                title = "听视频测试",
+                sourceLabel = "哔哩哔哩",
+                commentMessage = "暂不支持查看在线评论",
+                onBack = {},
+                onRetry = {},
+                listenInfo = ListenInfo(subtitle = "测试UP主", online = true),
+                details = { Text("搜索视频简介") }
+            )
+        }
+
+        compose.onNodeWithContentDescription("听视频").performClick()
+        compose.onNodeWithText("听视频 · 仅加载音频流").assertExists()
+        compose.onNodeWithText("测试UP主").assertExists()
+        compose.runOnIdle {
+            assertEquals(true, player.trackSelectionParameters.disabledTrackTypes
+                .contains(androidx.media3.common.C.TRACK_TYPE_VIDEO))
+        }
+        compose.onNodeWithContentDescription("定时关闭").performClick()
+        compose.onNodeWithText("30 分钟").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("定时关闭：剩余", substring = true).assertExists()
+
+        // Collapsing keeps listening; the video box shows the audio-only state.
+        compose.onNodeWithContentDescription("收起").performClick()
+        compose.waitForIdle()
+        // The test player has no media, so the collapsed card shows the paused state.
+        compose.onNodeWithText("听视频已暂停").assertExists()
+        compose.onNodeWithText("展开").assertExists()
+        compose.onNodeWithContentDescription("打开听视频").assertExists()
+
+        compose.onNodeWithText("恢复画面").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("听视频").assertExists()
+        compose.runOnIdle {
+            assertEquals(false, player.trackSelectionParameters.disabledTrackTypes
+                .contains(androidx.media3.common.C.TRACK_TYPE_VIDEO))
+        }
+    }
+
+    @Test
+    fun listenButtonOnlyAppearsInPortraitWithListenInfo() {
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            VideoPlayerScreen(
+                player = player,
+                title = "搜索视频",
+                sourceLabel = "哔哩哔哩",
+                commentMessage = "暂不支持查看在线评论",
+                onBack = {},
+                onRetry = {},
+                details = { Text("搜索视频简介") }
+            )
+        }
+        compose.onNodeWithContentDescription("听视频").assertDoesNotExist()
+    }
+
     private fun findPlayerView(): PlayerView {
         var result: PlayerView? = null
         InstrumentationRegistry.getInstrumentation().runOnMainSync {

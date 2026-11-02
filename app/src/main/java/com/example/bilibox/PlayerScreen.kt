@@ -328,6 +328,7 @@ internal fun LocalVideoPlayer(
     val playbackByKey = remember(playlist, video.uri) {
         playlist.associate { item -> item.key to progressStore.playback(item.key, item.durationMs) }
     }
+    val listenThumbnail = rememberVideoThumbnail(video)
     VideoPlayerScreen(
         player = player,
         title = video.name,
@@ -337,6 +338,14 @@ internal fun LocalVideoPlayer(
         commentMessage = "本地视频暂时没有评论",
         detailTabs = listOf("简介", "媒体信息"),
         sourcePill = true,
+        listenInfo = ListenInfo(
+            subtitle = listOf(
+                video.relativeDirectory.ifBlank { video.bucketName },
+                video.extension.uppercase(),
+            ).filter { it.isNotBlank() }.joinToString(" · "),
+            online = false,
+            coverBitmap = listenThumbnail,
+        ),
         // Persist the exact exit position before the library recomposes its status list.
         onBack = {
             savePlaybackProgress()
@@ -414,6 +423,7 @@ internal fun VideoPlayerScreen(
     sourcePill: Boolean = false,
     extraDetailPane: (@Composable (duration: Long) -> Unit)? = null,
     playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
+    listenInfo: ListenInfo? = null,
     details: @Composable (duration: Long) -> Unit,
 ) {
     val context = LocalContext.current
@@ -451,6 +461,38 @@ internal fun VideoPlayerScreen(
     var verticalGestureActive by remember(player) { mutableStateOf(false) }
     val captureScope = rememberCoroutineScope()
 
+    // 听视频: not keyed by player, so it survives switching to the next local file.
+    var listening by rememberSaveable { mutableStateOf(false) }
+    var listenPageOpen by rememberSaveable { mutableStateOf(false) }
+    val listenReveal = remember { Animatable(0f) }
+    var listenOrigin by remember { mutableStateOf(Offset.Zero) }
+    var screenRootOffset by remember { mutableStateOf(Offset.Zero) }
+    val listenTimer = remember { ListenSleepTimer() }
+    val listenCover = rememberListenCover(listenInfo, enabled = listening)
+    ListenPlaybackEffect(player, listening, title, listenInfo?.subtitle.orEmpty(), listenCover)
+    ListenSleepTimerEffect(player, listenTimer)
+    LaunchedEffect(listenPageOpen) {
+        listenReveal.animateTo(
+            if (listenPageOpen) 1f else 0f,
+            tween(if (listenPageOpen) 520 else 420, easing = CubicBezierEasing(.6f, 0f, .2f, 1f))
+        )
+    }
+    fun enterListen() {
+        if (!listening) {
+            listening = true
+            player.playWhenReady = true
+            Toast.makeText(context, "已切换为听视频，画面已关闭", Toast.LENGTH_SHORT).show()
+        }
+        speedMenuExpanded = false
+        playbackModeExpanded = false
+        listenPageOpen = true
+    }
+    fun restoreVideo() {
+        listening = false
+        listenPageOpen = false
+        controlsVisible = true
+    }
+
     val originalWindowBrightness = remember(activity) { activity?.window?.attributes?.screenBrightness }
     DisposableEffect(activity) {
         val originalOrientation = activity?.requestedOrientation
@@ -485,6 +527,16 @@ internal fun VideoPlayerScreen(
                 if (fullScreen) hide(WindowInsetsCompat.Type.systemBars())
                 else show(WindowInsetsCompat.Type.systemBars())
             }
+        }
+    }
+
+    // Runs after the effect above, so the dark 听视频 page keeps light nav icons
+    // even when opening it rotates the screen back to portrait.
+    val listenVisible by remember { derivedStateOf { listenReveal.value > 0f } }
+    LaunchedEffect(activity, fullScreen, listenVisible) {
+        activity?.let {
+            WindowCompat.getInsetsController(it.window, it.window.decorView).isAppearanceLightNavigationBars =
+                !listenVisible && !fullScreen && detailsBackground == Color.White
         }
     }
 
@@ -658,7 +710,7 @@ internal fun VideoPlayerScreen(
             frame.recycle()
         }
     }
-    BackHandler {
+    BackHandler(enabled = !listenPageOpen) {
         when {
             screenLocked -> controlsVisible = true
             episodeOverlayDismiss != null -> episodeOverlayDismiss()
@@ -674,7 +726,7 @@ internal fun VideoPlayerScreen(
     // runner and the ruler are the only things competing for attention.
     val showChrome = controlsVisible && !screenLocked && !(fullScreen && speedMenuExpanded)
 
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().onGloballyPositioned { screenRootOffset = it.positionInRoot() }) {
         Column(Modifier.fillMaxSize().background(Color.Black)
             .then(if (fullScreen) Modifier else Modifier.statusBarsPadding())) {
         Box(
@@ -684,7 +736,12 @@ internal fun VideoPlayerScreen(
         ) {
             AndroidView(
                 factory = { viewContext -> createTexturePlayerView(viewContext, player).also { playerView = it } },
-                update = { it.player = player; playerView = it },
+                update = {
+                    it.player = player
+                    // Let the screen sleep while only audio is playing.
+                    it.keepScreenOn = !listening
+                    playerView = it
+                },
                 modifier = Modifier.fillMaxSize()
             )
             PlayerTouchSurface(
@@ -697,6 +754,14 @@ internal fun VideoPlayerScreen(
                 onVerticalGestureEnd = { verticalGestureActive = false },
                 modifier = Modifier.fillMaxSize()
             )
+            if (listening && !listenPageOpen) {
+                CollapsedListenOverlay(
+                    cover = listenCover,
+                    playing = isPlaying,
+                    onExpand = { enterListen() },
+                    onRestoreVideo = { restoreVideo() },
+                )
+            }
             if (playbackError != null) {
                 Column(Modifier.padding(horizontal = 24.dp, vertical = 48.dp),
                     horizontalAlignment = Alignment.CenterHorizontally) {
@@ -859,6 +924,19 @@ internal fun VideoPlayerScreen(
                 }
                 Text(if (fullScreen) title else "", color = Color.White, fontSize = 14.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                if (!fullScreen && listenInfo != null) {
+                    ListenTopBarButton(
+                        listening = listening,
+                        modifier = Modifier.onGloballyPositioned { coordinates ->
+                            val p = coordinates.positionInRoot()
+                            listenOrigin = Offset(
+                                p.x + coordinates.size.width / 2f,
+                                p.y + coordinates.size.height / 2f
+                            )
+                        }
+                    ) { enterListen() }
+                    Spacer(Modifier.width(4.dp))
+                }
                 if (!fullScreen) {
                     SpeedBarChip(speed = speed) { speedMenuExpanded = true }
                 }
@@ -1126,6 +1204,44 @@ internal fun VideoPlayerScreen(
             }
         }
 
+    }
+    // 听视频 page: stays composed while its reveal animation is running.
+    val info = listenInfo
+    if (info != null && listenVisible) {
+        ListenScreen(
+            reveal = { listenReveal.value },
+            origin = listenOrigin - screenRootOffset,
+            open = listenPageOpen,
+            title = title,
+            info = info,
+            cover = listenCover,
+            playing = playWhenReady && playbackState != Player.STATE_ENDED,
+            buffering = playbackState == Player.STATE_BUFFERING,
+            positionMs = position,
+            durationMs = duration,
+            speed = speed,
+            timer = listenTimer,
+            hasNext = onNextEpisode != null,
+            onTogglePlay = {
+                if (player.playbackState == Player.STATE_ENDED) {
+                    player.seekTo(0L)
+                    player.playWhenReady = true
+                } else {
+                    player.playWhenReady = !player.playWhenReady
+                }
+            },
+            onSeek = { target ->
+                player.seekTo(target.coerceAtLeast(0L))
+                position = target.coerceAtLeast(0L)
+            },
+            onNext = { onNextEpisode?.invoke() },
+            onSpeedChange = {
+                player.setPlaybackSpeed(it)
+                speed = it
+            },
+            onCollapse = { listenPageOpen = false },
+            onRestoreVideo = { restoreVideo() },
+        )
     }
 }
 }

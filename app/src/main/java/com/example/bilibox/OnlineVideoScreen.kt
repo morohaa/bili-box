@@ -974,6 +974,14 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         } else null,
         detailsBackground = OnlineSurface,
         showDetailTabs = false,
+        listenInfo = ListenInfo(
+            subtitle = listOfNotNull(
+                videoInfo?.owner?.name?.takeIf { it.isNotBlank() } ?: video.author.takeIf { it.isNotBlank() },
+                episodePages?.firstOrNull { it.page == selectedPage }?.let { "P${it.page} ${it.part}".trim() },
+            ).joinToString(" · "),
+            online = true,
+            coverUrl = videoInfo?.pic?.takeIf { it.isNotBlank() }?.let(::normalizeImageUrl) ?: video.coverUrl,
+        ),
         details = { _ ->
             Box(Modifier.fillMaxWidth()) {
                 OnlineVideoDetails(
