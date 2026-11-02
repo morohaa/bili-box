@@ -205,8 +205,18 @@ private fun BiliBoxApp() {
                 )
             } else {
                 Column(Modifier.fillMaxSize()) {
-                    // 固定顶栏：不跟随内容滚动，三个 Tab 共用同一高度与边距。
-                    AppTopBar()
+                    // 固定顶栏：不跟随内容滚动，三个 Tab 共用尺寸与下边界。
+                    if (tab == 0) {
+                        AppTopBar {
+                            DynamicTopBarContent(
+                                query = searchQuery,
+                                onQueryChange = { searchQuery = it },
+                                onSearch = { runSearch(1, searchOrder) },
+                            )
+                        }
+                    } else {
+                        AppTopBar()
+                    }
                     // The scrollable page is captured once and shared by both glass surfaces.
                     Column(
                         Modifier.weight(1f).fillMaxWidth()
@@ -214,19 +224,13 @@ private fun BiliBoxApp() {
                             .padding(horizontal = 16.dp)
                     ) {
                         when (tab) {
-                            0 -> {
-                                // 搜索从原首页移到动态：输入即在这里出结果。
-                                VideoSearchField(
-                                    query = searchQuery,
-                                    onQueryChange = { searchQuery = it },
-                                    onSearch = { runSearch(1, searchOrder) }
-                                )
-                                Spacer(Modifier.height(26.dp))
-                                when (val state = searchState) {
-                                    SearchState.Idle -> Unit
-                                    SearchState.Loading -> SearchLoading()
-                                    is SearchState.Error -> SearchError(state.message) { runSearch(state.page, state.order) }
-                                    is SearchState.Success -> SearchResults(
+                            0 -> when (val state = searchState) {
+                                SearchState.Idle -> Unit
+                                SearchState.Loading -> SearchLoading()
+                                is SearchState.Error -> SearchError(state.message) { runSearch(state.page, state.order) }
+                                is SearchState.Success -> {
+                                    Spacer(Modifier.height(12.dp))
+                                    SearchResults(
                                         state = state,
                                         onVideoClick = { selectedVideo = it },
                                         onOrderChange = { runSearch(1, it) },

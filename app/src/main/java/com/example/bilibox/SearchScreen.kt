@@ -136,36 +136,6 @@ import kotlin.math.roundToInt
 
 
 @Composable
-internal fun VideoSearchField(query: String, onQueryChange: (String) -> Unit, onSearch: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            shape = RoundedCornerShape(18.dp),
-            placeholder = { Text("搜索 B 站视频", color = Muted) },
-            leadingIcon = { Text("⌕", fontSize = 26.sp, color = Pink) },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = Color.White.copy(alpha = .76f),
-                focusedContainerColor = Color.White,
-                unfocusedBorderColor = Color(0xFFE4E9EF),
-                focusedBorderColor = Pink
-            )
-        )
-        Spacer(Modifier.width(10.dp))
-        Button(
-            onClick = onSearch,
-            enabled = query.isNotBlank(),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Pink)
-        ) { Text("搜索") }
-    }
-}
-
-@Composable
 internal fun SearchLoading() {
     Column(Modifier.fillMaxWidth().padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         CircularProgressIndicator(color = Pink, strokeWidth = 2.dp)
