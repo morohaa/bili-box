@@ -417,6 +417,10 @@ internal fun VideoPlayerScreen(
     var volumeGestureRemainder by remember(player) { mutableFloatStateOf(0f) }
     var gestureFeedback by remember(player) { mutableStateOf<PlayerGestureFeedbackState?>(null) }
     var verticalGestureActive by remember(player) { mutableStateOf(false) }
+    // 长按画面: hold at 2x, restore the user's own speed on release.
+    var speedBoostActive by remember(player) { mutableStateOf(false) }
+    var speedBoostSpeed by remember(player) { mutableFloatStateOf(PlaybackSpeedBoost) }
+    var speedBeforeBoost by remember(player) { mutableFloatStateOf(1f) }
     val captureScope = rememberCoroutineScope()
 
     // 听视频: not keyed by player, so it survives switching to the next local file.
@@ -548,6 +552,8 @@ internal fun VideoPlayerScreen(
     }
 
     fun startVerticalGesture(side: PlayerGestureSide) {
+        // A held 2x gesture owns the finger; do not also drag brightness/volume.
+        if (speedBoostActive) return
         verticalGestureActive = true
         if (side == PlayerGestureSide.LEFT) {
             screenBrightness = activity?.let(::readScreenBrightness) ?: screenBrightness
@@ -558,6 +564,7 @@ internal fun VideoPlayerScreen(
     }
 
     fun adjustFromVerticalGesture(side: PlayerGestureSide, deltaFraction: Float) {
+        if (speedBoostActive) return
         if (side == PlayerGestureSide.LEFT) {
             val newBrightness = (screenBrightness - deltaFraction).coerceIn(.02f, 1f)
             screenBrightness = newBrightness
@@ -577,6 +584,26 @@ internal fun VideoPlayerScreen(
             }
         }
         updateGestureFeedback(side)
+    }
+
+    fun startSpeedBoost() {
+        if (screenLocked || speedBoostActive) return
+        val current = player.playbackParameters.speed
+        val target = longPressPlaybackSpeed(current)
+        speedBeforeBoost = current
+        speedBoostSpeed = target
+        speedBoostActive = true
+        gestureFeedback = null
+        player.setPlaybackSpeed(target)
+        speed = target
+    }
+
+    fun endSpeedBoost() {
+        if (!speedBoostActive) return
+        speedBoostActive = false
+        // The screen may be going away mid-hold and the player already released.
+        runCatching { player.setPlaybackSpeed(speedBeforeBoost) }
+        speed = speedBeforeBoost
     }
 
     fun takeVideoScreenshot() {
@@ -654,6 +681,16 @@ internal fun VideoPlayerScreen(
     // The local queue keeps one player across files, so reset what a fresh player
     // used to reset. Playback speed deliberately carries over to the next file.
     var lastMediaKey by remember(player) { mutableStateOf(mediaKey) }
+    // Leaving the screen mid-hold must not leave a shared player stuck at 2x.
+    val speedBoostActiveState = rememberUpdatedState(speedBoostActive)
+    val speedBeforeBoostState = rememberUpdatedState(speedBeforeBoost)
+    DisposableEffect(player) {
+        onDispose {
+            if (speedBoostActiveState.value) {
+                runCatching { player.setPlaybackSpeed(speedBeforeBoostState.value) }
+            }
+        }
+    }
     LaunchedEffect(player, mediaKey) {
         if (mediaKey == lastMediaKey) return@LaunchedEffect
         lastMediaKey = mediaKey
@@ -740,6 +777,10 @@ internal fun VideoPlayerScreen(
                 onVerticalGestureStart = { startVerticalGesture(it) },
                 onVerticalSwipe = { side, delta -> adjustFromVerticalGesture(side, delta) },
                 onVerticalGestureEnd = { verticalGestureActive = false },
+                speedBoostEnabled = !screenLocked && !speedMenuExpanded &&
+                    !playbackModeExpanded && !sleepTimerOpen && playbackError == null,
+                onSpeedBoostStart = { startSpeedBoost() },
+                onSpeedBoostEnd = { endSpeedBoost() },
                 modifier = Modifier.fillMaxSize()
             )
             if (listening && !listenPageOpen) {
@@ -963,6 +1004,14 @@ internal fun VideoPlayerScreen(
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
+            PlayerSpeedBoostIndicator(
+                active = speedBoostActive,
+                speed = speedBoostSpeed,
+                // Keep the feedback near the top edge: centering it covered the
+                // part of the frame the user was watching while holding.
+                modifier = Modifier.align(Alignment.TopCenter)
+                    .padding(top = if (fullScreen) 56.dp else 52.dp)
+            )
             val episodeContent = episodes
             if (fullScreen && !screenLocked && episodeContent != null) {
                 PlayerDrawerVisibility(visible = episodesExpanded) {

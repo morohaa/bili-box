@@ -75,6 +75,15 @@ internal const val PlaybackSpeedMax = 3f
 internal const val PlaybackSpeedStep = 0.05f
 internal val PlaybackSpeedPresets = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f, 3f)
 
+/** Temporary speed used while the video area is held down. */
+internal const val PlaybackSpeedBoost = 2f
+
+/**
+ * 长按只会加速：当前倍速低于 2x 时临时切到 2x，已经更快时保持用户的选择，
+ * 避免“长按反而慢下来”。
+ */
+internal fun longPressPlaybackSpeed(current: Float): Float = maxOf(current, PlaybackSpeedBoost)
+
 private val SpeedBlue = Color(0xFF00AEEC)
 private val SpeedInk = Color(0xFF18191C)
 private val SpeedPinkDeep = Color(0xFFE8547F)
@@ -329,6 +338,15 @@ private fun SpeedPanelContent(
         Spacer(Modifier.height(6.dp))
         Box(Modifier.fillMaxWidth().padding(horizontal = 22.dp)) {
             SpeedPresetRow(speed = speed, onPreset = onPreset)
+        }
+        if (!compact) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "长按画面 · 临时 ${formatSpeedBadge(PlaybackSpeedBoost)} 播放",
+                color = Color.White.copy(alpha = .38f),
+                fontSize = 10.sp,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
         }
     }
 }
