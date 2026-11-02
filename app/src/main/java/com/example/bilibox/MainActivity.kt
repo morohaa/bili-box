@@ -147,7 +147,8 @@ class MainActivity : ComponentActivity() {
 private fun BiliBoxApp() {
     val context = LocalContext.current
     var selected by rememberSaveable { mutableIntStateOf(0) }
-    var saved by rememberSaveable { mutableStateOf(false) }
+    // 0 动态 / 1 视频 / 2 我的. Clamp restored state from the old four-tab layout.
+    val tab = selected.coerceIn(0, 2)
     var session by remember { mutableStateOf<BiliSession?>(BiliSessionStore.load(context)) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchState by remember { mutableStateOf<SearchState>(SearchState.Idle) }
@@ -192,7 +193,7 @@ private fun BiliBoxApp() {
             backdrop.record { this@drawWithContent.drawContent() }
             drawLayer(backdrop)
         }) {
-            if (selected == 2) {
+            if (tab == 1) {
                 // The local-video browser owns its full-height layout so folders, the
                 // settings sheet and the floating resume card can use the whole screen.
                 LibraryPage(
@@ -209,8 +210,10 @@ private fun BiliBoxApp() {
                         .statusBarsPadding().padding(horizontal = 16.dp)
                 ) {
                     Header()
-                    when (selected) {
+                    when (tab) {
                         0 -> {
+                            // 搜索从原首页移到动态：输入即在这里出结果，
+                            // 未搜索时继续展示动态内容。
                             VideoSearchField(
                                 query = searchQuery,
                                 onQueryChange = { searchQuery = it },
@@ -218,7 +221,10 @@ private fun BiliBoxApp() {
                             )
                             Spacer(Modifier.height(26.dp))
                             when (val state = searchState) {
-                                SearchState.Idle -> HomeContent(saved) { saved = !saved }
+                                SearchState.Idle -> CollectionPage(
+                                    "动态", "关注的人，分享的日常",
+                                    "今天的灵感", "沿着海岸线，收集一整个夏天",
+                                )
                                 SearchState.Loading -> SearchLoading()
                                 is SearchState.Error -> SearchError(state.message) { runSearch(state.page, state.order) }
                                 is SearchState.Success -> SearchResults(
@@ -229,8 +235,7 @@ private fun BiliBoxApp() {
                                 )
                             }
                         }
-                        1 -> CollectionPage("动态", "关注的人，分享的日常", "今天的灵感", "沿着海岸线，收集一整个夏天")
-                        else -> MyPage(if (saved) 1 else 0, session) { session = it }
+                        else -> MyPage(0, session) { session = it }
                     }
                     Spacer(Modifier.height(150.dp))
                     Spacer(Modifier.navigationBarsPadding())
@@ -238,7 +243,7 @@ private fun BiliBoxApp() {
             }
         }
         if (selectedLocalVideo == null) {
-            LiquidNavigation(selected, { selected = it }, backdrop,
+            LiquidNavigation(tab, { selected = it.coerceIn(0, 2) }, backdrop,
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp))
         }
         // Keep the library composed underneath so its folder position, search and

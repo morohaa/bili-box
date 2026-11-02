@@ -64,7 +64,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -153,46 +152,6 @@ private fun SectionTitle(title: String, subtitle: String) {
 }
 
 @Composable
-internal fun HomeContent(saved: Boolean, onSave: () -> Unit) {
-    var liked by rememberSaveable { mutableStateOf(false) }
-    SectionTitle("发现你的下一份喜欢", "放慢一点，好内容值得停留。")
-    Spacer(Modifier.height(26.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("为你推荐", color = Pink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        Text("生活", color = Muted, fontSize = 13.sp)
-        Text("音乐", color = Muted, fontSize = 13.sp)
-        Text("旅行", color = Muted, fontSize = 13.sp)
-    }
-    Spacer(Modifier.height(20.dp))
-    Landscape(0, Modifier.fillMaxWidth().aspectRatio(1.25f))
-    Spacer(Modifier.height(18.dp))
-    Text("日落之前，去海边走走", color = Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-    Spacer(Modifier.height(7.dp))
-    Text("把城市的喧嚣，交给海浪。", color = Muted, fontSize = 13.sp)
-    Row(Modifier.fillMaxWidth().padding(vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(30.dp).background(Color(0xFFDDEBEA), CircleShape), contentAlignment = Alignment.Center) { Text("海", color = Color(0xFF6A9997), fontSize = 12.sp) }
-        Spacer(Modifier.width(8.dp))
-        Text("海边的阿树", color = Ink, fontSize = 12.sp)
-        Spacer(Modifier.weight(1f))
-        Text("12.8 万次观看", color = Muted, fontSize = 11.sp)
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        FilterChip(selected = liked, onClick = { liked = !liked }, label = { Text(if (liked) "♥ 已点赞" else "♡ 点赞") })
-        FilterChip(selected = saved, onClick = onSave, label = { Text(if (saved) "★ 已收藏" else "☆ 收藏") })
-    }
-    Spacer(Modifier.height(28.dp))
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("继续发现", color = Ink, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Spacer(Modifier.weight(1f))
-        Text("为好奇心留一点时间", color = Muted, fontSize = 11.sp)
-    }
-    Spacer(Modifier.height(16.dp))
-    VideoCard("山野之间，有风经过", "山间来信 · 8.6 万次观看", 1)
-    Spacer(Modifier.height(20.dp))
-    VideoCard("今天，也要好好生活", "日常放映室 · 3.2 万次观看", 2)
-}
-
-@Composable
 internal fun CollectionPage(title: String, subtitle: String, cardTitle: String, description: String) {
     SectionTitle(title, subtitle)
     Spacer(Modifier.height(26.dp))
@@ -257,31 +216,21 @@ private fun Landscape(variant: Int, modifier: Modifier = Modifier) {
     }
 }
 
-/** A three-item capsule plus a detached profile button: (xxx) (x). */
+/** A single three-item capsule: (xxx). */
 @Composable
 internal fun LiquidNavigation(selected: Int, onSelect: (Int) -> Unit, backdrop: GraphicsLayer, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-        val gap = 12.dp
-        val circle = 68.dp
-        val capsuleWidth = maxWidth - circle - gap
-        val itemWidth = (capsuleWidth - 12.dp) / 3
-        val indicatorOffset by animateDpAsState(itemWidth * selected.coerceAtMost(2), label = "glass selection position")
-        Row(horizontalArrangement = Arrangement.spacedBy(gap), verticalAlignment = Alignment.CenterVertically) {
-            GlassSurface(backdrop, Modifier.width(capsuleWidth).height(68.dp)) {
-                Box(Modifier.fillMaxSize().padding(6.dp)) {
-                    if (selected < 3) Box(Modifier.offset(x = indicatorOffset).width(itemWidth).fillMaxHeight()
-                        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .9f), Color.White.copy(alpha = .38f))), CircleShape)
-                        .then(Modifier.clip(CircleShape)))
-                    Row(Modifier.fillMaxSize().selectableGroup()) {
-                        listOf("首页", "动态", "视频").forEachIndexed { index, title ->
-                            NavigationItem(index, title, selected == index, { onSelect(index) }, Modifier.weight(1f))
-                        }
+        val itemWidth = (maxWidth - 12.dp) / 3
+        val indicatorOffset by animateDpAsState(itemWidth * selected.coerceIn(0, 2), label = "glass selection position")
+        GlassSurface(backdrop, Modifier.fillMaxWidth().height(68.dp)) {
+            Box(Modifier.fillMaxSize().padding(6.dp)) {
+                Box(Modifier.offset(x = indicatorOffset).width(itemWidth).fillMaxHeight()
+                    .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .9f), Color.White.copy(alpha = .38f))), CircleShape)
+                    .then(Modifier.clip(CircleShape)))
+                Row(Modifier.fillMaxSize().selectableGroup()) {
+                    listOf("动态", "视频", "我的").forEachIndexed { index, title ->
+                        NavigationItem(index, title, selected == index, { onSelect(index) }, Modifier.weight(1f))
                     }
-                }
-            }
-            GlassSurface(backdrop, Modifier.size(circle)) {
-                Box(Modifier.fillMaxSize().padding(6.dp).background(if (selected == 3) Color.White.copy(alpha = .8f) else Color.Transparent, CircleShape)) {
-                    NavigationItem(3, "我的", selected == 3, { onSelect(3) }, Modifier.fillMaxSize())
                 }
             }
         }
@@ -335,15 +284,11 @@ private fun NavIcon(index: Int, tint: Color) {
         fun line(x1: Float, y1: Float, x2: Float, y2: Float) = drawLine(tint, Offset(x1 * unit, y1 * unit), Offset(x2 * unit, y2 * unit), stroke.width, StrokeCap.Round)
         when (index) {
             0 -> {
-                val path = Path().apply { moveTo(3 * unit, 10 * unit); lineTo(12 * unit, 3 * unit); lineTo(21 * unit, 10 * unit); lineTo(21 * unit, 20 * unit); lineTo(15 * unit, 20 * unit); lineTo(15 * unit, 14 * unit); lineTo(9 * unit, 14 * unit); lineTo(9 * unit, 20 * unit); lineTo(3 * unit, 20 * unit); close() }
-                drawPath(path, tint, style = stroke)
-            }
-            1 -> {
                 drawRoundRect(tint, Offset(3 * unit, 6 * unit), androidx.compose.ui.geometry.Size(18 * unit, 15 * unit), androidx.compose.ui.geometry.CornerRadius(4 * unit), style = stroke)
                 line(8f, 2f, 10f, 6f); line(16f, 2f, 14f, 6f)
                 line(8f, 12f, 8f, 15f); line(16f, 12f, 16f, 15f)
             }
-            2 -> {
+            1 -> {
                 drawRoundRect(tint, Offset(3 * unit, 7 * unit), androidx.compose.ui.geometry.Size(18 * unit, 14 * unit), androidx.compose.ui.geometry.CornerRadius(3 * unit), style = stroke)
                 line(7f, 3f, 17f, 3f)
                 val path = Path().apply { moveTo(10 * unit, 11 * unit); lineTo(15 * unit, 14 * unit); lineTo(10 * unit, 17 * unit); close() }
