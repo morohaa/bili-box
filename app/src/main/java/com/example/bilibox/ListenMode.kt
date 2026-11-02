@@ -90,6 +90,22 @@ internal data class ListenInfo(
 )
 
 /**
+ * Queue controls on the 听视频 page (上一个/下一个/播放模式/选集). Kept in one
+ * object so VideoPlayerScreen does not grow more parameters: that composable is
+ * already so large that extra parameters pushed it past ART's verifier.
+ * [mode]: 0 列表循环, 1 单曲循环, 2 随机播放, 3 播完暂停.
+ */
+internal class ListenControls(
+    val mode: Int = 0,
+    val hasPrevious: Boolean = false,
+    val hasNext: Boolean = false,
+    val onPrevious: () -> Unit = {},
+    val onNext: () -> Unit = {},
+    val onCycleMode: () -> Unit = {},
+    val onOpenQueue: () -> Unit = {},
+)
+
+/**
  * Applies the audio-only state to [player]: the video renderer is disabled so
  * frames are neither downloaded (DASH) nor decoded, the player takes audio
  * focus, pauses on headphone unplug, holds a wake lock, and is exposed to the
@@ -529,13 +545,15 @@ internal fun ListenScreen(
                         when (mode) {
                             0 -> LoopListGlyph(it)
                             1 -> LoopOneGlyph(it)
-                            else -> ShuffleGlyph(it)
+                            2 -> ShuffleGlyph(it)
+                            else -> StopAfterGlyph(it)
                         }
                     },
                     label = when (mode) {
                         0 -> "列表循环"
                         1 -> "单曲循环"
-                        else -> "随机播放"
+                        2 -> "随机播放"
+                        else -> "播完暂停"
                     },
                     active = false,
                     onClick = { onCycleMode() }
@@ -903,6 +921,16 @@ private fun ShuffleGlyph(tint: Color) {
         drawLine(tint, Offset(15f * u, 15f * u), Offset(21f * u, 21f * u), 1.9f * u, StrokeCap.Round)
         // M4 4l5 5
         drawLine(tint, Offset(4f * u, 4f * u), Offset(9f * u, 9f * u), 1.9f * u, StrokeCap.Round)
+    }
+}
+
+@Composable
+private fun StopAfterGlyph(tint: Color) {
+    Canvas(Modifier.size(24.dp)) {
+        val u = size.width / 24f
+        // 暂停符号 - 两个竖条
+        drawRoundRect(tint, Offset(7f * u, 5f * u), Size(3f * u, 14f * u), CornerRadius(1f * u))
+        drawRoundRect(tint, Offset(14f * u, 5f * u), Size(3f * u, 14f * u), CornerRadius(1f * u))
     }
 }
 

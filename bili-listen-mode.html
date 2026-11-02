@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>听视频 · 按钮与页面设计</title>
+<style>
+:root{color-scheme:light;--pink:#FB7299;--pink-d:#E85A84;--blue:#00AEEC;--ink:#18191C;--sub:#61666D;--mute:#9499A0;--line:#E3E5E7;--bg:#F1F2F3}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei",sans-serif;background:linear-gradient(135deg,#fdf1f5,#eef7fc);color:var(--ink);min-height:100vh;display:flex;gap:40px;justify-content:center;align-items:flex-start;padding:32px 20px;flex-wrap:wrap}
+button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}
+svg{display:block}
+.phone{width:360px;height:760px;border-radius:44px;background:#000;padding:10px;box-shadow:0 30px 60px -20px rgba(24,25,28,.35),0 0 0 2px #2a2a2e inset;flex-shrink:0}
+.screen{position:relative;width:100%;height:100%;border-radius:34px;overflow:hidden;background:#fff}
+.status{position:absolute;top:0;left:0;right:0;height:30px;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font-size:12px;font-weight:600;z-index:50;pointer-events:none}
+.status.light{color:#fff}
+.view{position:absolute;inset:0;overflow:hidden}
+/* ---------- 首页 ---------- */
+#home{background:var(--bg);padding-top:30px}
+.h-top{display:flex;align-items:center;gap:10px;padding:8px 14px}
+.h-top .logo{font-weight:800;color:var(--pink);font-size:20px;letter-spacing:-.5px}
+.h-top .search{flex:1;height:32px;border-radius:16px;background:#fff;color:var(--mute);font-size:13px;display:flex;align-items:center;padding:0 12px}
+.h-tabs{display:flex;gap:18px;padding:4px 16px 10px;font-size:15px;color:var(--sub)}
+.h-tabs b{color:var(--pink);position:relative}
+.h-tabs b:after{content:"";position:absolute;left:50%;bottom:-6px;width:14px;height:3px;border-radius:2px;background:var(--pink);transform:translateX(-50%)}
+.feed{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 10px 120px;overflow:auto;height:calc(100% - 90px)}
+.card{background:#fff;border-radius:8px;overflow:hidden;cursor:pointer;transition:transform .15s}
+.card:active{transform:scale(.97)}
+.thumb{aspect-ratio:16/10;position:relative}
+.thumb .dur{position:absolute;right:6px;bottom:5px;font-size:10px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.thumb .tag{position:absolute;left:6px;top:6px;font-size:10px;padding:1px 5px;border-radius:4px;color:#fff;background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
+.card .tt{font-size:12.5px;line-height:1.4;padding:6px 8px 2px;height:42px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.card .meta{font-size:11px;color:var(--mute);padding:2px 8px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick{grid-column:1/-1;border:1.5px dashed #f6b3c7;border-radius:10px;padding:12px;text-align:center;font-size:12.5px;color:var(--pink-d);background:#fff7fa;cursor:pointer}
+/* 迷你播放条（收起后） */
+.mini{position:absolute;left:12px;right:12px;bottom:18px;height:58px;border-radius:29px;display:flex;align-items:center;gap:10px;padding:0 8px 0 7px;z-index:30;
+ background:rgba(255,255,255,.62);backdrop-filter:blur(18px) saturate(1.8);-webkit-backdrop-filter:blur(18px) saturate(1.8);box-shadow:0 8px 24px -6px rgba(0,0,0,.18),0 0 0 .5px rgba(255,255,255,.8) inset,0 0 0 .5px rgba(0,0,0,.06);
+ transform:translateY(120%);transition:transform .45s cubic-bezier(.3,1.3,.5,1);cursor:pointer}
+.mini.show{transform:none}
+.mini .mc{width:64px;height:44px;border-radius:22px 8px 8px 22px;position:relative;overflow:hidden;flex-shrink:0}
+.mini .mt{flex:1;min-width:0}
+.mini .mt div{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini .mt small{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:4px}
+.mini .ring{width:40px;height:40px;position:relative;flex-shrink:0}
+.mini .ring svg{position:absolute;inset:0}
+.mini .x{width:30px;height:30px;color:var(--mute);display:grid;place-items:center}
+/* ---------- 视频播放页 ---------- */
+#player{background:#fff;display:flex;flex-direction:column}
+.vbox{position:relative;aspect-ratio:16/9;margin-top:30px;background:#000;overflow:hidden;flex-shrink:0}
+.vbox .art{position:absolute;inset:0}
+.art,.thumb,.mc{container-type:inline-size}
+.vbox video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+.vbox .shade{position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.45),transparent 30%,transparent 65%,rgba(0,0,0,.55))}
+.vtop{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:4px;padding:6px 6px;color:#fff;z-index:2}
+.vtop .sp{flex:1}
+.ib{width:34px;height:34px;display:grid;place-items:center;border-radius:50%;transition:background .15s}
+.ib:active{background:rgba(255,255,255,.18)}
+/* 按钮① 播放器顶栏「耳机」图标 */
+.ear{position:relative}
+.ear .tip{position:absolute;top:36px;right:-4px;white-space:nowrap;font-size:11px;background:var(--pink);color:#fff;padding:4px 8px;border-radius:6px;animation:tipin .4s ease both 1s;pointer-events:none}
+.ear .tip:before{content:"";position:absolute;top:-4px;right:16px;border:4px solid transparent;border-top:0;border-bottom-color:var(--pink)}
+@keyframes tipin{from{opacity:0;transform:translateY(-4px)}}
+.vbot{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:8px;padding:4px 10px;color:#fff;font-size:11px;z-index:2}
+.vbot .bar{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.3);position:relative}
+.vbot .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--pink);border-radius:2px}
+.vbig{position:absolute;inset:0;display:grid;place-items:center;z-index:1}
+.vbig button{width:46px;height:46px;border-radius:50%;background:rgba(0,0,0,.35);color:#fff;display:grid;place-items:center}
+.ptabs{display:flex;gap:26px;padding:0 16px;height:40px;align-items:center;border-bottom:1px solid var(--line);font-size:14px;color:var(--sub)}
+.ptabs b{color:var(--pink);position:relative;height:100%;display:flex;align-items:center}
+.ptabs b:after{content:"";position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:20px;height:2px;background:var(--pink);border-radius:1px}
+.pbody{flex:1;overflow:auto;padding:12px 16px 30px}
+.up{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.up .av{width:34px;height:34px;border-radius:50%;flex-shrink:0}
+.up .nm{font-size:13px;color:var(--pink-d);font-weight:600}
+.up small{display:block;font-size:11px;color:var(--mute);font-weight:400}
+.up .fo{margin-left:auto;background:var(--pink);color:#fff;font-size:12px;padding:5px 14px;border-radius:14px}
+.src{display:flex;align-items:center;gap:10px;margin-bottom:10px;background:var(--bg);border-radius:8px;padding:8px 10px}
+.src .fi{width:32px;height:32px;border-radius:8px;background:#fff;display:grid;place-items:center;color:var(--blue)}
+.src div{font-size:12.5px}
+.src small{display:block;font-size:11px;color:var(--mute)}
+.ptitle{font-size:15.5px;line-height:1.45;font-weight:600}
+.pstat{font-size:11.5px;color:var(--mute);margin:6px 0 12px;display:flex;gap:12px}
+/* 按钮② 功能区「听视频」胶囊（主入口） */
+.listen-pill{position:relative;display:flex;align-items:center;gap:10px;width:100%;height:52px;border-radius:14px;padding:0 12px 0 8px;margin:4px 0 14px;
+ background:linear-gradient(100deg,#fff0f5 0%,#fde3ec 100%);color:var(--ink);overflow:hidden;transition:transform .15s}
+.listen-pill:active{transform:scale(.98)}
+.listen-pill .lp-ic{width:36px;height:36px;border-radius:11px;background:var(--pink);color:#fff;display:grid;place-items:center;flex-shrink:0;box-shadow:0 4px 10px -3px rgba(251,114,153,.7)}
+.listen-pill .lp-t{text-align:left;flex:1}
+.listen-pill .lp-t b{font-size:14px;display:block}
+.listen-pill .lp-t small{font-size:11px;color:var(--sub)}
+.listen-pill .lp-go{font-size:12px;color:var(--pink-d);display:flex;align-items:center;gap:2px}
+.listen-pill .wave{position:absolute;right:62px;bottom:0;display:flex;gap:3px;align-items:flex-end;height:100%;opacity:.25}
+.listen-pill .wave i{width:3px;background:var(--pink);border-radius:2px 2px 0 0;animation:wv 1.2s ease-in-out infinite}
+@keyframes wv{0%,100%{height:20%}50%{height:70%}}
+.listen-pill.on{background:var(--pink);color:#fff}
+.listen-pill.on .lp-ic{background:#fff;color:var(--pink)}
+.listen-pill.on .lp-t small,.listen-pill.on .lp-go{color:rgba(255,255,255,.9)}
+.listen-pill.on .wave{opacity:.45}.listen-pill.on .wave i{background:#fff}
+.acts{display:flex;justify-content:space-around;margin-bottom:14px}
+.acts div{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--sub)}
+.acts svg{color:var(--sub)}
+.sec-t{font-size:13px;font-weight:600;margin:4px 0 8px}
+.rel{display:flex;gap:10px;margin-bottom:10px;cursor:pointer}
+.rel .rt{width:120px;aspect-ratio:16/10;border-radius:6px;flex-shrink:0;position:relative}
+.rel .rt span{position:absolute;right:4px;bottom:3px;font-size:10px;color:#fff}
+.rel p{font-size:12.5px;line-height:1.4}
+.rel small{font-size:11px;color:var(--mute);display:block;margin-top:4px}
+/* ---------- 听视频页 ---------- */
+#listen{z-index:20;color:#fff;clip-path:circle(0 at var(--ox,300px) var(--oy,60px));transition:clip-path .55s cubic-bezier(.6,0,.2,1);pointer-events:none;display:flex;flex-direction:column}
+#listen.open{clip-path:circle(150% at var(--ox,300px) var(--oy,60px));pointer-events:auto}
+.l-bg{position:absolute;inset:-40px;filter:blur(40px) saturate(1.3);transform:scale(1.2);transition:background 1s}
+.l-bg:after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(10,10,14,.35),rgba(10,10,14,.75) 70%,rgba(10,10,14,.9))}
+.l-in{position:relative;flex:1;display:flex;flex-direction:column;padding:34px 18px 18px;min-height:0}
+.l-top{display:flex;align-items:center;gap:6px}
+.l-top .mid{flex:1;text-align:center;font-size:12px;opacity:.85}
+.l-top .mid b{display:inline-flex;align-items:center;gap:5px;font-weight:500;background:rgba(255,255,255,.14);padding:4px 10px;border-radius:12px}
+.l-top .mid b i{width:6px;height:6px;border-radius:50%;background:#7CF29A;box-shadow:0 0 6px #7CF29A}
+.l-seg{align-self:center;display:flex;margin:14px 0 6px;background:rgba(255,255,255,.12);border-radius:16px;padding:3px;font-size:12.5px}
+.l-seg button{padding:5px 14px;border-radius:13px;opacity:.7;transition:.2s}
+.l-seg button.on{background:rgba(255,255,255,.95);color:var(--ink);opacity:1}
+.l-stage{flex:1;position:relative;min-height:0}
+.pane{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .35s,transform .35s}
+.pane.hide{opacity:0;transform:scale(.96);pointer-events:none}
+/* 封面：16:9 视频封面 + 「屏幕熄灭」质感 */
+.cover{width:100%;aspect-ratio:16/9;border-radius:14px;position:relative;overflow:hidden;box-shadow:0 20px 40px -12px rgba(0,0,0,.6);transition:transform .6s cubic-bezier(.3,1.4,.5,1)}
+.cover.paused{transform:scale(.92)}
+.cover .art{position:absolute;inset:0}
+.cover .gl{position:absolute;inset:0;background:linear-gradient(115deg,rgba(255,255,255,.22),transparent 40%)}
+.cover .badge{position:absolute;left:10px;bottom:10px;font-size:10.5px;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);padding:3px 8px;border-radius:10px;display:flex;gap:4px;align-items:center}
+.cover .back2v{position:absolute;right:10px;bottom:10px;font-size:11px;background:rgba(255,255,255,.9);color:var(--ink);padding:4px 10px;border-radius:12px;display:flex;gap:4px;align-items:center}
+canvas#viz{width:100%;height:56px;margin-top:16px}
+.chap-now{font-size:12px;opacity:.75;margin-top:4px;height:16px}
+/* 字幕滚动 */
+.lyr{width:100%;height:100%;overflow:hidden;mask-image:linear-gradient(transparent,#000 18%,#000 82%,transparent);-webkit-mask-image:linear-gradient(transparent,#000 18%,#000 82%,transparent)}
+.lyr ul{list-style:none;transition:transform .5s cubic-bezier(.3,.9,.4,1);padding:0 4px}
+.lyr li{font-size:15px;line-height:1.5;padding:9px 0;opacity:.38;transition:opacity .3s,font-size .3s;cursor:pointer}
+.lyr li.on{opacity:1;font-size:18px;font-weight:600}
+.lyr li small{display:block;font-size:11px;opacity:.7;font-weight:400}
+.nolyr{opacity:.6;font-size:13px;text-align:center;line-height:1.8}
+.l-info{margin-top:10px}
+.l-info .t{font-size:17px;font-weight:600;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.l-info .s{font-size:12px;opacity:.7;margin-top:4px;display:flex;align-items:center;gap:6px}
+.l-info .s .tg{font-size:10px;border:1px solid rgba(255,255,255,.4);border-radius:3px;padding:0 4px}
+.l-row{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
+.l-row .like{display:flex;gap:4px}
+.l-row .like button{width:38px;height:34px;display:grid;place-items:center;opacity:.9}
+.l-row .like button.on{color:var(--pink)}
+/* 进度条（带章节分段） */
+.prog{margin-top:12px;position:relative;height:18px;cursor:pointer;touch-action:none}
+.prog .trk{position:absolute;left:0;right:0;top:7px;height:4px;display:flex;gap:2px}
+.prog .trk span{height:100%;background:rgba(255,255,255,.25);border-radius:2px;position:relative;overflow:hidden}
+.prog .trk span i{position:absolute;left:0;top:0;bottom:0;background:#fff;border-radius:2px}
+.prog .dot{position:absolute;top:3px;width:12px;height:12px;border-radius:50%;background:#fff;margin-left:-6px;box-shadow:0 0 0 4px rgba(251,114,153,.35);transition:transform .15s}
+.prog:active .dot{transform:scale(1.4)}
+.ptime{display:flex;justify-content:space-between;font-size:11px;opacity:.7;font-variant-numeric:tabular-nums;margin-top:2px}
+.ctrl{display:flex;align-items:center;justify-content:space-between;margin:14px 4px 6px}
+.ctrl .ib{width:42px;height:42px}
+.ctrl .play{width:64px;height:64px;border-radius:50%;background:#fff;color:var(--ink);display:grid;place-items:center;box-shadow:0 8px 20px -6px rgba(251,114,153,.8);transition:transform .15s}
+.ctrl .play:active{transform:scale(.92)}
+.tools{display:flex;justify-content:space-around;margin-top:10px}
+.tools button{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;opacity:.8;min-width:52px;position:relative}
+.tools button.on{opacity:1;color:#FFB3CA}
+.tools button em{font-style:normal;position:absolute;top:-4px;right:2px;font-size:9px;background:var(--pink);color:#fff;border-radius:6px;padding:0 4px}
+/* ---------- 底部面板 ---------- */
+.mask{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.25s;z-index:40}
+.mask.on{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;color:var(--ink);border-radius:18px 18px 0 0;padding:8px 16px 22px;z-index:41;transform:translateY(105%);transition:transform .35s cubic-bezier(.3,1.1,.4,1);max-height:70%;display:flex;flex-direction:column}
+.sheet.on{transform:none}
+.sheet .grab{width:36px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 10px}
+.sheet h4{font-size:15px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.sheet h4 small{font-size:12px;color:var(--mute);font-weight:400}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{padding:7px 14px;border-radius:16px;background:var(--bg);font-size:13px}
+.chips button.on{background:#ffe9f0;color:var(--pink-d);font-weight:600;box-shadow:0 0 0 1px var(--pink) inset}
+.opt{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid #f2f3f4;font-size:13.5px}
+.opt small{display:block;font-size:11px;color:var(--mute);margin-top:2px}
+.sw{width:40px;height:22px;border-radius:11px;background:#d5d7da;position:relative;transition:.2s;flex-shrink:0}
+.sw:after{content:"";position:absolute;left:2px;top:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.sw.on{background:var(--pink)}.sw.on:after{left:20px}
+.qlist{overflow:auto;flex:1}
+.q{display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer}
+.q .qt{width:64px;height:38px;border-radius:5px;flex-shrink:0;position:relative}
+.q p{flex:1;font-size:13px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q p small{display:block;font-size:11px;color:var(--mute)}
+.q.on p{color:var(--pink-d)}
+.eqbars{display:inline-flex;gap:2px;align-items:flex-end;height:12px}
+.eqbars i{width:2px;background:currentColor;animation:wv .9s ease-in-out infinite}
+.eqbars i:nth-child(2){animation-delay:-.3s}.eqbars i:nth-child(3){animation-delay:-.6s}
+.paused-eq .eqbars i{animation-play-state:paused}
+.toast{position:absolute;left:50%;top:90px;transform:translate(-50%,-10px);background:rgba(24,25,28,.85);color:#fff;font-size:12.5px;padding:8px 14px;border-radius:18px;opacity:0;transition:.3s;z-index:60;pointer-events:none;white-space:nowrap}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+/* ---------- 说明面板 ---------- */
+.spec{width:420px;max-width:100%}
+.spec h1{font-size:22px;display:flex;align-items:center;gap:10px}
+.spec h1 span{font-size:12px;font-weight:500;background:var(--pink);color:#fff;padding:3px 8px;border-radius:6px}
+.spec>p{font-size:13px;color:var(--sub);margin:8px 0 18px;line-height:1.6}
+.blk{background:#fff;border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 4px 18px -8px rgba(0,0,0,.12)}
+.blk h3{font-size:14px;margin-bottom:4px}
+.blk .d{font-size:12px;color:var(--sub);line-height:1.6;margin-bottom:12px}
+.demo-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.demo-row .cap{font-size:10.5px;color:var(--mute);text-align:center;margin-top:5px}
+.darkbox{background:#222;border-radius:10px;padding:8px;display:flex;gap:2px;color:#fff}
+.darkbox .on2{background:rgba(251,114,153,.25);color:#FFB3CA}
+.lp-mini{width:250px;margin:0}
+.ctx{background:#fff;border-radius:10px;box-shadow:0 6px 20px -6px rgba(0,0,0,.25);width:170px;font-size:13px;overflow:hidden}
+.ctx div{padding:9px 12px;display:flex;align-items:center;gap:8px;color:var(--sub)}
+.ctx div.hl{color:var(--pink-d);background:#fff5f8;font-weight:600}
+.kv{font-size:12px;line-height:1.75;color:var(--sub)}
+.kv b{color:var(--ink)}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:-1px;margin-right:3px}
+</style>
+</head>
+<body>
+<div class="phone"><div class="screen" id="scr">
+  <div class="status" id="status"><span id="clock">9:41</span><span>5G ▮▮▮ 86%</span></div>
+
+  <!-- 首页 -->
+  <section class="view" id="home">
+    <div class="h-top"><span class="logo">bilibili</span><div class="search">搜索视频、UP主或本地文件</div></div>
+    <div class="h-tabs"><b>推荐</b><span>热门</span><span>本地</span><span>番剧</span></div>
+    <div class="feed" id="feed"></div>
+    <div class="mini" id="mini">
+      <div class="mc" id="miniArt"></div>
+      <div class="mt"><div id="miniT"></div><small><span class="eqbars"><i></i><i></i><i></i></span><span id="miniS">听视频中</span></small></div>
+      <div class="ring"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" fill="none" stroke="rgba(0,0,0,.08)" stroke-width="2.5"/><circle id="miniRing" cx="20" cy="20" r="17" fill="none" stroke="#FB7299" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="106.8" stroke-dashoffset="106.8" transform="rotate(-90 20 20)"/></svg>
+        <button class="ib" id="miniPlay" style="position:absolute;inset:3px;width:34px;height:34px"></button></div>
+      <button class="x" id="miniX" data-ic="close"></button>
+    </div>
+  </section>
+
+  <!-- 视频播放页 -->
+  <section class="view" id="player" style="display:none">
+    <div class="vbox" id="vbox">
+      <div class="art" id="vArt"></div>
+      <video id="media" playsinline></video>
+      <div class="shade"></div>
+      <div class="vbig"><button id="vPlay"></button></div>
+      <div class="vtop">
+        <button class="ib" id="pBack" data-ic="back"></button><span class="sp"></span>
+        <button class="ib ear" id="earBtn" title="听视频"><i data-ic="headphones"></i><span class="tip">点这里只听声音</span></button>
+        <button class="ib" data-ic="more"></button>
+      </div>
+      <div class="vbot"><span id="vCur">00:00</span><div class="bar"><i id="vBar"></i></div><span id="vDur">00:00</span></div>
+    </div>
+    <div class="ptabs"><b>简介</b><span id="tab2">评论 1.2万</span></div>
+    <div class="pbody" id="pbody"></div>
+  </section>
+
+  <!-- 听视频页 -->
+  <section class="view" id="listen">
+    <div class="l-bg" id="lBg"></div>
+    <div class="l-in">
+      <div class="l-top">
+        <button class="ib" id="lDown" data-ic="down" title="收起（继续后台播放）"></button>
+        <div class="mid"><b><i></i><span id="lMode">听视频 · 画面已关闭</span></b></div>
+        <button class="ib" id="lMore" data-ic="more"></button>
+      </div>
+      <div class="l-seg"><button class="on" data-v="cover">封面</button><button data-v="lyr">字幕</button></div>
+      <div class="l-stage">
+        <div class="pane" id="pCover">
+          <div class="cover" id="cover"><div class="art" id="lArt"></div><div class="gl"></div>
+            <button class="back2v" id="back2v"><i data-ic="video"></i>回到画面</button></div>
+          <canvas id="viz" width="640" height="112"></canvas>
+          <div class="chap-now" id="chapNow"></div>
+        </div>
+        <div class="pane hide" id="pLyr"><div class="lyr" id="lyr"><ul id="lyrUl"></ul></div></div>
+      </div>
+      <div class="l-info"><div class="t" id="lT"></div><div class="s" id="lS"></div></div>
+      <div class="l-row"><div class="like" id="likeRow"></div><button class="ib" id="lQueue2" data-ic="list"></button></div>
+      <div class="prog" id="prog"><div class="trk" id="trk"></div><div class="dot" id="dot"></div></div>
+      <div class="ptime"><span id="lCur">00:00</span><span id="lDur">00:00</span></div>
+      <div class="ctrl">
+        <button class="ib" id="modeBtn" title="播放顺序"></button>
+        <button class="ib" id="prevBtn" data-ic="prev"></button>
+        <button class="play" id="playBtn"></button>
+        <button class="ib" id="nextBtn" data-ic="next"></button>
+        <button class="ib" id="qBtn" data-ic="list"></button>
+      </div>
+      <div class="tools">
+        <button id="tSpeed"><i data-ic="speed"></i><span id="spT">倍速</span></button>
+        <button id="tTimer"><i data-ic="timer"></i><span id="tmT">定时关闭</span></button>
+        <button id="tFx"><i data-ic="fx"></i>音效</button>
+        <button id="tSkip"><i data-ic="skip"></i>跳过片头</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="mask" id="mask"></div>
+  <div class="sheet" id="shSpeed"><div class="grab"></div><h4>播放倍速<small>听播客/课程常用 1.25–1.5x</small></h4><div class="chips" id="spChips"></div></div>
+  <div class="sheet" id="shTimer"><div class="grab"></div><h4>定时关闭<small id="tmLeft">未开启</small></h4><div class="chips" id="tmChips"></div>
+    <div class="opt" style="margin-top:8px"><div>结束前音量渐弱<small>最后 30 秒逐渐降低音量</small></div><span class="sw on" data-sw></span></div></div>
+  <div class="sheet" id="shFx"><div class="grab"></div><h4>音效</h4>
+    <div class="opt"><div>人声增强<small>压低背景音乐，突出解说/对白</small></div><span class="sw on" data-sw></span></div>
+    <div class="opt"><div>音量均衡<small>不同视频之间音量自动拉平</small></div><span class="sw on" data-sw></span></div>
+    <div class="opt"><div>跳过静音片段<small>自动略过无声的部分</small></div><span class="sw" data-sw></span></div>
+    <div class="opt"><div>声道<small>立体声 / 左右互换 / 单声道</small></div><span style="font-size:12px;color:var(--mute)">立体声 ›</span></div></div>
+  <div class="sheet" id="shMore"><div class="grab"></div><h4>听视频设置</h4>
+    <div class="opt"><div>退出 App 后继续播放<small>通知栏与锁屏显示播放控件</small></div><span class="sw on" data-sw></span></div>
+    <div class="opt"><div>耳机拔出时暂停</div><span class="sw on" data-sw></span></div>
+    <div class="opt"><div>默认以听视频打开<small>本地音乐类视频（MV / 演唱会 / 播客）</small></div><span class="sw" data-sw></span></div>
+    <div class="opt"><div>列表连续播放<small>播完自动听下一个</small></div><span class="sw on" data-sw></span></div></div>
+  <div class="sheet" id="shQ"><div class="grab"></div><h4><span>播放列表 <small id="qCnt"></small></span><small id="qMode">列表循环</small></h4><div class="qlist" id="qlist"></div></div>
+  <div class="toast" id="toast"></div>
+</div></div>
+<div class="spec">
+  <h1>听视频 <span>按钮 + 页面</span></h1>
+  <p>左边的手机可以直接操作：点开任意视频，再点顶栏的耳机图标或简介区的「听视频」胶囊进入；收起后首页底部会出现迷你播放条。底部的「选择本机视频」可以加载真实文件来试听。</p>
+
+  <div class="blk"><h3>① 播放器顶栏 · 耳机图标</h3>
+    <div class="d">放在横竖屏播放器右上角，紧挨「更多」。首次使用时弹出粉色气泡提示，之后不再出现。开启后图标变粉并带浅粉底，提示当前处于听视频状态。</div>
+    <div class="demo-row">
+      <div><div class="darkbox"><span class="ib" data-ic="headphones"></span><span class="ib" data-ic="more"></span></div><div class="cap">默认</div></div>
+      <div><div class="darkbox"><span class="ib on2" data-ic="headphones"></span><span class="ib" data-ic="more"></span></div><div class="cap">听视频中</div></div>
+    </div></div>
+
+  <div class="blk"><h3>② 简介区 · 「听视频」胶囊（主入口）</h3>
+    <div class="d">在标题下方、三连按钮上方放一条整宽胶囊，比顶栏图标更容易被发现。副标题会根据内容变化：在线视频显示「省流量约 85%」，本地视频显示「熄屏省电」。</div>
+    <button class="listen-pill lp-mini"><span class="lp-ic" data-ic="headphones"></span><span class="lp-t"><b>听视频</b><small>关闭画面 · 省流量约 85%</small></span><span class="lp-go">开启 ›</span></button>
+    <div style="height:8px"></div>
+    <button class="listen-pill lp-mini on"><span class="lp-ic"><span class="eqbars" style="height:14px"><i></i><i></i><i></i></span></span><span class="lp-t"><b>正在听视频</b><small>点击打开播放页</small></span><span class="lp-go">打开 ›</span></button>
+  </div>
+
+  <div class="blk"><h3>③ 列表长按 · 快捷入口</h3>
+    <div class="d">在首页或本地文件列表中长按卡片，第一项就是「听视频」，不用进播放页就能直接听，适合本地 MV、演唱会和播客类视频。</div>
+    <div class="ctx"><div class="hl"><i data-ic="headphones"></i>听视频</div><div><i data-ic="list"></i>添加到播放列表</div><div><i data-ic="star"></i>稍后再看</div></div>
+  </div>
+
+  <div class="blk"><h3>页面设计要点</h3>
+    <div class="kv">
+      <b>转场：</b>页面以按钮位置为圆心展开（clip-path 圆形扩散），让用户知道它是从哪里来的。<br>
+      <b>封面 / 字幕：</b>保留 16:9 视频封面而不是唱片圆盘，延续视频的身份感。有字幕（CC 或本地 .srt）时可以切到滚动字幕，点任意一句跳到对应时间。<br>
+      <b>章节进度条：</b>进度条按视频分P或章节分段，当前章节名显示在频谱下方。<br>
+      <b>在线 / 本地区分：</b>在线视频显示 UP主和点赞、投币、收藏；本地视频只显示文件夹、格式和音轨信息，不放社交按钮。<br>
+      <b>收起而不是关闭：</b>左上角是向下箭头，收起后迷你条悬浮在首页底部，用液态玻璃样式，并带环形进度。<br>
+      <b>颜色：</b><span class="swatch" style="background:#FB7299"></span>#FB7299 主色，背景取封面颜色做大面积模糊，所以每个视频的听视频页颜色都不一样。
+    </div>
+  </div>
+</div>
+<input type="file" id="file" accept="video/*,audio/*" hidden>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const S=(d,w=22,f)=>`<svg width="${w}" height="${w}" viewBox="0 0 24 24" fill="${f?'currentColor':'none'}" stroke="${f?'none':'currentColor'}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const IC={
+ back:S('<path d="M15 18l-6-6 6-6"/>'),
+ more:S('<circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/>',22,1),
+ headphones:S('<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="7" rx="1.6"/><rect x="16.5" y="14" width="4.5" height="7" rx="1.6"/>',20),
+ play:S('<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>',22,1),
+ pause:S('<rect x="6.5" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.2"/>',20,1),
+ playL:S('<path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/>',30,1),
+ pauseL:S('<rect x="6.5" y="5" width="3.6" height="14" rx="1.2"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.2"/>',28,1),
+ down:S('<path d="M6 9l6 6 6-6"/>',24),
+ close:S('<path d="M7 7l10 10M17 7L7 17"/>',18),
+ prev:S('<path d="M18 6.2v11.6a.8.8 0 0 1-1.2.7L8.5 12.7a.8.8 0 0 1 0-1.4l8.3-5.8a.8.8 0 0 1 1.2.7z"/><rect x="5" y="5.5" width="2.4" height="13" rx="1"/>',26,1),
+ next:S('<path d="M6 6.2v11.6a.8.8 0 0 0 1.2.7l8.3-5.8a.8.8 0 0 0 0-1.4L7.2 5.5A.8.8 0 0 0 6 6.2z"/><rect x="16.6" y="5.5" width="2.4" height="13" rx="1"/>',26,1),
+ list:S('<path d="M4 6h11M4 12h11M4 18h7"/><path d="M18 14v6"/><circle cx="16.5" cy="19.5" r="1.8"/><path d="M18 14l3 1"/>'),
+ loopList:S('<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>'),
+ loopOne:S('<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/><path d="M11 10.5l1.5-1v5" stroke-width="1.7"/>'),
+ shuffle:S('<path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/>'),
+ speed:S('<path d="M4.5 18a8.5 8.5 0 1 1 15 0"/><path d="M12 14l4-4.5"/><circle cx="12" cy="14" r="1.3"/>',20),
+ timer:S('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2"/><path d="M9.5 2.5h5"/>',20),
+ fx:S('<path d="M4 21v-6M4 11V3M12 21v-9M12 8V3M20 21v-4M20 13V3"/><path d="M1.5 15h5M9.5 8h5M17.5 17h5"/>',20),
+ skip:S('<path d="M4 6l7 6-7 6zM12 6l7 6-7 6z"/><path d="M21 5v14"/>',20),
+ screenoff:S('<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M3 3l18 18"/>',12),
+ video:S('<rect x="3" y="5" width="18" height="13" rx="2.5"/><path d="M8 21h8"/><path d="M10.5 9.2v4.6l4-2.3z" fill="currentColor"/>',13),
+ like:S('<path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zm0 0l4-7.5a2.3 2.3 0 0 1 3.3 2.3L13.5 9H19a2 2 0 0 1 2 2.3l-1.3 7.6A2.5 2.5 0 0 1 17.2 21H7"/>'),
+ coin:S('<circle cx="12" cy="12" r="9"/><path d="M8.5 9h7M12 9v8M9 13h6"/>'),
+ star:S('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',18),
+ share:S('<path d="M14 4l7 7-7 7v-4c-5 0-8.5 1.5-11 5 1-5 4-9.5 11-10.5z"/>'),
+ folder:S('<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',18),
+ track:S('<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>'),
+ ab:S('<path d="M3 17l3.5-10L10 17M4.2 13.5h4.6"/><path d="M14 7h3.5a2.5 2.5 0 0 1 0 5H14zm0 5h4a2.5 2.5 0 0 1 0 5h-4z"/>'),
+ info:S('<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>'),
+};
+const paint=root=>(root||document).querySelectorAll('[data-ic]').forEach(e=>e.innerHTML=IC[e.dataset.ic]||'');
+
+const DATA=[
+ {type:'online',k:'雨夜',title:'【4K】在海边听了一整晚的雨｜城市白噪音合集',up:'声音收藏家',fans:'38.2万粉丝',views:'126.5万',dm:'8231',dur:1832,c:['#2b5876','#4fc3f7','#0f1a2b'],
+  ch:[[0,'开场'],[420,'雨夜海边'],[980,'屋檐滴水'],[1500,'雷声远去']],
+  subs:[['（远处的海浪声）'],['雨开始落在帐篷上'],['（风声渐起）'],['今晚的潮水比昨天更近一些'],['（雨声变密）'],['听，那是远处的灯塔雾笛'],['（雨点打在礁石上）'],['如果你睡不着，就跟着这个节奏呼吸'],['吸气……四秒'],['屏住……七秒'],['呼气……八秒'],['（雨声持续）']]},
+ {type:'online',k:'宋',title:'一口气听完宋朝三百年：从陈桥兵变到崖山',up:'历史夜话',fans:'211万粉丝',views:'489.0万',dm:'3.1万',dur:5420,c:['#b08968','#e6ccb2','#3b2a20'],
+  ch:[[0,'序'],[900,'北宋建立'],[2300,'变法与党争'],[3500,'靖康之变'],[4600,'南宋与崖山']],
+  subs:[['公元960年，一个寒冷的正月'],['后周大将赵匡胤率军北上'],['大军走到陈桥驿，停了下来'],['那天夜里，发生了一件改变历史的事'],['将士们把一件黄袍披在了他身上'],['这就是著名的“陈桥兵变”'],['而赵匡胤几乎没有流一滴血'],['就完成了改朝换代'],['他后来做的第一件事'],['是请老兄弟们喝了一顿酒'],['这顿酒，史称“杯酒释兵权”'],['宋朝重文轻武的基调，从这里开始']]},
+ {type:'online',k:'FM',title:'深夜电台 Vol.37｜关于独处这件小事',up:'晚风电台FM',fans:'56.7万粉丝',views:'33.8万',dm:'1902',dur:2710,c:['#6a3093','#a044ff','#140a2e'],
+  ch:[[0,'开场白'],[300,'听众来信'],[1400,'一首歌的时间'],[2200,'晚安']],subs:null},
+ {type:'local',k:'LIVE',title:'Live_2019跨年演唱会_现场.mkv',folder:'/Movies/Concert',fmt:'MKV · H.265 · FLAC 2.0',size:'3.2 GB',tracks:2,dur:6120,c:['#f857a6','#ff5858','#2a0a1a'],
+  ch:[[0,'开场'],[1200,'Part 1'],[2900,'嘉宾环节'],[4300,'Part 2'],[5600,'安可']],subs:null},
+ {type:'local',k:'EN',title:'英语听力_第12课_At the Airport.mp4',folder:'/Download/课程',fmt:'MP4 · H.264 · AAC 128k',size:'214 MB',tracks:1,dur:1505,c:['#11998e','#38ef7d','#08251f'],
+  ch:[[0,'导入'],[200,'对话 1'],[640,'对话 2'],[1100,'练习']],
+  subs:[['Excuse me, where is the check-in counter?','打扰一下，值机柜台在哪里？'],['It\'s on your left, next to the café.','在您左手边，咖啡馆旁边。'],['Can I see your passport, please?','请出示您的护照。'],['Here you are.','给您。'],['Would you like a window or an aisle seat?','您想要靠窗还是靠过道的座位？'],['A window seat, please.','靠窗，谢谢。'],['How many bags are you checking in?','您要托运几件行李？'],['Just one.','只有一件。'],['Your gate is B12. Boarding starts at 9:40.','您的登机口是 B12，9:40 开始登机。'],['Thank you. Have a nice day!','谢谢，祝你愉快！']]},
+ {type:'local',k:'VLOG',title:'公路旅行_川西D3.mp4',folder:'/DCIM/Camera',fmt:'MP4 · HEVC · AAC 256k',size:'1.1 GB',tracks:1,dur:964,c:['#f7971e','#ffd200','#3a2306'],
+  ch:[[0,'出发'],[320,'翻垭口'],[700,'到营地']],subs:null},
+];
+const fmt=s=>{s=Math.max(0,Math.floor(s||0));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return(h?h+':'+String(m).padStart(2,'0'):String(m).padStart(2,'0'))+':'+String(x).padStart(2,'0')};
+const art=it=>`<div style="position:absolute;inset:0;background:radial-gradient(circle at 78% 28%,${it.c[1]} 0,transparent 58%),radial-gradient(circle at 15% 90%,${it.c[0]} 0,transparent 60%),linear-gradient(135deg,${it.c[0]},${it.c[2]})"></div><b style="position:absolute;left:8%;top:50%;transform:translateY(-50%);font-size:clamp(14px,${it.k.length>2?'18cqw':'26cqw'},90px);font-weight:900;color:rgba(255,255,255,.88);letter-spacing:-1px;text-shadow:0 2px 12px rgba(0,0,0,.25);font-family:Georgia,'Songti SC',serif">${it.k}</b>`;
+const artBox=(it,cls='')=>`<div class="${cls}" style="container-type:inline-size;position:relative">${art(it)}</div>`;
+const st={i:0,t:0,playing:false,listening:false,mode:0,speed:1,timer:0,timerEnd:null,liked:{},view:'cover',lastLyr:-1};
+const MODES=[['loopList','列表循环'],['loopOne','单个循环'],['shuffle','随机播放']];
+const media=$('#media');let actx,analyser,freq;
+const cur=()=>DATA[st.i];
+const isReal=()=>!!cur().url;
+const dur=()=>isReal()&&isFinite(media.duration)?media.duration:cur().dur;
+let toastT;function toast(m){const e=$('#toast');e.textContent=m;e.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>e.classList.remove('on'),1800)}
+
+/* ---- 首页 ---- */
+function renderFeed(){
+ $('#feed').innerHTML=DATA.map((it,i)=>`<div class="card" data-i="${i}"><div class="thumb">${art(it)}<span class="tag">${it.type==='local'?'本地':'在线'}</span><span class="dur">${fmt(it.dur)}</span></div>
+  <div class="tt">${it.title}</div><div class="meta">${it.type==='local'?it.folder+' · '+it.size:it.up+' · '+it.views+'播放'}</div></div>`).join('')+
+  `<div class="pick" id="pickBtn">＋ 选择本机视频，真实试听「听视频」<br><small style="color:var(--mute)">长按任意卡片可以直接开始听视频</small></div>`;
+ $$('.card').forEach(c=>{let lp,long=false;
+  c.onpointerdown=()=>{long=false;lp=setTimeout(()=>{long=true;load(+c.dataset.i);st.listening=true;play();showMini();toast('已开始听视频：'+cur().title.slice(0,10)+'…')},550)};
+  c.onpointerup=c.onpointerleave=()=>clearTimeout(lp);
+  c.onclick=()=>{if(long)return;openPlayer(+c.dataset.i)};
+  c.oncontextmenu=e=>e.preventDefault();});
+ $('#pickBtn').onclick=()=>$('#file').click();
+}
+$('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;
+ const it={type:'local',k:(f.name.split('.').pop()||'MP4').toUpperCase().slice(0,4),title:f.name,folder:'/本机选择',fmt:(f.type||'video')+' · 实际文件',size:(f.size/1048576).toFixed(1)+' MB',tracks:1,dur:0,c:['#FB7299','#00AEEC','#1a1030'],ch:[[0,'全片']],subs:null,url:URL.createObjectURL(f)};
+ DATA.unshift(it);renderFeed();openPlayer(0);};
+
+/* ---- 加载 / 播放 ---- */
+function load(i){st.i=i;st.t=0;st.lastLyr=-1;const it=cur();
+ if(it.url){media.src=it.url;media.playbackRate=st.speed;media.onloadedmetadata=()=>{it.dur=media.duration;renderAll()};media.onended=()=>next(true)}
+ else{media.removeAttribute('src');media.load()}
+ renderAll();}
+function setupAnalyser(){if(analyser||!media.src)return;try{actx=new(window.AudioContext||window.webkitAudioContext)();const src=actx.createMediaElementSource(media);analyser=actx.createAnalyser();analyser.fftSize=128;freq=new Uint8Array(analyser.frequencyBinCount);src.connect(analyser);analyser.connect(actx.destination)}catch(e){}}
+function play(){st.playing=true;if(isReal()){setupAnalyser();actx&&actx.resume();media.play().catch(()=>{})}renderPlay()}
+function pause(){st.playing=false;if(isReal())media.pause();renderPlay()}
+function toggle(){st.playing?pause():play()}
+function next(auto){const n=DATA.length;
+ if(auto&&st.mode===1){seek(0);play();return}
+ const j=st.mode===2?(st.i+1+Math.floor(Math.random()*(n-1)))%n:(st.i+1)%n;load(j);if(st.listening)play();else pause()}
+function prev(){if(st.t>5){seek(0);return}load((st.i-1+DATA.length)%DATA.length);play()}
+function seek(t){st.t=Math.max(0,Math.min(dur(),t));if(isReal())media.currentTime=st.t;renderProg()}
+
+/* ---- 时钟 ---- */
+let last=performance.now();
+function loop(now){const dt=(now-last)/1000;last=now;
+ if(st.playing){
+  if(isReal())st.t=media.currentTime;
+  else{st.t+=dt*st.speed;if(st.t>=dur()){next(true)}}
+  if(st.timerEnd){const left=(st.timerEnd-Date.now())/1000;
+   if(isReal())media.volume=left<30?Math.max(0,left/30):1;
+   if(left<=0){st.timerEnd=null;st.timer=0;pause();media.volume=1;toast('定时关闭：已暂停');renderTools()}}
+  renderProg();}
+ drawViz();requestAnimationFrame(loop)}
+setInterval(()=>{const d=new Date();$('#clock').textContent=d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');if(st.timerEnd)$('#tmLeft').textContent='剩余 '+fmt((st.timerEnd-Date.now())/1000);else if(st.timer===-1)$('#tmLeft').textContent='播完当前视频后暂停'},500);
+
+/* ---- 频谱 ---- */
+const cv=$('#viz'),cx=cv.getContext('2d');const N=48;const lvl=new Array(N).fill(0);
+function drawViz(){if(!$('#listen').classList.contains('open'))return;
+ cx.clearRect(0,0,cv.width,cv.height);const w=cv.width/N;
+ for(let k=0;k<N;k++){let target=0;
+  if(st.playing){if(analyser){analyser.getByteFrequencyData(freq);target=freq[Math.floor(k/N*freq.length*.8)]/255}
+   else{const t=performance.now()/1000;target=.25+.35*Math.abs(Math.sin(t*2.1+k*.45))*Math.abs(Math.cos(t*1.3+k*.17))+Math.random()*.25;target*=1-Math.abs(k-N/2)/N*.9}}
+  lvl[k]+=(target-lvl[k])*.18;
+  const h=Math.max(4,lvl[k]*cv.height*.92);
+  const g=cx.createLinearGradient(0,cv.height,0,cv.height-h);g.addColorStop(0,'rgba(255,255,255,.9)');g.addColorStop(1,'rgba(251,114,153,.9)');
+  cx.fillStyle=g;const x=k*w+w*.22,bw=w*.56,y=(cv.height-h)/2;
+  cx.beginPath();cx.roundRect?cx.roundRect(x,y,bw,h,bw/2):cx.rect(x,y,bw,h);cx.fill();}}
+/* ---- 渲染 ---- */
+function chapters(){const it=cur(),D=dur()||1;return it.ch.map((c,j)=>({s:c[0],e:j<it.ch.length-1?it.ch[j+1][0]:D,n:c[1]}))}
+function renderAll(){const it=cur();
+ $('#vArt').innerHTML=art(it);$('#lArt').innerHTML=art(it);$('#miniArt').innerHTML=art(it);
+ $('#lBg').style.background=`radial-gradient(circle at 30% 20%,${it.c[1]},transparent 60%),linear-gradient(${it.c[0]},${it.c[2]})`;
+ $('#lT').textContent=it.title;$('#miniT').textContent=it.title;
+ $('#lS').innerHTML=it.type==='online'?`<span class="tg">UP</span>${it.up} · ${it.views}播放`:`<i data-ic="folder" style="opacity:.8"></i>${it.folder} · ${it.fmt}`;
+ $('#lMode').textContent=it.type==='online'?'听视频 · 仅加载音频流':'听视频 · 画面已停止解码';
+ $('#cover .badge').innerHTML=it.type==='online'?`<i data-ic="screenoff"></i>省流量 · 约节省 85%`:``;
+ $('#likeRow').innerHTML=it.type==='online'
+  ?['like','coin','star','share'].map(k=>`<button data-k="${k}" class="${st.liked[st.i+k]?'on':''}" data-ic="${k}"></button>`).join('')
+  :[['track','音轨'],['ab','AB 复读'],['info','文件信息']].map(([k,n])=>`<button data-k="${k}" title="${n}" data-ic="${k}"></button>`).join('');
+ $$('#likeRow button').forEach(b=>b.onclick=()=>{const k=b.dataset.k;
+  if(['like','coin','star'].includes(k)){st.liked[st.i+k]=!st.liked[st.i+k];b.classList.toggle('on');toast(b.classList.contains('on')?{like:'点赞成功',coin:'投币成功 +1',star:'已收藏'}[k]:'已取消')}
+  else toast({share:'分享面板',track:`音轨：${it.tracks>1?'1 / '+it.tracks+'（国语 · 粤语）':'仅 1 条音轨'}`,ab:'AB 复读：点一次设 A 点，再点设 B 点',info:`${it.size} · ${it.fmt}`}[k])});
+ $('#trk').innerHTML=chapters().map(()=>`<span><i></i></span>`).join('');
+ $$('#trk span').forEach((s,j)=>s.style.flex=chapters()[j].e-chapters()[j].s);
+ $('#lyrUl').innerHTML=it.subs?it.subs.map((l,j)=>`<li data-j="${j}">${l[0]}${l[1]?`<small>${l[1]}</small>`:''}</li>`).join(''):'';
+ $('#pLyr .lyr').style.display=it.subs?'':'none';
+ $('#pLyr .nolyr')?.remove();if(!it.subs)$('#pLyr').insertAdjacentHTML('beforeend',`<div class="nolyr">这个视频没有字幕<br><small>${it.type==='local'?'把同名 .srt / .ass 放到同一文件夹即可自动加载':'UP主暂未上传 CC 字幕'}</small></div>`);
+ $$('#lyrUl li').forEach(li=>li.onclick=()=>{seek(+li.dataset.j*SUBSTEP+.1);play()});
+ renderPlayerBody();renderQueue();paint();renderPlay();renderProg();}
+const SUBSTEP=6;
+function renderPlay(){
+ $('#modeBtn').innerHTML=IC[MODES[st.mode][0]];
+ $('#playBtn').innerHTML=IC[st.playing?'pauseL':'playL'];
+ $('#miniPlay').innerHTML=IC[st.playing?'pause':'play'];
+ $('#vPlay').innerHTML=IC[st.playing?'pause':'play'];$('#vPlay').style.opacity=st.playing&&!st.listening?0:1;
+ $('#cover').classList.toggle('paused',!st.playing);
+ $('#mini').classList.toggle('paused-eq',!st.playing);$('#miniS').textContent=st.playing?'听视频中':'已暂停';
+ $('#earBtn').style.cssText=st.listening?'background:rgba(251,114,153,.25);color:#FFB3CA':'';
+ const pill=$('#pill');if(pill){pill.classList.toggle('on',st.listening);
+  pill.querySelector('.lp-ic').innerHTML=st.listening?'<span class="eqbars" style="height:14px"><i></i><i></i><i></i></span>':IC.headphones;
+  pill.querySelector('b').textContent=st.listening?'正在听视频':'听视频';
+  pill.querySelector('small').textContent=st.listening?'点击打开播放页':(cur().type==='online'?'关闭画面 · 省流量约 85%':'关闭画面 · 熄屏省电，可后台播放');
+  pill.querySelector('.lp-go').textContent=st.listening?'打开 ›':'开启 ›';}
+ $$('.q').forEach(q=>q.classList.toggle('paused-eq',!st.playing));}
+function renderProg(){const D=dur()||1,t=st.t,r=t/D;
+ $('#lCur').textContent=fmt(t);$('#lDur').textContent=fmt(D);$('#vCur').textContent=fmt(t);$('#vDur').textContent=fmt(D);
+ $('#vBar').style.width=r*100+'%';$('#dot').style.left=r*100+'%';
+ $('#miniRing').style.strokeDashoffset=106.8*(1-r);
+ const ch=chapters();$$('#trk span i').forEach((x,j)=>{const c=ch[j];x.style.width=Math.max(0,Math.min(1,(t-c.s)/(c.e-c.s)))*100+'%'});
+ const c=ch.find(c=>t>=c.s&&t<c.e)||ch[0];$('#chapNow').textContent=`章节 ${ch.indexOf(c)+1}/${ch.length} · ${c.n}`;
+ const it=cur();if(it.subs){const j=Math.floor(t/SUBSTEP)%it.subs.length;if(j!==st.lastLyr){st.lastLyr=j;
+  $$('#lyrUl li').forEach((li,k)=>li.classList.toggle('on',k===j));
+  const li=$$('#lyrUl li')[j],box=$('#lyr');if(li)$('#lyrUl').style.transform=`translateY(${box.clientHeight/2-li.offsetTop-li.offsetHeight/2}px)`}}}
+function renderPlayerBody(){const it=cur();
+ $('#tab2').textContent=it.type==='online'?'评论 1.2万':'媒体信息';
+ const head=it.type==='online'
+  ?`<div class="up"><div class="av" style="background:linear-gradient(135deg,${it.c[0]},${it.c[1]})"></div><div><div class="nm">${it.up}</div><small>${it.fans}</small></div><button class="fo">+ 关注</button></div>`
+  :`<div class="src"><div class="fi" data-ic="folder"></div><div>${it.folder}<small>${it.fmt} · ${it.size}</small></div></div>`;
+ const stat=it.type==='online'?`<span>▶ ${it.views}</span><span>弹幕 ${it.dm}</span><span>2026-10-28</span>`:`<span>时长 ${fmt(it.dur)}</span><span>${it.tracks} 条音轨</span>`;
+ const acts=it.type==='online'?[['like','1.8万'],['coin','6236'],['star','9874'],['share','分享']]:[['track','音轨'],['ab','AB 复读'],['speed','倍速'],['info','信息']];
+ $('#pbody').innerHTML=`${head}<div class="ptitle">${it.title}</div><div class="pstat">${stat}</div>
+  <button class="listen-pill" id="pill"><span class="lp-ic"></span><span class="lp-t"><b></b><small></small></span><span class="wave">${Array.from({length:9},(_,k)=>`<i style="animation-delay:${-k*.13}s"></i>`).join('')}</span><span class="lp-go"></span></button>
+  <div class="acts">${acts.map(([k,n])=>`<div><i data-ic="${k}"></i>${n}</div>`).join('')}</div>
+  <div class="sec-t">${it.type==='online'?'相关推荐':'同文件夹'}</div>
+  ${DATA.map((d,j)=>j===st.i||d.type!==it.type?'':`<div class="rel" data-i="${j}"><div class="rt" style="container-type:inline-size;overflow:hidden">${art(d)}<span>${fmt(d.dur)}</span></div><div><p>${d.title}</p><small>${d.type==='online'?d.up:d.size}</small></div></div>`).join('')}`;
+ $('#pill').onclick=e=>{if(st.listening)openListen(e.currentTarget);else enterListen(e.currentTarget)};
+ $$('.rel').forEach(r=>r.onclick=()=>{load(+r.dataset.i);if(st.listening)play()});}
+/* ---- 页面切换 ---- */
+const status=()=>{const dark=$('#listen').classList.contains('open')||$('#player').style.display!=='none';$('#status').classList.toggle('light',dark);$('#status').style.background=$('#player').style.display!=='none'&&!$('#listen').classList.contains('open')?'#000':'transparent'};
+function openPlayer(i){if(i!==st.i||!media.src&&isReal())load(i);else renderAll();
+ $('#player').style.display='';$('#mini').classList.remove('show');
+ if(st.listening){st.listening=false;if(isReal())media.currentTime=st.t;}
+ play();renderPlay();status();}
+function origin(el){const r=el.getBoundingClientRect(),s=$('#scr').getBoundingClientRect();$('#listen').style.setProperty('--ox',r.left+r.width/2-s.left+'px');$('#listen').style.setProperty('--oy',r.top+r.height/2-s.top+'px')}
+function enterListen(el){st.listening=true;play();openListen(el);toast('已切换为听视频，画面已关闭')}
+function openListen(el){origin(el);$('#listen').classList.add('open');$('#media').style.visibility='hidden';renderPlay();status();setTimeout(()=>renderProg(),60)}
+function collapseListen(){origin($('#player').style.display==='none'?$('#mini'):$('#pill'));$('#listen').classList.remove('open');
+ setTimeout(()=>{$('#player').style.display='none';showMini();status()},450)}
+function backToVideo(){st.listening=false;$('#media').style.visibility='';origin($('#vbox'));$('#listen').classList.remove('open');
+ $('#player').style.display='';$('#mini').classList.remove('show');renderPlay();status();toast('已回到画面 · '+fmt(st.t)+' 继续播放')}
+function showMini(){$('#mini').classList.add('show');renderPlay()}
+
+$('#earBtn').onclick=e=>{e.currentTarget.querySelector('.tip')?.remove();st.listening?openListen(e.currentTarget):enterListen(e.currentTarget)};
+$('#pBack').onclick=()=>{if(!st.listening)pause();$('#player').style.display='none';if(st.listening)showMini();status()};
+$('#vPlay').onclick=toggle;
+$('#lDown').onclick=collapseListen;
+$('#back2v').onclick=backToVideo;
+$('#playBtn').onclick=toggle;$('#nextBtn').onclick=()=>next();$('#prevBtn').onclick=prev;
+$('#modeBtn').onclick=()=>{st.mode=(st.mode+1)%3;$('#modeBtn').innerHTML=IC[MODES[st.mode][0]];$('#qMode').textContent=MODES[st.mode][1];toast(MODES[st.mode][1])};
+$('#mini').onclick=e=>{if(e.target.closest('#miniPlay,#miniX'))return;openListen($('#mini'))};
+$('#miniPlay').onclick=toggle;
+$('#miniX').onclick=()=>{pause();st.listening=false;$('#mini').classList.remove('show')};
+$$('.l-seg button').forEach(b=>b.onclick=()=>{$$('.l-seg button').forEach(x=>x.classList.toggle('on',x===b));st.view=b.dataset.v;
+ $('#pCover').classList.toggle('hide',st.view!=='cover');$('#pLyr').classList.toggle('hide',st.view!=='lyr');st.lastLyr=-1;setTimeout(renderProg,30)});
+/* 进度拖动 */
+const pg=$('#prog');let drag=false;
+const pos=e=>{const r=pg.getBoundingClientRect();seek(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*dur())};
+pg.onpointerdown=e=>{drag=true;pg.setPointerCapture(e.pointerId);pos(e)};pg.onpointermove=e=>drag&&pos(e);pg.onpointerup=()=>drag=false;
+
+/* ---- 底部面板 ---- */
+let openSheet=null;
+function sheet(id){closeSheet();openSheet=$(id);openSheet.classList.add('on');$('#mask').classList.add('on')}
+function closeSheet(){openSheet&&openSheet.classList.remove('on');$('#mask').classList.remove('on');openSheet=null}
+$('#mask').onclick=closeSheet;
+$$('[data-sw]').forEach(s=>s.onclick=()=>s.classList.toggle('on'));
+const SPEEDS=[.5,.75,1,1.25,1.5,2,3];
+$('#spChips').innerHTML=SPEEDS.map(v=>`<button data-v="${v}" class="${v===1?'on':''}">${v}x</button>`).join('');
+$$('#spChips button').forEach(b=>b.onclick=()=>{st.speed=+b.dataset.v;media.playbackRate=st.speed;$$('#spChips button').forEach(x=>x.classList.toggle('on',x===b));renderTools();closeSheet();toast('倍速 '+st.speed+'x')});
+const TIMERS=[[0,'不开启'],[-1,'播完当前'],[15,'15 分钟'],[30,'30 分钟'],[45,'45 分钟'],[60,'60 分钟'],[90,'90 分钟']];
+$('#tmChips').innerHTML=TIMERS.map(([v,n])=>`<button data-v="${v}" class="${v===0?'on':''}">${n}</button>`).join('');
+$$('#tmChips button').forEach(b=>b.onclick=()=>{const v=+b.dataset.v;st.timer=v;st.timerEnd=v>0?Date.now()+v*60000:null;
+ $$('#tmChips button').forEach(x=>x.classList.toggle('on',x===b));if(!v)$('#tmLeft').textContent='未开启';renderTools();closeSheet();toast(v?'定时关闭：'+b.textContent:'已关闭定时')});
+function renderTools(){$('#spT').textContent=st.speed===1?'倍速':st.speed+'x';$('#tSpeed').classList.toggle('on',st.speed!==1);
+ $('#tmT').textContent=st.timer===0?'定时关闭':st.timer===-1?'播完停止':st.timer+' 分钟';$('#tTimer').classList.toggle('on',st.timer!==0)}
+$('#tSpeed').onclick=()=>sheet('#shSpeed');$('#tTimer').onclick=()=>sheet('#shTimer');$('#tFx').onclick=()=>sheet('#shFx');$('#lMore').onclick=()=>sheet('#shMore');
+$('#tSkip').onclick=()=>{const c=chapters();if(st.t<c[0].e&&c.length>1){seek(c[1].s);toast('已跳过片头 → '+c[1].n)}else toast('当前已不在片头')};
+$('#qBtn').onclick=$('#lQueue2').onclick=()=>sheet('#shQ');
+function renderQueue(){$('#qCnt').textContent=DATA.length+' 个';
+ $('#qlist').innerHTML=DATA.map((d,j)=>`<div class="q ${j===st.i?'on':''}" data-i="${j}"><div class="qt" style="container-type:inline-size;overflow:hidden">${art(d)}</div><p>${d.title}<small>${d.type==='local'?'本地 · '+d.folder:d.up} · ${fmt(d.dur)}</small></p>${j===st.i?'<span class="eqbars" style="color:var(--pink)"><i></i><i></i><i></i></span>':''}</div>`).join('');
+ $$('.q').forEach(q=>q.onclick=()=>{load(+q.dataset.i);play();closeSheet()})}
+/* "播完当前"定时：在切换时暂停 */
+const _next=next;next=function(auto){if(auto&&st.timer===-1){st.timer=0;renderTools();pause();seek(dur());toast('定时关闭：当前视频已播完');return}_next(auto)};
+
+paint();renderFeed();load(0);status();requestAnimationFrame(loop);
+</script>
+</body>
+</html>

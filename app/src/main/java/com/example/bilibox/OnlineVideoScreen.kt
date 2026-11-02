@@ -15,6 +15,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
 import android.os.Build
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.Settings
 import android.text.format.Formatter
@@ -599,6 +600,11 @@ internal fun RowScope.VideoAction(index: Int, label: String, selected: Boolean, 
 }
 
 
+/** Startup gets this long before a non-progressing CDN host is abandoned. */
+private const val STARTUP_STALL_TIMEOUT_MS = 8_000L
+/** Buffered position must not have grown for this long to count as stalled. */
+private const val STARTUP_NO_PROGRESS_MS = 4_000L
+
 @Composable
 internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -618,6 +624,8 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     var playbackCid by remember(video.bvid, session?.cookie) { mutableLongStateOf(0L) }
     var playbackCandidateIndex by remember(video.bvid, session?.cookie) { mutableIntStateOf(0) }
     var playbackCandidateCount by remember(video.bvid, session?.cookie) { mutableIntStateOf(1) }
+    // Candidate lists depend on the qn they were built with; host rotation must reuse it.
+    var playbackCandidateQn by remember(video.bvid, session?.cookie) { mutableIntStateOf(BiliQn.P1080) }
     var playbackRefreshTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
     var dashFallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
     var durlFallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
@@ -638,14 +646,33 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     // Cache entries belong to one quality, so do not reuse 1080P urls after a quality change.
     val episodePlayCache = remember(video.bvid, session?.cookie, selectedQn) { EpisodePlayCache() }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
+    /** Attaches fresh playurl data, resuming where the failed stream stopped. */
+    fun attachPlayData(data: com.example.bilibox.bili.PlayData, qn: Int, resumeMs: Long = exoPlayer.currentPosition) {
+        playbackData = data
+        playbackCandidateIndex = 0
+        playbackCandidateQn = qn
+        playbackCandidateCount = BiliPlayback.candidateCount(data, preferredQn = qn)
+        BiliPlayback.attach(exoPlayer, data, preferredQn = qn, cookie = session?.cookie, bvid = video.bvid, startPositionMs = resumeMs)
+    }
+    /** Moves to the next CDN host pair of the current playurl response. */
+    fun rotateCandidate(): Boolean {
+        val data = playbackData ?: return false
+        val nextIndex = playbackCandidateIndex + 1
+        if (nextIndex >= playbackCandidateCount) return false
+        val resumeMs = exoPlayer.currentPosition
+        playbackCandidateIndex = nextIndex
+        playbackState = PlaybackState.Loading
+        BiliPlayback.attach(
+            exoPlayer, data, preferredQn = playbackCandidateQn, candidateIndex = nextIndex,
+            cookie = session?.cookie, bvid = video.bvid, startPositionMs = resumeMs,
+        )
+        return true
+    }
     suspend fun tryHtml5Fallback(): String? {
         html5FallbackTried = true
         return try {
             val fallback = client.playUrlHtml5(video.bvid, playbackCid, qn = BiliQn.P1080)
-            playbackData = fallback
-            playbackCandidateIndex = 0
-            playbackCandidateCount = BiliPlayback.candidateCount(fallback, preferredQn = BiliQn.P1080)
-            BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P1080, cookie = session?.cookie, bvid = video.bvid)
+            attachPlayData(fallback, BiliQn.P1080)
             null
         } catch (error: CancellationException) {
             throw error
@@ -660,14 +687,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                val data = playbackData
-                val nextIndex = playbackCandidateIndex + 1
-                if (data != null && nextIndex < playbackCandidateCount) {
-                    playbackCandidateIndex = nextIndex
-                    playbackState = PlaybackState.Loading
-                    BiliPlayback.attach(exoPlayer, data, preferredQn = BiliQn.P1080, candidateIndex = nextIndex, cookie = session?.cookie, bvid = video.bvid)
-                    return
-                }
+                if (rotateCandidate()) return
                 // Signed CDN URLs are short-lived and a CDN can reject one
                 // host while another URL returned by a fresh playurl request
                 // is still usable. Refresh DASH once before falling back to
@@ -683,10 +703,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                                 qn = BiliQn.P1080,
                                 fnval = BiliClient.FNVAL_DASH_ALL,
                             )
-                            playbackData = refreshed
-                            playbackCandidateIndex = 0
-                            playbackCandidateCount = BiliPlayback.candidateCount(refreshed, preferredQn = BiliQn.P1080)
-                            BiliPlayback.attach(exoPlayer, refreshed, preferredQn = BiliQn.P1080, cookie = session?.cookie, bvid = video.bvid)
+                            attachPlayData(refreshed, BiliQn.P1080)
                         } catch (error: CancellationException) {
                             throw error
                         } catch (_: Exception) {
@@ -701,10 +718,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                                     qn = BiliQn.P720,
                                     fnval = BiliClient.FNVAL_DURL,
                                 )
-                                playbackData = fallback
-                                playbackCandidateIndex = 0
-                                playbackCandidateCount = BiliPlayback.candidateCount(fallback, preferredQn = BiliQn.P720)
-                                BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P720, cookie = session?.cookie, bvid = video.bvid)
+                                attachPlayData(fallback, BiliQn.P720)
                             } catch (error2: CancellationException) {
                                 throw error2
                             } catch (error2: Exception) {
@@ -728,11 +742,8 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                                 qn = BiliQn.P720,
                                 fnval = BiliClient.FNVAL_DASH_ALL,
                             )
-                            playbackData = fallback
-                            playbackCandidateIndex = 0
-                            playbackCandidateCount = BiliPlayback.candidateCount(fallback, preferredQn = BiliQn.P720)
                             durlFallbackTried = fallback.dash == null
-                            BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P720, cookie = session?.cookie, bvid = video.bvid)
+                            attachPlayData(fallback, BiliQn.P720)
                         } catch (error: CancellationException) {
                             throw error
                         } catch (_: Exception) {
@@ -744,10 +755,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                                     qn = BiliQn.P720,
                                     fnval = BiliClient.FNVAL_DURL,
                                 )
-                                playbackData = fallback
-                                playbackCandidateIndex = 0
-                                playbackCandidateCount = BiliPlayback.candidateCount(fallback, preferredQn = BiliQn.P720)
-                                BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P720, cookie = session?.cookie, bvid = video.bvid)
+                                attachPlayData(fallback, BiliQn.P720)
                             } catch (error: CancellationException) {
                                 throw error
                             } catch (error: Exception) {
@@ -773,10 +781,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                                 qn = BiliQn.P720,
                                 fnval = BiliClient.FNVAL_DURL,
                             )
-                            playbackData = fallback
-                            playbackCandidateIndex = 0
-                            playbackCandidateCount = BiliPlayback.candidateCount(fallback, preferredQn = BiliQn.P720)
-                            BiliPlayback.attach(exoPlayer, fallback, preferredQn = BiliQn.P720, cookie = session?.cookie, bvid = video.bvid)
+                            attachPlayData(fallback, BiliQn.P720)
                         } catch (error: CancellationException) {
                             throw error
                         } catch (error: Exception) {
@@ -816,6 +821,32 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         onDispose {
             exoPlayer.removeListener(listener)
             exoPlayer.release()
+        }
+    }
+    // A CDN node can accept the connection and then trickle or stall without
+    // ever raising an error, leaving the player on "正在获取视频流". If startup
+    // makes no buffering progress for a while, move to the next backup host.
+    LaunchedEffect(playbackData, playbackCandidateIndex) {
+        if (playbackData == null) return@LaunchedEffect
+        val startedAt = SystemClock.elapsedRealtime()
+        var lastBuffered = -1L
+        var lastProgressAt = startedAt
+        while (playbackState == PlaybackState.Loading) {
+            delay(1_000)
+            val now = SystemClock.elapsedRealtime()
+            val buffered = exoPlayer.bufferedPosition
+            if (buffered > lastBuffered) {
+                lastBuffered = buffered
+                lastProgressAt = now
+            }
+            if (now - startedAt >= STARTUP_STALL_TIMEOUT_MS &&
+                now - lastProgressAt >= STARTUP_NO_PROGRESS_MS
+            ) {
+                // No more hosts here: let the read timeout raise an error so
+                // onPlayerError walks the refresh / DURL / HTML5 fallbacks.
+                rotateCandidate()
+                return@LaunchedEffect
+            }
         }
     }
     // Part loading runs in its own scope instead of the effect: when listening in
@@ -859,11 +890,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
             val play = episodePlayCache.take(cid)
                 ?: client.playUrl(info.bvid.ifBlank { video.bvid }, cid, qn = selectedQn)
             playbackCid = cid
-            playbackData = play
-            playbackCandidateIndex = 0
-            playbackCandidateCount = BiliPlayback.candidateCount(play, preferredQn = selectedQn)
-            BiliPlayback.attach(exoPlayer, play, preferredQn = selectedQn, candidateIndex = 0, cookie = session?.cookie, bvid = video.bvid)
-            if (resumeAtMs > 0L) exoPlayer.seekTo(resumeAtMs)
+            attachPlayData(play, selectedQn, resumeMs = resumeAtMs)
             if (!resumePlaying) exoPlayer.playWhenReady = false
         } catch (cancelled: CancellationException) {
             throw cancelled

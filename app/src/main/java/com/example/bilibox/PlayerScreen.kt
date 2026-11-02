@@ -281,6 +281,7 @@ internal fun LocalVideoPlayer(
     }
     val currentIndex = playlist.indexOfFirst { it.uri == video.uri }
     val nextVideo = if (currentIndex >= 0) playlist.getOrNull(currentIndex + 1) else null
+    val previousVideo = if (currentIndex > 0) playlist.getOrNull(currentIndex - 1) else null
     // Folder queue progress is read once per opened video; the current item's
     // bar keeps following the live player position instead.
     val playbackByKey = remember(playlist, video.uri) {
@@ -303,6 +304,26 @@ internal fun LocalVideoPlayer(
             coverBitmap = listenThumbnail,
         ),
         listenQueue = queue,
+        listenControls = ListenControls(
+            mode = when (queueMode) {
+                LocalQueueMode.LIST_LOOP -> 0
+                LocalQueueMode.SINGLE_LOOP -> 1
+                LocalQueueMode.SHUFFLE -> 2
+                LocalQueueMode.STOP_AFTER -> 3
+            },
+            hasPrevious = previousVideo != null,
+            hasNext = nextVideo != null,
+            onPrevious = { previousVideo?.let { switchTo(it) } },
+            onNext = { nextVideo?.let { switchTo(it) } },
+            onCycleMode = {
+                queueMode = when (queueMode) {
+                    LocalQueueMode.LIST_LOOP -> LocalQueueMode.SINGLE_LOOP
+                    LocalQueueMode.SINGLE_LOOP -> LocalQueueMode.SHUFFLE
+                    LocalQueueMode.SHUFFLE -> LocalQueueMode.STOP_AFTER
+                    LocalQueueMode.STOP_AFTER -> LocalQueueMode.LIST_LOOP
+                }
+            },
+        ),
         mediaKey = video.uri,
         // Persist the exact exit position before the library recomposes its status list.
         onBack = {
@@ -377,6 +398,8 @@ internal fun VideoPlayerScreen(
     playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     listenInfo: ListenInfo? = null,
     listenQueue: ListenQueue? = null,
+    // One object instead of separate params: see ListenControls.
+    listenControls: ListenControls? = null,
     // Files left in the folder / part list, used by the 按内容 timer options.
     remainingVideos: Int = 1,
     // Changes when the same player switches to another file; per-file UI resets.
@@ -1287,8 +1310,11 @@ internal fun VideoPlayerScreen(
             durationMs = duration,
             speed = speed,
             timer = sleepTimer,
+            mode = listenControls?.mode ?: 0,
             remainingVideos = remainingVideos,
-            hasNext = onNextEpisode != null,
+            hasPrevious = listenControls?.hasPrevious ?: false,
+            // Online videos pass no controls; their 下一个 is the next P as before.
+            hasNext = listenControls?.hasNext ?: (onNextEpisode != null),
             onTogglePlay = {
                 if (player.playbackState == Player.STATE_ENDED) {
                     player.seekTo(0L)
@@ -1301,11 +1327,14 @@ internal fun VideoPlayerScreen(
                 player.seekTo(target.coerceAtLeast(0L))
                 position = target.coerceAtLeast(0L)
             },
-            onNext = { onNextEpisode?.invoke() },
+            onPrevious = listenControls?.onPrevious ?: {},
+            onNext = { (listenControls?.onNext ?: onNextEpisode)?.invoke() },
             onSpeedChange = {
                 player.setPlaybackSpeed(it)
                 speed = it
             },
+            onCycleMode = listenControls?.onCycleMode ?: {},
+            onOpenQueue = listenControls?.onOpenQueue ?: {},
             onCollapse = { listenPageOpen = false },
             onRestoreVideo = { restoreVideo() },
         )
