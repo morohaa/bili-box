@@ -146,21 +146,6 @@ internal data class SearchVideo(
     val coverUrl: String
 )
 
-internal data class LocalVideo(
-    val uri: Uri,
-    val name: String,
-    val durationMs: Long,
-    val sizeBytes: Long
-)
-
-
-internal sealed interface LocalVideoScanState {
-    data object NeedsPermission : LocalVideoScanState
-    data object Loading : LocalVideoScanState
-    data class Ready(val videos: List<LocalVideo>) : LocalVideoScanState
-    data class Error(val message: String) : LocalVideoScanState
-}
-
 internal sealed interface SearchState {
     data object Idle : SearchState
     data object Loading : SearchState

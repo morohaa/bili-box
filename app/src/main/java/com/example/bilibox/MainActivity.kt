@@ -147,7 +147,6 @@ class MainActivity : ComponentActivity() {
 private fun BiliBoxApp() {
     val context = LocalContext.current
     var selected by rememberSaveable { mutableIntStateOf(0) }
-    var librarySource by rememberSaveable { mutableIntStateOf(0) }
     var saved by rememberSaveable { mutableStateOf(false) }
     var session by remember { mutableStateOf<BiliSession?>(BiliSessionStore.load(context)) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -182,11 +181,7 @@ private fun BiliBoxApp() {
     var selectedVideo by remember { mutableStateOf<SearchVideo?>(null) }
     var selectedLocalVideo by remember { mutableStateOf<LocalVideo?>(null) }
     var localPlaylist by remember { mutableStateOf<List<LocalVideo>>(emptyList()) }
-    selectedLocalVideo?.let { video ->
-        LocalVideoPlayer(video, localPlaylist, onVideoSelected = { selectedLocalVideo = it },
-            onBack = { selectedLocalVideo = null })
-        return
-    }
+    var libraryRefresh by remember { mutableIntStateOf(0) }
     selectedVideo?.let { video ->
         BiliVideoDetail(video, session) { selectedVideo = null }
         return
@@ -197,53 +192,67 @@ private fun BiliBoxApp() {
             backdrop.record { this@drawWithContent.drawContent() }
             drawLayer(backdrop)
         }) {
-            // The scrollable page is captured once and shared by both glass surfaces.
-            Column(
-                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    .statusBarsPadding().padding(horizontal = 16.dp)
-            ) {
-                Header()
-                when (selected) {
-                    0 -> {
-                        VideoSearchField(
-                            query = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            onSearch = { runSearch(1, searchOrder) }
-                        )
-                        Spacer(Modifier.height(26.dp))
-                        when (val state = searchState) {
-                            SearchState.Idle -> HomeContent(saved) { saved = !saved }
-                            SearchState.Loading -> SearchLoading()
-                            is SearchState.Error -> SearchError(state.message) { runSearch(state.page, state.order) }
-                            is SearchState.Success -> SearchResults(
-                                state = state,
-                                onVideoClick = { selectedVideo = it },
-                                onOrderChange = { runSearch(1, it) },
-                                onPageChange = { runSearch(it, state.order) },
+            if (selected == 2) {
+                // The local-video browser owns its full-height layout so folders, the
+                // settings sheet and the floating resume card can use the whole screen.
+                LibraryPage(
+                    refreshToken = libraryRefresh,
+                    onVideoSelected = { video, playlist ->
+                        localPlaylist = playlist
+                        selectedLocalVideo = video
+                    },
+                )
+            } else {
+                // The scrollable page is captured once and shared by both glass surfaces.
+                Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                        .statusBarsPadding().padding(horizontal = 16.dp)
+                ) {
+                    Header()
+                    when (selected) {
+                        0 -> {
+                            VideoSearchField(
+                                query = searchQuery,
+                                onQueryChange = { searchQuery = it },
+                                onSearch = { runSearch(1, searchOrder) }
                             )
+                            Spacer(Modifier.height(26.dp))
+                            when (val state = searchState) {
+                                SearchState.Idle -> HomeContent(saved) { saved = !saved }
+                                SearchState.Loading -> SearchLoading()
+                                is SearchState.Error -> SearchError(state.message) { runSearch(state.page, state.order) }
+                                is SearchState.Success -> SearchResults(
+                                    state = state,
+                                    onVideoClick = { selectedVideo = it },
+                                    onOrderChange = { runSearch(1, it) },
+                                    onPageChange = { runSearch(it, state.order) },
+                                )
+                            }
                         }
+                        1 -> CollectionPage("动态", "关注的人，分享的日常", "今天的灵感", "沿着海岸线，收集一整个夏天")
+                        else -> MyPage(if (saved) 1 else 0, session) { session = it }
                     }
-                    1 -> CollectionPage("动态", "关注的人，分享的日常", "今天的灵感", "沿着海岸线，收集一整个夏天")
-                    2 -> {
-                        LibraryPage(
-                            source = librarySource,
-                            onSourceChange = { librarySource = it },
-                            hasSavedVideo = saved,
-                            onVideoSelected = { video, playlist ->
-                                localPlaylist = playlist
-                                selectedLocalVideo = video
-                            },
-                        )
-                    }
-                    else -> MyPage(if (saved) 1 else 0, session) { session = it }
+                    Spacer(Modifier.height(150.dp))
+                    Spacer(Modifier.navigationBarsPadding())
                 }
-                Spacer(Modifier.height(150.dp))
-                Spacer(Modifier.navigationBarsPadding())
             }
         }
-        if (selectedVideo == null) {
+        if (selectedLocalVideo == null) {
             LiquidNavigation(selected, { selected = it }, backdrop,
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp))
+        }
+        // Keep the library composed underneath so its folder position, search and
+        // scroll state survive a playback session.
+        selectedLocalVideo?.let { video ->
+            LocalVideoPlayer(
+                video = video,
+                playlist = localPlaylist,
+                onVideoSelected = { selectedLocalVideo = it },
+                onBack = {
+                    selectedLocalVideo = null
+                    libraryRefresh++
+                },
+            )
         }
     }
 }

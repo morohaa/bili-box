@@ -246,7 +246,11 @@ internal fun LocalVideoPlayer(
         playbackError = playbackError,
         sourceLabel = "本地视频",
         commentMessage = "本地视频暂时没有评论",
-        onBack = onBack,
+        // Persist the exact exit position before the library recomposes its status list.
+        onBack = {
+            savePlaybackProgress()
+            onBack()
+        },
         onRetry = {
             playbackError = null
             val retryPosition = player.currentPosition.coerceAtLeast(0L)
