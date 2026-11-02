@@ -1024,6 +1024,10 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
             coverUrl = videoInfo?.pic?.takeIf { it.isNotBlank() }?.let(::normalizeImageUrl) ?: video.coverUrl,
         ),
         listenQueue = listenQueue,
+        remainingVideos = episodePages?.let { parts ->
+            val index = parts.indexOfFirst { it.page == selectedPage }
+            if (index >= 0) (parts.size - index).coerceAtLeast(1) else 1
+        } ?: 1,
         details = { _ ->
             Box(Modifier.fillMaxWidth()) {
                 OnlineVideoDetails(

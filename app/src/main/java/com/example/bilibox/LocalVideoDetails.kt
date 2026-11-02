@@ -180,10 +180,8 @@ internal fun LocalVideoIntro(
     playlist: List<LocalVideo>,
     durationMs: Long,
     resumeMs: Long,
-    saved: Boolean,
     queueMode: LocalQueueMode,
     playbackByKey: Map<String, LocalVideoPlayback>,
-    onToggleSaved: () -> Unit,
     onShare: () -> Unit,
     onSelectVideo: (LocalVideo) -> Unit,
     onResumeDismiss: () -> Unit,
@@ -276,11 +274,11 @@ internal fun LocalVideoIntro(
             )
             LocalDetailAction(
                 modifier = Modifier.weight(1f),
-                icon = LocalIcon.STAR,
-                label = if (saved) "已收藏" else "收藏",
-                active = saved,
-                filled = saved,
-                onClick = onToggleSaved,
+                icon = LocalIcon.MOON,
+                label = "定时关闭",
+                active = actions?.sleepTimerActive == true,
+                enabled = actions != null,
+                onClick = { actions?.openSleepTimerSheet?.invoke() },
             )
             LocalDetailAction(
                 modifier = Modifier.weight(1f),

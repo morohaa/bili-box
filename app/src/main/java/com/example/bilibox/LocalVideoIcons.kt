@@ -55,6 +55,7 @@ internal enum class LocalIcon {
     LOOP,
     CAMERA,
     STAR,
+    MOON,
     COPY,
     HISTORY,
     TV,
@@ -241,6 +242,13 @@ internal fun DrawScope.drawLocalGlyph(
             LocalIcon.STAR -> drawPath(
                 PathParser().parsePathString(
                     "M12 3.6l2.62 5.32 5.88.86-4.25 4.14 1 5.85L12 16.99l-5.25 2.78 1-5.85L3.5 9.78l5.88-.86z"
+                ).toPath(),
+                tint,
+                style = if (fill) androidx.compose.ui.graphics.drawscope.Fill else stroke,
+            )
+            LocalIcon.MOON -> drawPath(
+                PathParser().parsePathString(
+                    "M20.4 14.3A8.6 8.6 0 0 1 9.7 3.6a8.6 8.6 0 1 0 10.7 10.7z"
                 ).toPath(),
                 tint,
                 style = if (fill) androidx.compose.ui.graphics.drawscope.Fill else stroke,

@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.media3.exoplayer.ExoPlayer
@@ -40,7 +41,7 @@ class LocalVideoDetailsTest {
         val first = video("第一堂课.mp4")
         val second = video("第二堂课.mp4")
         var speedOpened = 0
-        var saved = 0
+        var timerOpened = 0
         var playbackSheetOpened = 0
         var selected: LocalVideo? = null
         compose.setContent {
@@ -51,6 +52,8 @@ class LocalVideoDetailsTest {
                     screenshotEnabled = true,
                     openSpeedPanel = { speedOpened++ },
                     openPlaybackModeSheet = { playbackSheetOpened++ },
+                    openSleepTimerSheet = { timerOpened++ },
+                    sleepTimerActive = false,
                     takeScreenshot = {},
                     seekTo = {},
                 )
@@ -60,10 +63,8 @@ class LocalVideoDetailsTest {
                     playlist = listOf(first, second),
                     durationMs = 6_000L,
                     resumeMs = 0L,
-                    saved = false,
                     queueMode = LocalQueueMode.STOP_AFTER,
                     playbackByKey = emptyMap(),
-                    onToggleSaved = { saved++ },
                     onShare = {},
                     onSelectVideo = { selected = it },
                     onResumeDismiss = {},
@@ -80,10 +81,39 @@ class LocalVideoDetailsTest {
         compose.runOnIdle { assertEquals(second.uri, selected?.uri) }
         compose.onNodeWithText("1.5x").performClick()
         compose.runOnIdle { assertEquals(1, speedOpened) }
-        compose.onNodeWithText("收藏").performClick()
-        compose.runOnIdle { assertEquals(1, saved) }
+        compose.onNodeWithText("定时关闭").performClick()
+        compose.runOnIdle { assertEquals(1, timerOpened) }
         compose.onNodeWithText("播完暂停").performClick()
         compose.runOnIdle { assertEquals(1, playbackSheetOpened) }
+    }
+
+    @Test
+    fun sleepTimerSheetShowsPresetsContentAndAppliesChoice() {
+        lateinit var timer: PlaybackSleepTimer
+        compose.setContent {
+            timer = remember { PlaybackSleepTimer() }
+            SleepTimerSheet(
+                timer = timer,
+                remainingVideos = 4,
+                currentRemainingMs = 300_000L,
+                durationMs = 600_000L,
+                onDismiss = {},
+            )
+        }
+        compose.onNodeWithText("定时关闭").assertExists()
+        compose.onNodeWithText("未开启").assertExists()
+        compose.onNodeWithText("按时长").assertExists()
+        compose.onNodeWithText("按内容").assertExists()
+        compose.onNodeWithText("播完当前视频").assertExists()
+        compose.onNodeWithText("播完多个视频").assertExists()
+        compose.onNodeWithText("音量渐弱").assertExists()
+        compose.onNodeWithText("结束前提醒").assertExists()
+        compose.onNodeWithContentDescription("30 分钟定时").performClick()
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals(SleepTimerMode.TIME, timer.mode)
+            assertEquals(30, timer.minutes)
+        }
     }
 
     @Test

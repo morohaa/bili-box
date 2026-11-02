@@ -5,7 +5,6 @@ import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -24,7 +23,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,7 +63,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
-import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.Dispatchers
@@ -90,36 +87,6 @@ internal data class ListenInfo(
     val coverUrl: String? = null,
     val coverBitmap: Bitmap? = null,
 )
-
-/** Sleep timer shared by the listen page and the collapsed state. */
-@Stable
-internal class ListenSleepTimer {
-    /** elapsedRealtime deadline, or 0 when no countdown is running. */
-    var endAt by mutableLongStateOf(0L)
-    var minutes by mutableIntStateOf(0)
-    var afterCurrent by mutableStateOf(false)
-    val active: Boolean get() = endAt > 0L || afterCurrent
-
-    fun start(minutes: Int) {
-        afterCurrent = false
-        this.minutes = minutes
-        endAt = SystemClock.elapsedRealtime() + minutes * 60_000L
-    }
-
-    fun stopAfterCurrent() {
-        endAt = 0L
-        minutes = 0
-        afterCurrent = true
-    }
-
-    fun cancel() {
-        endAt = 0L
-        minutes = 0
-        afterCurrent = false
-    }
-}
-
-private val ListenFadeMs = 30_000L
 
 /**
  * Applies the audio-only state to [player]: the video renderer is disabled so
@@ -183,51 +150,6 @@ internal fun ListenPlaybackEffect(
             if (bytes != null) {
                 ListenPlaybackBridge.attach(context, player, buildListenMetadata(title, subtitle, bytes), queue)
             }
-        }
-    }
-}
-
-/** Countdown / "播完当前" handling. Fades the volume over the last 30 seconds. */
-@androidx.annotation.OptIn(UnstableApi::class)
-@Composable
-internal fun ListenSleepTimerEffect(player: ExoPlayer, timer: ListenSleepTimer) {
-    val context = LocalContext.current
-    LaunchedEffect(player, timer.endAt) {
-        val endAt = timer.endAt
-        if (endAt <= 0L) return@LaunchedEffect
-        try {
-            while (isActive) {
-                val left = endAt - SystemClock.elapsedRealtime()
-                if (left <= 0L) {
-                    player.playWhenReady = false
-                    timer.cancel()
-                    Toast.makeText(context, "定时关闭：已暂停播放", Toast.LENGTH_SHORT).show()
-                    break
-                }
-                player.volume = if (left < ListenFadeMs) (left.toFloat() / ListenFadeMs).coerceIn(0f, 1f) else 1f
-                delay(if (left < ListenFadeMs) 200L else 1_000L)
-            }
-        } finally {
-            player.volume = 1f
-        }
-    }
-    DisposableEffect(player, timer.afterCurrent) {
-        if (!timer.afterCurrent) return@DisposableEffect onDispose { }
-        // ExoPlayer pauses right before leaving the item, so 连播 / 自动下一P
-        // never get a chance to start the next file.
-        player.pauseAtEndOfMediaItems = true
-        val listener = object : Player.Listener {
-            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) {
-                    timer.cancel()
-                    Toast.makeText(context, "定时关闭：当前视频已播完", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-        player.addListener(listener)
-        onDispose {
-            player.removeListener(listener)
-            player.pauseAtEndOfMediaItems = false
         }
     }
 }
@@ -407,11 +329,14 @@ internal fun ListenScreen(
     info: ListenInfo,
     cover: Bitmap?,
     playing: Boolean,
+    // 帧动画只在真正出声时跑：缓冲中 playWhenReady 已为 true，但画面不该一直重绘。
+    visualizing: Boolean = playing,
     buffering: Boolean,
     positionMs: Long,
     durationMs: Long,
     speed: Float,
-    timer: ListenSleepTimer,
+    timer: PlaybackSleepTimer,
+    remainingVideos: Int = 1,
     hasNext: Boolean,
     onTogglePlay: () -> Unit,
     onSeek: (Long) -> Unit,
@@ -486,9 +411,9 @@ internal fun ListenScreen(
             }
 
             Spacer(Modifier.weight(.6f))
-            ListenCoverCard(cover, playing, info.online, onRestoreVideo)
+            ListenCoverCard(cover, visualizing, info.online, onRestoreVideo)
             Spacer(Modifier.height(18.dp))
-            ListenVisualizer(playing, Modifier.fillMaxWidth().height(40.dp))
+            ListenVisualizer(visualizing, Modifier.fillMaxWidth().height(40.dp))
             Spacer(Modifier.weight(1f))
 
             Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
@@ -600,7 +525,13 @@ internal fun ListenScreen(
             enter = fadeIn(tween(180)) + slideInVertically(tween(260, easing = FastOutSlowInEasing)) { it },
             exit = fadeOut(tween(140)) + slideOutVertically(tween(220, easing = FastOutSlowInEasing)) { it },
         ) {
-            SleepTimerSheet(timer, onDismiss = { timerOpen = false })
+            SleepTimerSheet(
+                timer = timer,
+                remainingVideos = remainingVideos,
+                currentRemainingMs = (durationMs - positionMs).coerceAtLeast(0L),
+                durationMs = durationMs,
+                onDismiss = { timerOpen = false },
+            )
         }
     }
 }
@@ -756,85 +687,6 @@ private fun NextGlyph(tint: Color) {
         val u = size.width / 24f
         drawPath(Path().apply { moveTo(6f * u, 5.5f * u); lineTo(16f * u, 12f * u); lineTo(6f * u, 18.5f * u); close() }, tint)
         drawRoundRect(tint, Offset(17f * u, 5.5f * u), Size(2.4f * u, 13f * u), CornerRadius(1f * u))
-    }
-}
-
-@Composable
-private fun SleepTimerLabel(timer: ListenSleepTimer, modifier: Modifier) {
-    var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
-    LaunchedEffect(timer.endAt) {
-        while (isActive && timer.endAt > 0L) {
-            now = SystemClock.elapsedRealtime()
-            delay(1_000)
-        }
-    }
-    val text = when {
-        timer.afterCurrent -> "定时关闭：播完当前视频后暂停"
-        timer.endAt > 0L -> "定时关闭：剩余 ${formatPlaybackTime((timer.endAt - now).coerceAtLeast(0L))}"
-        else -> ""
-    }
-    Text(text, color = Color(0xFFFFB3CA), fontSize = 12.sp, modifier = modifier)
-}
-
-private val SleepTimerChoices = listOf(-1 to "播完当前", 15 to "15 分钟", 30 to "30 分钟",
-    45 to "45 分钟", 60 to "60 分钟", 90 to "90 分钟")
-
-@Composable
-private fun SleepTimerSheet(timer: ListenSleepTimer, onDismiss: () -> Unit) {
-    val scrim = remember { MutableInteractionSource() }
-    Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .46f))
-            .clickable(interactionSource = scrim, indication = null, onClick = onDismiss)
-            .semantics { contentDescription = "关闭定时关闭" })
-        Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .background(Color.White)
-                .pointerInput(Unit) { detectTapGestures { } }
-                .navigationBarsPadding()
-                .padding(start = 18.dp, end = 18.dp, top = 10.dp, bottom = 18.dp)
-        ) {
-            Box(Modifier.align(Alignment.CenterHorizontally).size(width = 36.dp, height = 4.dp)
-                .clip(RoundedCornerShape(2.dp)).background(Color(0xFFE3E5E7)))
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("定时关闭", color = OnlineText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.weight(1f))
-                if (timer.active) SleepTimerLabel(timer, Modifier)
-                else Text("未开启", color = Color(0xFF9499A0), fontSize = 12.sp)
-            }
-            Spacer(Modifier.height(14.dp))
-            SleepTimerChoices.chunked(3).forEach { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    row.forEach { (value, label) ->
-                        val selected = if (value < 0) timer.afterCurrent else timer.endAt > 0L && timer.minutes == value
-                        Box(
-                            Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(20.dp))
-                                .background(if (selected) OnlinePinkSoft else Color(0xFFF1F2F3))
-                                .border(1.dp, if (selected) OnlinePink else Color.Transparent, RoundedCornerShape(20.dp))
-                                .clickable(role = Role.Button) {
-                                    if (value < 0) timer.stopAfterCurrent() else timer.start(value)
-                                    onDismiss()
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(label, color = if (selected) OnlinePink else OnlineText, fontSize = 13.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-            }
-            if (timer.active) {
-                Box(
-                    Modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(21.dp))
-                        .clickable(role = Role.Button) { timer.cancel(); onDismiss() },
-                    contentAlignment = Alignment.Center
-                ) { Text("关闭定时", color = Color(0xFF61666D), fontSize = 13.sp) }
-            }
-            Text("倒计时结束前 30 秒音量会逐渐降低", color = Color(0xFF9499A0), fontSize = 11.sp,
-                modifier = Modifier.padding(top = 4.dp))
-        }
     }
 }
 

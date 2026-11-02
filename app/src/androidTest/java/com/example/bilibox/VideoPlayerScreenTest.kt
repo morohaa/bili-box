@@ -369,6 +369,7 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("30 分钟").performClick()
         compose.waitForIdle()
         compose.onNodeWithText("定时关闭：剩余", substring = true).assertExists()
+        compose.onNodeWithText("完成").performClick()
 
         // Collapsing keeps listening; the video box shows the audio-only state.
         compose.onNodeWithContentDescription("收起").performClick()

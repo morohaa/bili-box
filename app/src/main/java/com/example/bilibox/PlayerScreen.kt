@@ -15,6 +15,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Bundle
 import android.os.Build
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.Settings
 import android.text.format.Formatter
@@ -166,6 +167,8 @@ internal class PlayerDetailActions(
     val screenshotEnabled: Boolean,
     val openSpeedPanel: () -> Unit,
     val openPlaybackModeSheet: () -> Unit,
+    val openSleepTimerSheet: () -> Unit,
+    val sleepTimerActive: Boolean,
     val takeScreenshot: () -> Unit,
     val seekTo: (Long) -> Unit,
 )
@@ -199,7 +202,6 @@ internal fun LocalVideoPlayer(
     val player = queue.player
     var playbackError by remember(player) { mutableStateOf<String?>(null) }
     var playbackState by remember(player) { mutableIntStateOf(Player.STATE_IDLE) }
-    var saved by remember(video.uri) { mutableStateOf(false) }
     // Survives a switch to the next folder item so 连播 keeps working.
     var queueMode by rememberSaveable { mutableStateOf(LocalQueueMode.LIST_LOOP) }
     var resumeDismissed by remember(video.uri) { mutableStateOf(false) }
@@ -291,6 +293,7 @@ internal fun LocalVideoPlayer(
         defaultDurationMs = video.durationMs,
         playbackError = playbackError,
         sourceLabel = "本地视频 ${playlist.size}",
+        remainingVideos = (playlist.size - currentIndex).coerceAtLeast(1),
         commentMessage = "本地视频暂时没有评论",
         detailTabs = listOf("简介", "媒体信息"),
         sourcePill = true,
@@ -336,10 +339,8 @@ internal fun LocalVideoPlayer(
                 playlist = playlist,
                 durationMs = duration,
                 resumeMs = if (resumeDismissed) 0L else resumePosition,
-                saved = saved,
                 queueMode = queueMode,
                 playbackByKey = playbackByKey,
-                onToggleSaved = { saved = !saved },
                 onShare = { shareVideo() },
                 onSelectVideo = { switchTo(it) },
                 onResumeDismiss = { resumeDismissed = true },
@@ -376,6 +377,8 @@ internal fun VideoPlayerScreen(
     playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     listenInfo: ListenInfo? = null,
     listenQueue: ListenQueue? = null,
+    // Files left in the folder / part list, used by the 按内容 timer options.
+    remainingVideos: Int = 1,
     // Changes when the same player switches to another file; per-file UI resets.
     mediaKey: Any? = null,
     details: @Composable (duration: Long) -> Unit,
@@ -398,6 +401,7 @@ internal fun VideoPlayerScreen(
     var playbackState by remember(player) { mutableIntStateOf(player.playbackState) }
     var detailsTab by remember(player) { mutableIntStateOf(0) }
     var playbackModeExpanded by remember(player) { mutableStateOf(false) }
+    var sleepTimerOpen by remember(player) { mutableStateOf(false) }
     var controlsVisible by remember(player) { mutableStateOf(true) }
     var screenLocked by remember(player) { mutableStateOf(false) }
     var orientationBeforeLock by remember(player) { mutableStateOf<Int?>(null) }
@@ -421,10 +425,10 @@ internal fun VideoPlayerScreen(
     val listenReveal = remember { Animatable(0f) }
     var listenOrigin by remember { mutableStateOf(Offset.Zero) }
     var screenRootOffset by remember { mutableStateOf(Offset.Zero) }
-    val listenTimer = remember { ListenSleepTimer() }
+    val sleepTimer = remember { PlaybackSleepTimer() }
     val listenCover = rememberListenCover(listenInfo, enabled = listening)
     ListenPlaybackEffect(player, listening, title, listenInfo?.subtitle.orEmpty(), listenCover, listenQueue)
-    ListenSleepTimerEffect(player, listenTimer)
+    SleepTimerEffect(player, sleepTimer)
     LaunchedEffect(listenPageOpen) {
         listenReveal.animateTo(
             if (listenPageOpen) 1f else 0f,
@@ -470,6 +474,7 @@ internal fun VideoPlayerScreen(
     LaunchedEffect(activity, fullScreen) {
         speedMenuExpanded = false
         playbackModeExpanded = false
+        sleepTimerOpen = false
         episodesExpanded = false
         qualityMenuExpanded = false
         if (!fullScreen) screenLocked = false
@@ -657,14 +662,15 @@ internal fun VideoPlayerScreen(
         scrubbing = false
         speedMenuExpanded = false
         playbackModeExpanded = false
+        sleepTimerOpen = false
         episodesExpanded = false
         qualityMenuExpanded = false
         duration = defaultDurationMs
         position = player.currentPosition.coerceAtLeast(0L)
     }
-    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, playbackModeExpanded, episodesExpanded, qualityMenuExpanded) {
+    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded) {
         if (controlsVisible && (isPlaying || screenLocked) && !scrubbing &&
-            !speedMenuExpanded && !playbackModeExpanded && !episodesExpanded && !qualityMenuExpanded) {
+            !speedMenuExpanded && !playbackModeExpanded && !sleepTimerOpen && !episodesExpanded && !qualityMenuExpanded) {
             delay(4_000)
             controlsVisible = false
         }
@@ -692,6 +698,7 @@ internal fun VideoPlayerScreen(
             qualityMenuExpanded -> qualityMenuExpanded = false
             episodesExpanded -> episodesExpanded = false
             playbackModeExpanded -> playbackModeExpanded = false
+            sleepTimerOpen -> sleepTimerOpen = false
             speedMenuExpanded -> speedMenuExpanded = false
             else -> navigateBack()
         }
@@ -700,6 +707,12 @@ internal fun VideoPlayerScreen(
     // The speed panel takes the whole stage: hide the chrome behind it so the
     // runner and the ruler are the only things competing for attention.
     val showChrome = controlsVisible && !screenLocked && !(fullScreen && speedMenuExpanded)
+    val sleepTimerRemainingMs = when (sleepTimer.mode) {
+        SleepTimerMode.TIME -> (sleepTimer.endAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+        SleepTimerMode.VIDEOS ->
+            if (sleepTimer.videosLeft <= 1) (duration - position).coerceAtLeast(0L) else 0L
+        SleepTimerMode.OFF -> 0L
+    }
 
     Box(Modifier.fillMaxSize().onGloballyPositioned { screenRootOffset = it.positionInRoot() }) {
         Column(Modifier.fillMaxSize().background(Color.Black)
@@ -746,6 +759,15 @@ internal fun VideoPlayerScreen(
             } else if (loadingMessage != null || playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_IDLE) {
                 BiliLoadingIndicator(
                     message = loadingMessage ?: if (playbackState == Player.STATE_BUFFERING) "正在缓冲…" else "等待视频加载"
+                )
+            }
+            if (sleepTimer.warning && sleepTimer.active) {
+                SleepTimerWarning(
+                    remainingMs = sleepTimerRemainingMs,
+                    onExtend = { sleepTimer.extend(10, sleepTimerRemainingMs) },
+                    onDismiss = { sleepTimer.dismissWarning() },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                        .padding(bottom = if (fullScreen) 150.dp else 72.dp),
                 )
             }
             if (showChrome) {
@@ -1102,6 +1124,12 @@ internal fun VideoPlayerScreen(
                             speedMenuExpanded = false
                             playbackModeExpanded = true
                         },
+                        openSleepTimerSheet = {
+                            speedMenuExpanded = false
+                            playbackModeExpanded = false
+                            sleepTimerOpen = true
+                        },
+                        sleepTimerActive = sleepTimer.active,
                         takeScreenshot = { takeVideoScreenshot() },
                         seekTo = { target ->
                             player.seekTo(target.coerceAtLeast(0L))
@@ -1178,7 +1206,20 @@ internal fun VideoPlayerScreen(
                 }
             }
         }
-
+    }
+    // The timer lives on the player, so it keeps counting while the sheet is
+    // closed and the queue switches files. It is a sibling of the player
+    // column so the panel covers the video too, like the reference design.
+    if (!fullScreen) {
+        PlayerDrawerVisibility(visible = sleepTimerOpen, fromBottom = true) {
+            SleepTimerSheet(
+                timer = sleepTimer,
+                remainingVideos = remainingVideos,
+                currentRemainingMs = (duration - position).coerceAtLeast(0L),
+                durationMs = duration,
+                onDismiss = { sleepTimerOpen = false },
+            )
+        }
     }
     // 听视频 page: stays composed while its reveal animation is running.
     val info = listenInfo
@@ -1191,11 +1232,13 @@ internal fun VideoPlayerScreen(
             info = info,
             cover = listenCover,
             playing = playWhenReady && playbackState != Player.STATE_ENDED,
+            visualizing = isPlaying,
             buffering = playbackState == Player.STATE_BUFFERING,
             positionMs = position,
             durationMs = duration,
             speed = speed,
-            timer = listenTimer,
+            timer = sleepTimer,
+            remainingVideos = remainingVideos,
             hasNext = onNextEpisode != null,
             onTogglePlay = {
                 if (player.playbackState == Player.STATE_ENDED) {
