@@ -51,6 +51,16 @@ internal enum class LocalIcon {
     PLAYED,
     TITLE,
     BACK,
+    SPEED,
+    LOOP,
+    CAMERA,
+    STAR,
+    COPY,
+    HISTORY,
+    TV,
+    LOOP_ONE,
+    WAVEFORM,
+    SHUFFLE,
 }
 
 @Composable
@@ -59,11 +69,17 @@ internal fun LocalGlyphIcon(
     tint: Color,
     modifier: Modifier = Modifier.size(22.dp),
     strokeWidth: Float = 1.8f,
+    fill: Boolean = false,
 ) {
-    Canvas(modifier) { drawLocalGlyph(icon, tint, strokeWidth) }
+    Canvas(modifier) { drawLocalGlyph(icon, tint, strokeWidth, fill) }
 }
 
-internal fun DrawScope.drawLocalGlyph(icon: LocalIcon, tint: Color, strokeWidth: Float = 1.8f) {
+internal fun DrawScope.drawLocalGlyph(
+    icon: LocalIcon,
+    tint: Color,
+    strokeWidth: Float = 1.8f,
+    fill: Boolean = false,
+) {
     val unit = size.minDimension / 24f
     scale(unit, unit, pivot = Offset.Zero) {
         val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
@@ -207,6 +223,56 @@ internal fun DrawScope.drawLocalGlyph(icon: LocalIcon, tint: Color, strokeWidth:
                 path("M18.5 6v12M15.8 15.3l2.7 2.7 2.7-2.7")
             }
             LocalIcon.BACK -> path("M15 5l-7 7 7 7")
+            LocalIcon.SPEED -> {
+                path("M4.5 16a8 8 0 1 1 15 0")
+                line(12f, 15.5f, 16.3f, 11.2f)
+                circle(12f, 15.5f, 1.3f, filled = true)
+            }
+            LocalIcon.LOOP -> {
+                path("M17 3l3 3-3 3")
+                path("M4 11V9a3 3 0 0 1 3-3h13")
+                path("M7 21l-3-3 3-3")
+                path("M20 13v2a3 3 0 0 1-3 3H4")
+            }
+            LocalIcon.CAMERA -> {
+                path("M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6L16.5 7h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z")
+                circle(12f, 13f, 3.4f)
+            }
+            LocalIcon.STAR -> drawPath(
+                PathParser().parsePathString(
+                    "M12 3.6l2.62 5.32 5.88.86-4.25 4.14 1 5.85L12 16.99l-5.25 2.78 1-5.85L3.5 9.78l5.88-.86z"
+                ).toPath(),
+                tint,
+                style = if (fill) androidx.compose.ui.graphics.drawscope.Fill else stroke,
+            )
+            LocalIcon.COPY -> {
+                drawRoundRect(tint, Offset(8f, 8f), Size(12f, 12f), CornerRadius(2f), style = stroke)
+                path("M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3")
+            }
+            LocalIcon.HISTORY -> {
+                path("M4 12a8 8 0 1 0 8-8 8 8 0 0 0-6 2.7L4 9")
+                path("M4 4v5h5M12 8v4l3 2")
+            }
+            LocalIcon.TV -> {
+                drawRoundRect(tint, Offset(3f, 5f), Size(18f, 13f), CornerRadius(2.5f), style = stroke)
+                line(8f, 20f, 16f, 20f)
+                line(12f, 18f, 12f, 20f)
+            }
+            LocalIcon.LOOP_ONE -> {
+                path("M17 3l3 3-3 3")
+                path("M4 11V9a3 3 0 0 1 3-3h13")
+                path("M7 21l-3-3 3-3")
+                path("M20 13v2a3 3 0 0 1-3 3H4")
+                path("M11.4 10.3l1.1-.6v4.6")
+            }
+            LocalIcon.WAVEFORM -> path("M4 12h3l2-6 4 12 2-6h5")
+            LocalIcon.SHUFFLE -> {
+                path("M16 4h4v4")
+                path("M4 20L20 4")
+                path("M20 16v4h-4")
+                path("M14.5 14.5L20 20")
+                path("M4 4l5 5")
+            }
         }
     }
 }

@@ -2063,7 +2063,7 @@ private fun folderMetaParts(
     return parts
 }
 
-private fun formatBytes(bytes: Long): String {
+internal fun formatBytes(bytes: Long): String {
     if (bytes <= 0L) return "0 B"
     val gb = bytes / 1_000_000_000.0
     if (gb >= 1.0) return "%.2f GB".format(gb)
@@ -2072,7 +2072,7 @@ private fun formatBytes(bytes: Long): String {
     return "%.0f KB".format(bytes / 1_000.0)
 }
 
-private fun resolutionLabel(width: Int, height: Int): String {
+internal fun resolutionLabel(width: Int, height: Int): String {
     val shortSide = minOf(width, height)
     return when {
         shortSide >= 2160 -> "4K"
@@ -2084,7 +2084,7 @@ private fun resolutionLabel(width: Int, height: Int): String {
     }
 }
 
-private fun frameRateLabel(frameRate: Float): String {
+internal fun frameRateLabel(frameRate: Float): String {
     val rounded = frameRate.roundToInt()
     val text = if (kotlin.math.abs(frameRate - rounded) < .05f) "$rounded" else {
         "%.2f".format(frameRate).trimEnd('0').trimEnd('.')
@@ -2092,7 +2092,7 @@ private fun frameRateLabel(frameRate: Float): String {
     return "$text fps"
 }
 
-private fun formatRelativeDate(milliseconds: Long): String {
+internal fun formatRelativeDate(milliseconds: Long): String {
     if (milliseconds <= 0L) return "未知"
     val zone = ZoneId.systemDefault()
     val date = Instant.ofEpochMilli(milliseconds).atZone(zone).toLocalDate()
@@ -2111,7 +2111,7 @@ private fun formatFullDate(milliseconds: Long, formatter: DateTimeFormatter): St
     if (milliseconds <= 0L) "未知"
     else Instant.ofEpochMilli(milliseconds).atZone(ZoneId.systemDefault()).format(formatter)
 
-private fun coverBrush(seed: String): Brush {
+internal fun coverBrush(seed: String): Brush {
     val hash = seed.hashCode()
     val hue = ((hash ushr 8) % 360 + 360) % 360
     val secondHue = (hue + 42 + ((hash ushr 3) % 70)) % 360
@@ -2128,7 +2128,7 @@ private val thumbnailCache = object : LruCache<String, Bitmap>(24 * 1024 * 1024)
 }
 
 @Composable
-private fun rememberVideoThumbnail(video: LocalVideo): Bitmap? {
+internal fun rememberVideoThumbnail(video: LocalVideo): Bitmap? {
     val context = LocalContext.current
     val bitmap by produceState<Bitmap?>(initialValue = thumbnailCache.get(video.key), video.key) {
         if (value == null) {

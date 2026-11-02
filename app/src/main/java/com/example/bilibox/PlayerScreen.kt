@@ -29,16 +29,21 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -64,10 +69,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
@@ -83,6 +90,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
@@ -147,6 +155,23 @@ internal data class PlayerQualityOption(
     val badge: String? = null,
 )
 
+/**
+ * Live player hooks for the portrait details pane. The pane can reuse the
+ * player's own speed sheet, screenshot pipeline and seek logic instead of
+ * keeping a second copy of that state.
+ */
+internal class PlayerDetailActions(
+    val speed: Float,
+    val positionMs: Long,
+    val screenshotEnabled: Boolean,
+    val openSpeedPanel: () -> Unit,
+    val openPlaybackModeSheet: () -> Unit,
+    val takeScreenshot: () -> Unit,
+    val seekTo: (Long) -> Unit,
+)
+
+internal val LocalPlayerDetailActions = staticCompositionLocalOf<PlayerDetailActions?> { null }
+
 private fun readScreenBrightness(activity: ComponentActivity): Float {
     val override = activity.window.attributes.screenBrightness
     if (override >= 0f) return override.coerceIn(0f, 1f)
@@ -174,8 +199,15 @@ internal fun LocalVideoPlayer(
     val player = remember(video.uri) { createCompatiblePlayer(context) }
     var playbackError by remember(player) { mutableStateOf<String?>(null) }
     var playbackState by remember(player) { mutableIntStateOf(Player.STATE_IDLE) }
-    var liked by remember(video.uri) { mutableStateOf(false) }
     var saved by remember(video.uri) { mutableStateOf(false) }
+    // Survives a switch to the next folder item so 连播 keeps working.
+    var queueMode by rememberSaveable { mutableStateOf(LocalQueueMode.LIST_LOOP) }
+    var resumeDismissed by remember(video.uri) { mutableStateOf(false) }
+    val queueModeState = rememberUpdatedState(queueMode)
+    val playlistState = rememberUpdatedState(playlist)
+    val videoState = rememberUpdatedState(video)
+    val selectState = rememberUpdatedState(onVideoSelected)
+
     fun savePlaybackProgress() {
         // Ignore the empty/idle player during setup or a failed preparation.
         if (player.mediaItemCount == 0 || player.playbackState == Player.STATE_IDLE) return
@@ -185,6 +217,26 @@ internal fun LocalVideoPlayer(
             player.duration.takeIf { it > 0L } ?: video.durationMs,
             completed = player.playbackState == Player.STATE_ENDED
         )
+    }
+
+    fun switchTo(next: LocalVideo) {
+        savePlaybackProgress()
+        onVideoSelected(next)
+    }
+
+    fun shareVideo() {
+        runCatching {
+            context.startActivity(
+                Intent.createChooser(
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = video.mimeType.ifBlank { "video/*" }
+                        putExtra(Intent.EXTRA_STREAM, video.uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    },
+                    "分享视频"
+                )
+            )
+        }.onFailure { Toast.makeText(context, "无法分享这个视频", Toast.LENGTH_SHORT).show() }
     }
 
     DisposableEffect(player, activity) {
@@ -197,6 +249,34 @@ internal fun LocalVideoPlayer(
             override fun onPlaybackStateChanged(state: Int) {
                 playbackState = state
                 if (state == Player.STATE_READY) playbackError = null
+                if (state == Player.STATE_ENDED) {
+                    val list = playlistState.value
+                    val current = videoState.value
+                    when (queueModeState.value) {
+                        LocalQueueMode.LIST_LOOP -> {
+                            val index = list.indexOfFirst { it.uri == current.uri }
+                            val next = list.getOrNull(index + 1) ?: list.firstOrNull()
+                            if (next != null && next.uri != current.uri) {
+                                savePlaybackProgress()
+                                selectState.value(next)
+                            } else {
+                                player.seekTo(0L)
+                                player.playWhenReady = true
+                            }
+                        }
+                        LocalQueueMode.SHUFFLE -> {
+                            val next = list.filter { it.uri != current.uri }.randomOrNull()
+                            if (next != null) {
+                                savePlaybackProgress()
+                                selectState.value(next)
+                            } else {
+                                player.seekTo(0L)
+                                player.playWhenReady = true
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
             }
 
             override fun onEvents(player: Player, events: Player.Events) {
@@ -237,15 +317,26 @@ internal fun LocalVideoPlayer(
             }
         }
     }
+    LaunchedEffect(player, queueMode) {
+        player.repeatMode = if (queueMode == LocalQueueMode.SINGLE_LOOP) Player.REPEAT_MODE_ONE
+        else Player.REPEAT_MODE_OFF
+    }
     val currentIndex = playlist.indexOfFirst { it.uri == video.uri }
     val nextVideo = if (currentIndex >= 0) playlist.getOrNull(currentIndex + 1) else null
+    // Folder queue progress is read once per opened video; the current item's
+    // bar keeps following the live player position instead.
+    val playbackByKey = remember(playlist, video.uri) {
+        playlist.associate { item -> item.key to progressStore.playback(item.key, item.durationMs) }
+    }
     VideoPlayerScreen(
         player = player,
         title = video.name,
         defaultDurationMs = video.durationMs,
         playbackError = playbackError,
-        sourceLabel = "本地视频",
+        sourceLabel = "本地视频 ${playlist.size}",
         commentMessage = "本地视频暂时没有评论",
+        detailTabs = listOf("简介", "媒体信息"),
+        sourcePill = true,
         // Persist the exact exit position before the library recomposes its status list.
         onBack = {
             savePlaybackProgress()
@@ -259,42 +350,40 @@ internal fun LocalVideoPlayer(
             player.prepare()
             player.playWhenReady = true
         },
-        onNextEpisode = nextVideo?.let { next -> { onVideoSelected(next) } },
+        onNextEpisode = nextVideo?.let { next -> { switchTo(next) } },
         episodes = { dismiss ->
             LocalVideoEpisodes(playlist, video, onDismiss = dismiss, onVideoSelected = {
                 dismiss()
-                onVideoSelected(it)
+                switchTo(it)
             })
         },
+        extraDetailPane = { duration ->
+            LocalVideoMediaInfo(video = video, durationMs = duration)
+        },
+        playbackModeSheet = { dismiss ->
+            PlaybackModeSheet(
+                selected = queueMode,
+                onDismiss = dismiss,
+                onSelect = { mode ->
+                    queueMode = mode
+                    dismiss()
+                },
+            )
+        },
         details = { duration ->
-            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
-                Text(video.name, color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "本地视频 · ${Formatter.formatFileSize(context, video.sizeBytes)} · ${formatVideoDuration(duration)}",
-                    color = Muted,
-                    fontSize = 12.sp
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    VideoAction(0, if (liked) "已点赞" else "点赞", liked) { liked = !liked }
-                    VideoAction(1, "投币", false, enabled = false) { }
-                    VideoAction(2, if (saved) "已收藏" else "收藏", saved) { saved = !saved }
-                    VideoAction(3, "分享", false) {
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "video/*"
-                            putExtra(Intent.EXTRA_STREAM, video.uri)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(Intent.createChooser(intent, "分享视频"))
-                    }
-                }
-                HorizontalDivider(Modifier.padding(top = 14.dp), color = Color(0xFFE9EAEC), thickness = 1.dp)
-                Spacer(Modifier.height(14.dp))
-                Text("视频信息", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(6.dp))
-                Text("${video.name}\n${Formatter.formatFileSize(context, video.sizeBytes)}", color = Muted, fontSize = 12.sp, lineHeight = 19.sp)
-            }
+            LocalVideoIntro(
+                video = video,
+                playlist = playlist,
+                durationMs = duration,
+                resumeMs = if (resumeDismissed) 0L else resumePosition,
+                saved = saved,
+                queueMode = queueMode,
+                playbackByKey = playbackByKey,
+                onToggleSaved = { saved = !saved },
+                onShare = { shareVideo() },
+                onSelectVideo = { switchTo(it) },
+                onResumeDismiss = { resumeDismissed = true },
+            )
         }
     )
 }
@@ -321,6 +410,10 @@ internal fun VideoPlayerScreen(
     onQualitySelected: ((Int) -> Unit)? = null,
     detailsBackground: Color = Color.White,
     showDetailTabs: Boolean = true,
+    detailTabs: List<String> = listOf("简介", "评论"),
+    sourcePill: Boolean = false,
+    extraDetailPane: (@Composable (duration: Long) -> Unit)? = null,
+    playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     details: @Composable (duration: Long) -> Unit,
 ) {
     val context = LocalContext.current
@@ -340,12 +433,16 @@ internal fun VideoPlayerScreen(
     var qualityMenuExpanded by remember(player) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableIntStateOf(player.playbackState) }
     var detailsTab by remember(player) { mutableIntStateOf(0) }
+    var playbackModeExpanded by remember(player) { mutableStateOf(false) }
     var controlsVisible by remember(player) { mutableStateOf(true) }
     var screenLocked by remember(player) { mutableStateOf(false) }
     var orientationBeforeLock by remember(player) { mutableStateOf<Int?>(null) }
     var playerView by remember(player) { mutableStateOf<PlayerView?>(null) }
     var hasVideoFrame by remember(player) { mutableStateOf(false) }
     var savingFrame by remember { mutableStateOf(false) }
+    val screenshotFlash = remember { Animatable(0f) }
+    var screenshotPreview by remember { mutableStateOf<Bitmap?>(null) }
+    var screenshotPreviewVisible by remember { mutableStateOf(false) }
     var screenBrightness by remember(activity) {
         mutableFloatStateOf(activity?.let(::readScreenBrightness) ?: .5f)
     }
@@ -376,6 +473,7 @@ internal fun VideoPlayerScreen(
     }
     LaunchedEffect(activity, fullScreen) {
         speedMenuExpanded = false
+        playbackModeExpanded = false
         episodesExpanded = false
         qualityMenuExpanded = false
         if (!fullScreen) screenLocked = false
@@ -479,18 +577,31 @@ internal fun VideoPlayerScreen(
             Toast.makeText(context, "暂时无法截取画面，请等待视频显示后重试", Toast.LENGTH_SHORT).show()
             return
         }
+        // Shutter flash over the video, then the captured frame slides in as a
+        // confirmation card instead of a plain toast.
+        val flash = captureScope.launch {
+            screenshotFlash.snapTo(.82f)
+            screenshotFlash.animateTo(0f, animationSpec = tween(360, easing = LinearEasing))
+        }
         savingFrame = true
         captureScope.launch {
+            var saved = false
             try {
                 withContext(Dispatchers.IO) { saveVideoFrame(context, frame) }
-                Toast.makeText(context, "已保存到相册 Pictures/BiliBox", Toast.LENGTH_SHORT).show()
+                saved = true
+                // Let the shutter flash finish first, then reveal the frame card.
+                flash.join()
+                screenshotPreview = frame
+                // Compose the card once while hidden so its scale-in transition runs.
+                withFrameNanos { }
+                screenshotPreviewVisible = true
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
                 Toast.makeText(context, "截帧保存失败，请检查存储空间或权限后重试", Toast.LENGTH_SHORT).show()
             } finally {
-                frame.recycle()
                 savingFrame = false
+                if (!saved) frame.recycle()
             }
         }
     }
@@ -524,9 +635,9 @@ internal fun VideoPlayerScreen(
             delay(250)
         }
     }
-    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, episodesExpanded, qualityMenuExpanded) {
+    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, playbackModeExpanded, episodesExpanded, qualityMenuExpanded) {
         if (controlsVisible && (isPlaying || screenLocked) && !scrubbing &&
-            !speedMenuExpanded && !episodesExpanded && !qualityMenuExpanded) {
+            !speedMenuExpanded && !playbackModeExpanded && !episodesExpanded && !qualityMenuExpanded) {
             delay(4_000)
             controlsVisible = false
         }
@@ -537,12 +648,23 @@ internal fun VideoPlayerScreen(
             gestureFeedback = null
         }
     }
+    LaunchedEffect(screenshotPreview) {
+        val frame = screenshotPreview ?: return@LaunchedEffect
+        delay(2_200)
+        screenshotPreviewVisible = false
+        delay(260)
+        if (screenshotPreview === frame) {
+            screenshotPreview = null
+            frame.recycle()
+        }
+    }
     BackHandler {
         when {
             screenLocked -> controlsVisible = true
             episodeOverlayDismiss != null -> episodeOverlayDismiss()
             qualityMenuExpanded -> qualityMenuExpanded = false
             episodesExpanded -> episodesExpanded = false
+            playbackModeExpanded -> playbackModeExpanded = false
             speedMenuExpanded -> speedMenuExpanded = false
             else -> navigateBack()
         }
@@ -799,53 +921,179 @@ internal fun VideoPlayerScreen(
                     )
                 }
             }
+
+            // Save confirmation: a scaled thumbnail of the captured frame sits
+            // above the control bar, mirroring the reference player.
+            val previewFrame = screenshotPreview
+            if (previewFrame != null) {
+                ScreenshotPreviewCard(
+                    frame = previewFrame,
+                    visible = screenshotPreviewVisible,
+                    modifier = Modifier.align(Alignment.BottomStart)
+                        .padding(start = 10.dp, bottom = if (fullScreen) 156.dp else 48.dp),
+                )
+            }
+            if (screenshotFlash.value > .001f) {
+                Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = screenshotFlash.value)))
+            }
         }
 
         if (!fullScreen) {
             val overlayVisible = episodeOverlayVisible && episodeOverlay != null
+            val activePane = if (showDetailTabs) detailsTab else 0
+            val detailScroll = rememberScrollState()
+            LaunchedEffect(activePane) { detailScroll.scrollTo(0) }
             Box(
                 Modifier.weight(1f).fillMaxWidth().background(detailsBackground)
                     .navigationBarsPadding().clipToBounds()
             ) {
                 Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    Modifier.fillMaxSize().verticalScroll(detailScroll)
                 ) {
                     if (showDetailTabs) {
-                        Row(
-                            Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            listOf("简介", "评论").forEachIndexed { index, label ->
-                                Column(
-                                    Modifier.fillMaxHeight().clickable { detailsTab = index }.padding(horizontal = 12.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Text(label, color = if (detailsTab == index) Pink else Muted, fontSize = 15.sp,
-                                        fontWeight = if (detailsTab == index) FontWeight.SemiBold else FontWeight.Normal)
-                                    Spacer(Modifier.height(5.dp))
-                                    Box(Modifier.width(30.dp).height(2.dp).background(if (detailsTab == index) Pink else Color.Transparent, CircleShape))
+                        var tabCenters by remember { mutableStateOf<Map<Int, Float>>(emptyMap()) }
+                        val density = LocalDensity.current
+                        val indicatorWidth = 28.dp
+                        val indicatorWidthPx = with(density) { indicatorWidth.toPx() }
+                        val activeCenter = tabCenters[detailsTab]
+                        Box(Modifier.fillMaxWidth().height(44.dp)) {
+                            Row(
+                                Modifier.fillMaxSize().padding(start = 4.dp, end = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                detailTabs.forEachIndexed { index, label ->
+                                    val selected = detailsTab == index
+                                    val textColor by animateColorAsState(
+                                        targetValue = if (selected) OnlinePink else Color(0xFF61666D),
+                                        animationSpec = tween(180),
+                                        label = "详情标签颜色",
+                                    )
+                                    Box(
+                                        Modifier.fillMaxHeight()
+                                            .clickable { detailsTab = index }
+                                            .onGloballyPositioned { coordinates ->
+                                                val center = coordinates.positionInParent().x +
+                                                    coordinates.size.width / 2f
+                                                if (tabCenters[index] != center) {
+                                                    tabCenters = tabCenters + (index to center)
+                                                }
+                                            }
+                                            .padding(horizontal = 14.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            label,
+                                            color = textColor,
+                                            fontSize = 15.sp,
+                                            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.weight(1f))
+                                if (sourcePill) {
+                                    Row(
+                                        Modifier.height(32.dp).clip(RoundedCornerShape(16.dp))
+                                            .background(Color(0xFFF6F7F8))
+                                            .border(1.dp, Color(0xFFE3E5E7), RoundedCornerShape(16.dp))
+                                            .padding(start = 12.dp, end = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            sourceLabel,
+                                            color = Color(0xFF9499A0),
+                                            fontSize = 11.5.sp,
+                                            maxLines = 1,
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Box(
+                                            Modifier.size(26.dp).clip(CircleShape).background(Color.White)
+                                                .border(1.dp, Color(0xFFE3E5E7), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            LocalGlyphIcon(LocalIcon.TV, OnlinePink, Modifier.size(14.dp), 1.7f)
+                                        }
+                                    }
+                                } else {
+                                    Text(sourceLabel, color = Muted, fontSize = 12.sp)
                                 }
                             }
-                            Spacer(Modifier.weight(1f))
-                            Text(sourceLabel, color = Muted, fontSize = 12.sp)
-                        }
-                        HorizontalDivider(color = if (detailsBackground == Color.White) Color(0xFFE9EAEC) else Color.White.copy(alpha = .08f), thickness = 1.dp)
-                    }
-
-                    if (!showDetailTabs || detailsTab == 0) {
-                        details(duration)
-                        playbackError?.let { message ->
-                            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                                Text("播放失败：$message", color = Color(0xFFB42318), fontSize = 12.sp)
-                                TextButton(onClick = onRetry) { Text("重试", color = Pink) }
+                            if (activeCenter != null) {
+                                val indicatorX by animateDpAsState(
+                                    targetValue = with(density) {
+                                        ((activeCenter - indicatorWidthPx / 2f).coerceAtLeast(0f)).toDp()
+                                    },
+                                    animationSpec = tween(220, easing = FastOutSlowInEasing),
+                                    label = "详情标签下划线",
+                                )
+                                Box(
+                                    Modifier.align(Alignment.BottomStart)
+                                        .offset(x = indicatorX)
+                                        .width(indicatorWidth).height(3.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(OnlinePink)
+                                )
                             }
                         }
-                    } else {
-                        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
-                            Text("评论", color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.height(8.dp))
-                            Text(commentMessage, color = Muted, fontSize = 13.sp)
+                        HorizontalDivider(color = if (detailsBackground == Color.White) Color(0xFFE3E5E7) else Color.White.copy(alpha = .08f), thickness = 1.dp)
+                    }
+
+                    val detailActions = PlayerDetailActions(
+                        speed = speed,
+                        positionMs = if (scrubbing) scrubPosition.toLong() else position,
+                        screenshotEnabled = hasVideoFrame && playbackError == null && !savingFrame,
+                        openSpeedPanel = {
+                            playbackModeExpanded = false
+                            speedMenuExpanded = true
+                        },
+                        openPlaybackModeSheet = {
+                            speedMenuExpanded = false
+                            playbackModeExpanded = true
+                        },
+                        takeScreenshot = { takeVideoScreenshot() },
+                        seekTo = { target ->
+                            player.seekTo(target.coerceAtLeast(0L))
+                            player.playWhenReady = true
+                            controlsVisible = true
+                        },
+                    )
+                    CompositionLocalProvider(LocalPlayerDetailActions provides detailActions) {
+                        AnimatedContent(
+                            targetState = activePane,
+                            transitionSpec = {
+                                val forward = targetState > initialState
+                                val enter = fadeIn(tween(180)) +
+                                    slideInHorizontally(
+                                        animationSpec = tween(220, easing = FastOutSlowInEasing),
+                                        initialOffsetX = { width -> if (forward) width / 8 else -width / 8 },
+                                    )
+                                val exit = fadeOut(tween(120)) +
+                                    slideOutHorizontally(
+                                        animationSpec = tween(160, easing = FastOutSlowInEasing),
+                                        targetOffsetX = { width -> if (forward) -width / 8 else width / 8 },
+                                    )
+                                enter togetherWith exit
+                            },
+                            label = "简介与媒体信息切换",
+                        ) { tab ->
+                            when {
+                                tab == 0 -> Column(Modifier.fillMaxWidth()) {
+                                    details(duration)
+                                    playbackError?.let { message ->
+                                        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                                            Text("播放失败：$message", color = Color(0xFFB42318), fontSize = 12.sp)
+                                            TextButton(onClick = onRetry) { Text("重试", color = Pink) }
+                                        }
+                                    }
+                                }
+                                extraDetailPane != null -> extraDetailPane(duration)
+                                else -> {
+                                    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
+                                        Text(detailTabs.getOrNull(1) ?: "评论", color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                        Spacer(Modifier.height(8.dp))
+                                        Text(commentMessage, color = Muted, fontSize = 13.sp)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -854,24 +1102,81 @@ internal fun VideoPlayerScreen(
                 if (overlay != null) {
                     PlayerDetailsOverlay(visible = overlayVisible) { overlay() }
                 }
+
+                // Keep the portrait sheet inside the details pane so the video
+                // stays bright and the dimmed details remain visible behind it.
+                PlayerDrawerVisibility(visible = speedMenuExpanded, fromBottom = true) {
+                    SpeedPanel(
+                        speed = speed,
+                        mode = SpeedPanelMode.Sheet,
+                        onDismiss = { speedMenuExpanded = false },
+                        onSpeedChange = {
+                            player.setPlaybackSpeed(it)
+                            speed = it
+                        }
+                    )
+                }
+
+                val modeSheet = playbackModeSheet
+                if (modeSheet != null) {
+                    PlayerDrawerVisibility(visible = playbackModeExpanded, fromBottom = true) {
+                        modeSheet { playbackModeExpanded = false }
+                    }
+                }
             }
         }
 
-        if (!fullScreen) {
-            PlayerDrawerVisibility(visible = speedMenuExpanded, fromBottom = true) {
-                SpeedPanel(
-                    speed = speed,
-                    mode = SpeedPanelMode.Sheet,
-                    onDismiss = { speedMenuExpanded = false },
-                    onSpeedChange = {
-                        player.setPlaybackSpeed(it)
-                        speed = it
-                    }
+    }
+}
+}
+
+@Composable
+private fun ScreenshotPreviewCard(
+    frame: Bitmap,
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(180)) +
+            scaleIn(
+                initialScale = .6f,
+                transformOrigin = TransformOrigin(0f, 1f),
+                animationSpec = tween(240, easing = FastOutSlowInEasing),
+            ),
+        exit = fadeOut(tween(160)) +
+            scaleOut(
+                targetScale = .92f,
+                transformOrigin = TransformOrigin(0f, 1f),
+                animationSpec = tween(180, easing = FastOutSlowInEasing),
+            ),
+        modifier = modifier,
+    ) {
+        Column(
+            Modifier.width(96.dp)
+                .shadow(10.dp, RoundedCornerShape(7.dp))
+                .background(Color.White, RoundedCornerShape(7.dp))
+                .padding(2.dp)
+                .clip(RoundedCornerShape(5.dp)),
+        ) {
+            Box {
+                Image(
+                    bitmap = frame.asImageBitmap(),
+                    contentDescription = "已保存截图预览",
+                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+                    contentScale = ContentScale.Crop,
                 )
+                Box(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                        .background(Color.Black.copy(alpha = .55f))
+                        .padding(vertical = 3.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("已保存到相册", color = Color.White, fontSize = 10.sp, maxLines = 1)
+                }
             }
         }
     }
-}
 }
 
 @Composable
