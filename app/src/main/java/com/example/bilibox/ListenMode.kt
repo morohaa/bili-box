@@ -5,6 +5,7 @@ import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -336,12 +337,17 @@ internal fun ListenScreen(
     durationMs: Long,
     speed: Float,
     timer: PlaybackSleepTimer,
+    mode: Int = 0,
     remainingVideos: Int = 1,
+    hasPrevious: Boolean = false,
     hasNext: Boolean,
     onTogglePlay: () -> Unit,
     onSeek: (Long) -> Unit,
+    onPrevious: () -> Unit = {},
     onNext: () -> Unit,
     onSpeedChange: (Float) -> Unit,
+    onCycleMode: () -> Unit = {},
+    onOpenQueue: () -> Unit = {},
     onCollapse: () -> Unit,
     onRestoreVideo: () -> Unit,
 ) {
@@ -405,9 +411,7 @@ internal fun ListenScreen(
                         )
                     }
                 }
-                ListenRoundButton("定时关闭", { timerOpen = true }) {
-                    TimerGlyph(if (timer.active) Color(0xFFFFB3CA) else Color.White)
-                }
+                Spacer(Modifier.width(40.dp))
             }
 
             Spacer(Modifier.weight(.6f))
@@ -428,7 +432,7 @@ internal fun ListenScreen(
                 SleepTimerLabel(timer, Modifier)
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(6.dp))
             val sliderMax = durationMs.coerceAtLeast(1L).toFloat()
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
                 Slider(
@@ -464,31 +468,26 @@ internal fun ListenScreen(
                     color = Color.White.copy(alpha = .65f), fontSize = 11.sp)
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(6.dp))
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    Modifier.size(width = 52.dp, height = 44.dp).clip(RoundedCornerShape(10.dp))
-                        .clickable(role = Role.Button) { speedOpen = true }
-                        .semantics { contentDescription = "倍速" },
-                    contentAlignment = Alignment.Center
-                ) {
-                    val active = abs(speed - 1f) > .001f
-                    Text(if (active) formatSpeedBadge(speed) else "倍速",
-                        color = if (active) Color(0xFFFFB3CA) else Color.White,
-                        fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                ListenRoundButton("上一个", {
+                    if (hasPrevious) onPrevious()
+                    else Toast.makeText(context, "已经是第一个了", Toast.LENGTH_SHORT).show()
+                }, size = 48.dp) {
+                    PrevGlyph(Color.White.copy(alpha = if (hasPrevious) 1f else .35f))
                 }
-                ListenRoundButton("后退 15 秒", { onSeek((positionMs - 15_000L).coerceAtLeast(0L)) }, size = 48.dp) {
-                    SkipGlyph(forward = false)
+                ListenRoundButton("后退 10 秒", { onSeek((positionMs - 10_000L).coerceAtLeast(0L)) }, size = 48.dp) {
+                    SkipGlyph(forward = false, seconds = 10)
                 }
                 ListenPlayButton(playing, buffering, onTogglePlay)
-                ListenRoundButton("前进 15 秒", {
-                    onSeek(if (durationMs > 0) (positionMs + 15_000L).coerceAtMost(durationMs) else positionMs + 15_000L)
+                ListenRoundButton("前进 10 秒", {
+                    onSeek(if (durationMs > 0) (positionMs + 10_000L).coerceAtMost(durationMs) else positionMs + 10_000L)
                 }, size = 48.dp) {
-                    SkipGlyph(forward = true)
+                    SkipGlyph(forward = true, seconds = 10)
                 }
                 ListenRoundButton("下一个", {
                     if (hasNext) onNext()
@@ -497,12 +496,58 @@ internal fun ListenScreen(
                     NextGlyph(Color.White.copy(alpha = if (hasNext) 1f else .35f))
                 }
             }
-            Spacer(Modifier.height(14.dp))
-            Text(
-                "锁屏或切到后台会继续播放，可在通知栏控制",
-                color = Color.White.copy(alpha = .4f), fontSize = 11.sp,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
+
+            Spacer(Modifier.height(10.dp))
+
+            // 底部工具栏
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ToolButton(
+                    icon = { SpeedGlyph(it) },
+                    label = if (abs(speed - 1f) > .001f) formatSpeedBadge(speed) else "倍速",
+                    active = abs(speed - 1f) > .001f,
+                    onClick = { speedOpen = true }
+                )
+                ToolButton(
+                    icon = { TimerGlyph(it) },
+                    label = when {
+                        timer.mode == SleepTimerMode.TIME && timer.endAt > 0 -> {
+                            val remainingMs = (timer.endAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+                            formatTimerBadge(remainingMs)
+                        }
+                        timer.mode == SleepTimerMode.VIDEOS -> "${timer.videosLeft}个后"
+                        else -> "定时关闭"
+                    },
+                    active = timer.active,
+                    onClick = { timerOpen = true }
+                )
+                ToolButton(
+                    icon = {
+                        when (mode) {
+                            0 -> LoopListGlyph(it)
+                            1 -> LoopOneGlyph(it)
+                            else -> ShuffleGlyph(it)
+                        }
+                    },
+                    label = when (mode) {
+                        0 -> "列表循环"
+                        1 -> "单曲循环"
+                        else -> "随机播放"
+                    },
+                    active = false,
+                    onClick = { onCycleMode() }
+                )
+                ToolButton(
+                    icon = { QueueGlyph(it) },
+                    label = "选集",
+                    active = false,
+                    onClick = { onOpenQueue() }
+                )
+            }
+
             Spacer(Modifier.height(12.dp))
         }
 
@@ -576,20 +621,15 @@ private fun ListenCoverCard(cover: Bitmap?, playing: Boolean, online: Boolean, o
             listOf(Color.White.copy(alpha = .18f), Color.Transparent),
             start = Offset.Zero, end = Offset(600f, 600f)
         )))
-        Text(
-            if (online) "省流量 · 不加载画面" else "省电 · 已停止解码画面",
-            color = Color.White, fontSize = 10.5.sp,
-            modifier = Modifier.align(Alignment.BottomStart).padding(10.dp)
-                .clip(RoundedCornerShape(10.dp)).background(Color.Black.copy(alpha = .45f))
-                .padding(horizontal = 8.dp, vertical = 3.dp)
-        )
         Row(
             Modifier.align(Alignment.BottomEnd).padding(10.dp)
                 .clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = .92f))
                 .clickable(role = Role.Button, onClick = onRestoreVideo)
                 .padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
+            VideoScreenIcon(OnlineText)
             Text("回到画面", color = OnlineText, fontSize = 11.sp, fontWeight = FontWeight.Medium)
         }
     }
@@ -648,6 +688,40 @@ private fun ChevronDownGlyph(tint: Color) {
 }
 
 @Composable
+private fun VideoScreenIcon(tint: Color) {
+    Canvas(Modifier.size(13.dp)) {
+        val u = size.width / 24f
+        val stroke = Stroke(1.9f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+
+        // 外框矩形 - rect x="3" y="5" width="18" height="13" rx="2.5"
+        drawRoundRect(
+            tint,
+            topLeft = Offset(3f * u, 5f * u),
+            size = Size(18f * u, 13f * u),
+            cornerRadius = CornerRadius(2.5f * u),
+            style = stroke
+        )
+
+        // 底座线 - path d="M8 21h8"
+        drawLine(
+            tint,
+            start = Offset(8f * u, 21f * u),
+            end = Offset(16f * u, 21f * u),
+            strokeWidth = 1.9f * u,
+            cap = StrokeCap.Round
+        )
+
+        // 播放三角形（填充）- path d="M10.5 9.2v4.6l4-2.3z"
+        drawPath(Path().apply {
+            moveTo(10.5f * u, 9.2f * u)
+            relativeLineTo(0f, 4.6f * u)
+            relativeLineTo(4f * u, -2.3f * u)
+            close()
+        }, tint)
+    }
+}
+
+@Composable
 private fun TimerGlyph(tint: Color) {
     Canvas(Modifier.size(21.dp)) {
         val u = size.width / 24f
@@ -659,9 +733,9 @@ private fun TimerGlyph(tint: Color) {
     }
 }
 
-/** Circular arrow with "15" inside, mirrored for rewind. */
+/** Circular arrow with seconds inside, mirrored for rewind. */
 @Composable
-private fun SkipGlyph(forward: Boolean) {
+private fun SkipGlyph(forward: Boolean, seconds: Int = 15) {
     Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val u = size.width / 24f
@@ -677,7 +751,27 @@ private fun SkipGlyph(forward: Boolean) {
                 lineTo((tipX - 3f * dir) * u, 6.4f * u)
             }, Color.White, style = stroke)
         }
-        Text("15", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        Text("$seconds", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun PrevGlyph(tint: Color) {
+    Canvas(Modifier.size(24.dp)) {
+        val u = size.width / 24f
+        // 三角形向左 M18 6.2v11.6a.8.8 0 0 1-1.2.7L8.5 12.7a.8.8 0 0 1 0-1.4l8.3-5.8a.8.8 0 0 1 1.2.7z
+        drawPath(Path().apply {
+            moveTo(18f * u, 6.2f * u)
+            lineTo(18f * u, 17.8f * u)
+            cubicTo(18f * u, 18.2f * u, 17.6f * u, 18.4f * u, 17.3f * u, 18.2f * u)
+            lineTo(8.5f * u, 12.7f * u)
+            cubicTo(8.2f * u, 12.5f * u, 8.2f * u, 12.1f * u, 8.5f * u, 11.9f * u)
+            lineTo(17.3f * u, 6.1f * u)
+            cubicTo(17.6f * u, 5.9f * u, 18f * u, 6.1f * u, 18f * u, 6.4f * u)
+            close()
+        }, tint)
+        // 左侧竖条 rect x="5" y="5.5" width="2.4" height="13" rx="1"
+        drawRoundRect(tint, Offset(5f * u, 5.5f * u), Size(2.4f * u, 13f * u), CornerRadius(1f * u))
     }
 }
 
@@ -688,6 +782,151 @@ private fun NextGlyph(tint: Color) {
         drawPath(Path().apply { moveTo(6f * u, 5.5f * u); lineTo(16f * u, 12f * u); lineTo(6f * u, 18.5f * u); close() }, tint)
         drawRoundRect(tint, Offset(17f * u, 5.5f * u), Size(2.4f * u, 13f * u), CornerRadius(1f * u))
     }
+}
+
+@Composable
+private fun ToolButton(
+    icon: @Composable (Color) -> Unit,
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+            icon(if (active) Color(0xFFFFB3CA) else Color.White.copy(alpha = .8f))
+        }
+        Text(
+            label,
+            color = if (active) Color(0xFFFFB3CA) else Color.White.copy(alpha = .8f),
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+private fun SpeedGlyph(tint: Color) {
+    Canvas(Modifier.size(22.dp)) {
+        val u = size.width / 24f
+        val stroke = Stroke(1.9f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        // path d="M4.5 18a8.5 8.5 0 1 1 15 0"
+        drawArc(tint, 180f, 180f, false,
+            topLeft = Offset(4.5f * u, 9.5f * u),
+            size = Size(15f * u, 17f * u),
+            style = stroke)
+        // path d="M12 14l4-4.5"
+        drawLine(tint, Offset(12f * u, 14f * u), Offset(16f * u, 9.5f * u), 1.9f * u, StrokeCap.Round)
+        // circle cx="12" cy="14" r="1.3"
+        drawCircle(tint, 1.3f * u, Offset(12f * u, 14f * u))
+    }
+}
+
+@Composable
+private fun LoopListGlyph(tint: Color) {
+    Canvas(Modifier.size(24.dp)) {
+        val u = size.width / 24f
+        val stroke = Stroke(1.9f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        // M17 2l4 4-4 4
+        drawPath(Path().apply {
+            moveTo(17f * u, 2f * u); lineTo(21f * u, 6f * u); lineTo(17f * u, 10f * u)
+        }, tint, style = stroke)
+        // M3 11V9a3 3 0 0 1 3-3h15
+        drawPath(Path().apply {
+            moveTo(3f * u, 11f * u); lineTo(3f * u, 9f * u)
+            arcTo(Rect(3f * u, 6f * u, 9f * u, 12f * u), 180f, 90f, false)
+            lineTo(21f * u, 6f * u)
+        }, tint, style = stroke)
+        // M7 22l-4-4 4-4
+        drawPath(Path().apply {
+            moveTo(7f * u, 22f * u); lineTo(3f * u, 18f * u); lineTo(7f * u, 14f * u)
+        }, tint, style = stroke)
+        // M21 13v2a3 3 0 0 1-3 3H3
+        drawPath(Path().apply {
+            moveTo(21f * u, 13f * u); lineTo(21f * u, 15f * u)
+            arcTo(Rect(15f * u, 12f * u, 21f * u, 18f * u), 0f, 90f, false)
+            lineTo(3f * u, 18f * u)
+        }, tint, style = stroke)
+    }
+}
+
+@Composable
+private fun LoopOneGlyph(tint: Color) {
+    Canvas(Modifier.size(24.dp)) {
+        val u = size.width / 24f
+        val stroke = Stroke(1.9f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        drawPath(Path().apply {
+            moveTo(17f * u, 2f * u); lineTo(21f * u, 6f * u); lineTo(17f * u, 10f * u)
+        }, tint, style = stroke)
+        drawPath(Path().apply {
+            moveTo(3f * u, 11f * u); lineTo(3f * u, 9f * u)
+            arcTo(Rect(3f * u, 6f * u, 9f * u, 12f * u), 180f, 90f, false)
+            lineTo(21f * u, 6f * u)
+        }, tint, style = stroke)
+        drawPath(Path().apply {
+            moveTo(7f * u, 22f * u); lineTo(3f * u, 18f * u); lineTo(7f * u, 14f * u)
+        }, tint, style = stroke)
+        drawPath(Path().apply {
+            moveTo(21f * u, 13f * u); lineTo(21f * u, 15f * u)
+            arcTo(Rect(15f * u, 12f * u, 21f * u, 18f * u), 0f, 90f, false)
+            lineTo(3f * u, 18f * u)
+        }, tint, style = stroke)
+        // "1" 数字 - M11 10.5l1.5-1v5
+        val numStroke = Stroke(1.7f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        drawPath(Path().apply {
+            moveTo(11f * u, 10.5f * u); lineTo(12.5f * u, 9.5f * u); lineTo(12.5f * u, 14.5f * u)
+        }, tint, style = numStroke)
+    }
+}
+
+@Composable
+private fun ShuffleGlyph(tint: Color) {
+    Canvas(Modifier.size(24.dp)) {
+        val u = size.width / 24f
+        val stroke = Stroke(1.9f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        // M16 3h5v5
+        drawPath(Path().apply {
+            moveTo(16f * u, 3f * u); lineTo(21f * u, 3f * u); lineTo(21f * u, 8f * u)
+        }, tint, style = stroke)
+        // M4 20L21 3
+        drawLine(tint, Offset(4f * u, 20f * u), Offset(21f * u, 3f * u), 1.9f * u, StrokeCap.Round)
+        // M21 16v5h-5
+        drawPath(Path().apply {
+            moveTo(21f * u, 16f * u); lineTo(21f * u, 21f * u); lineTo(16f * u, 21f * u)
+        }, tint, style = stroke)
+        // M15 15l6 6
+        drawLine(tint, Offset(15f * u, 15f * u), Offset(21f * u, 21f * u), 1.9f * u, StrokeCap.Round)
+        // M4 4l5 5
+        drawLine(tint, Offset(4f * u, 4f * u), Offset(9f * u, 9f * u), 1.9f * u, StrokeCap.Round)
+    }
+}
+
+@Composable
+private fun QueueGlyph(tint: Color) {
+    Canvas(Modifier.size(24.dp)) {
+        val u = size.width / 24f
+        val stroke = Stroke(1.9f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        // M4 6h11 M4 12h11 M4 18h7
+        drawLine(tint, Offset(4f * u, 6f * u), Offset(15f * u, 6f * u), 1.9f * u, StrokeCap.Round)
+        drawLine(tint, Offset(4f * u, 12f * u), Offset(15f * u, 12f * u), 1.9f * u, StrokeCap.Round)
+        drawLine(tint, Offset(4f * u, 18f * u), Offset(11f * u, 18f * u), 1.9f * u, StrokeCap.Round)
+        // M18 14v6
+        drawLine(tint, Offset(18f * u, 14f * u), Offset(18f * u, 20f * u), 1.9f * u, StrokeCap.Round)
+        // circle cx="16.5" cy="19.5" r="1.8"
+        drawCircle(tint, 1.8f * u, Offset(16.5f * u, 19.5f * u), style = stroke)
+        // M18 14l3 1
+        drawLine(tint, Offset(18f * u, 14f * u), Offset(21f * u, 15f * u), 1.9f * u, StrokeCap.Round)
+    }
+}
+
+private fun formatTimerBadge(remainingMs: Long): String {
+    val mins = (remainingMs / 60_000).toInt()
+    return if (mins > 0) "${mins}分钟" else "不到1分钟"
 }
 
 private tailrec fun Context.findListenActivity(): ComponentActivity? = when (this) {
