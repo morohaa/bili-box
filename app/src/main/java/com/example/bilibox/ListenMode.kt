@@ -135,6 +135,7 @@ internal fun ListenPlaybackEffect(
     title: String,
     subtitle: String,
     cover: Bitmap?,
+    queue: ListenQueue? = null,
 ) {
     val context = LocalContext.current
     DisposableEffect(player, listening) {
@@ -167,9 +168,9 @@ internal fun ListenPlaybackEffect(
     }
     // Encode the notification artwork off the main thread; re-attaching only
     // refreshes the session player, the service keeps running.
-    LaunchedEffect(player, listening, title, subtitle, cover) {
+    LaunchedEffect(player, listening, title, subtitle, cover, queue) {
         if (!listening) return@LaunchedEffect
-        ListenPlaybackBridge.attach(context, player, buildListenMetadata(title, subtitle, null))
+        ListenPlaybackBridge.attach(context, player, buildListenMetadata(title, subtitle, null), queue)
         if (cover != null) {
             val bytes = withContext(Dispatchers.Default) {
                 runCatching {
@@ -180,7 +181,7 @@ internal fun ListenPlaybackEffect(
                 }.getOrNull()
             }
             if (bytes != null) {
-                ListenPlaybackBridge.attach(context, player, buildListenMetadata(title, subtitle, bytes))
+                ListenPlaybackBridge.attach(context, player, buildListenMetadata(title, subtitle, bytes), queue)
             }
         }
     }

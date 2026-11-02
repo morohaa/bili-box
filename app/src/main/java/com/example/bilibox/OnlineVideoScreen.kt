@@ -133,6 +133,10 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -814,7 +818,14 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
             exoPlayer.release()
         }
     }
-    LaunchedEffect(video.bvid, session?.cookie, retryToken, selectedPage, selectedQn, qualityRequestToken) {
+    // Part loading runs in its own scope instead of the effect: when listening in
+    // the background, Compose stops recomposing, so the end-of-part listener and the
+    // notification "next" start the next part directly through [startLoad].
+    val loadScope = remember(video.bvid, session?.cookie) { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    var loadJob by remember(video.bvid, session?.cookie) { mutableStateOf<Job?>(null) }
+    var lastRequestedLoad by remember(video.bvid, session?.cookie) { mutableStateOf<List<Any?>?>(null) }
+    DisposableEffect(loadScope) { onDispose { loadScope.cancel() } }
+    suspend fun loadPlayback() {
         val resumeAtMs = qualityResumeMs
         val resumePlaying = qualityResumePlaying
         qualityResumeMs = 0L
@@ -860,6 +871,28 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
             playbackState = PlaybackState.Error(error.message ?: "无法获取视频播放地址")
         }
     }
+    fun startLoad(key: List<Any?>) {
+        lastRequestedLoad = key
+        loadJob?.cancel()
+        loadJob = loadScope.launch { loadPlayback() }
+    }
+    LaunchedEffect(video.bvid, session?.cookie, retryToken, selectedPage, selectedQn, qualityRequestToken) {
+        val key = listOf(retryToken, selectedPage, selectedQn, qualityRequestToken)
+        // The background queue may already have started exactly this part.
+        if (key != lastRequestedLoad) startLoad(key)
+    }
+    fun listenSubtitle(page: Int): String = listOfNotNull(
+        videoInfo?.owner?.name?.takeIf { it.isNotBlank() } ?: video.author.takeIf { it.isNotBlank() },
+        videoInfo?.pages?.takeIf { it.size > 1 }?.firstOrNull { it.page == page }
+            ?.let { "P${it.page} ${it.part}".trim() },
+    ).joinToString(" · ")
+    /** Switches part without waiting for recomposition (background-safe). */
+    fun advanceToPart(page: Int) {
+        selectedPage = page
+        startLoad(listOf(retryToken, page, selectedQn, qualityRequestToken))
+        ListenPlaybackBridge.updateMetadata(exoPlayer, video.title, listenSubtitle(page))
+    }
+    val latestAdvance by rememberUpdatedState(::advanceToPart)
     // Fallback paths can lower the stream too, so derive the badge from every
     // successful playurl response instead of only the primary request.
     LaunchedEffect(playbackData) {
@@ -867,16 +900,17 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     }
     val episodePages = videoInfo?.pages?.takeIf { it.size > 1 }
     val latestEpisodePages by rememberUpdatedState(episodePages)
-    val latestSelectedPage by rememberUpdatedState(selectedPage)
     val latestAutoPlayNext by rememberUpdatedState(autoPlayNext)
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state != Player.STATE_ENDED || !latestAutoPlayNext) return
                 val parts = latestEpisodePages ?: return
-                val index = parts.indexOfFirst { it.page == latestSelectedPage }
+                // Read the live page, not a composition snapshot: in the background
+                // several parts can finish before the UI recomposes once.
+                val index = parts.indexOfFirst { it.page == selectedPage }
                 if (index in 0 until parts.lastIndex) {
-                    selectedPage = parts[index + 1].page
+                    latestAdvance(parts[index + 1].page)
                 }
             }
         }
@@ -941,6 +975,16 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         val currentIndex = pages.indexOfFirst { it.page == selectedPage }
         if (currentIndex >= 0) pages.getOrNull(currentIndex + 1) else null
     }
+    val listenQueue = remember(exoPlayer) {
+        object : ListenQueue {
+            private fun next() = latestEpisodePages?.let { parts ->
+                val index = parts.indexOfFirst { it.page == selectedPage }
+                if (index >= 0) parts.getOrNull(index + 1) else null
+            }
+            override val hasNext: Boolean get() = next() != null
+            override fun skipToNext() { next()?.let { latestAdvance(it.page) } }
+        }
+    }
     VideoPlayerScreen(
         player = exoPlayer,
         title = video.title,
@@ -950,7 +994,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         commentMessage = "暂不支持查看在线评论",
         onBack = onBack,
         onRetry = { retryToken++ },
-        onNextEpisode = nextPage?.let { page -> { selectedPage = page.page } },
+        onNextEpisode = nextPage?.let { page -> { advanceToPart(page.page) } },
         qualityOptions = qualityOptions,
         selectedQuality = effectiveQuality,
         onQualitySelected = { qn ->
@@ -975,13 +1019,11 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         detailsBackground = OnlineSurface,
         showDetailTabs = false,
         listenInfo = ListenInfo(
-            subtitle = listOfNotNull(
-                videoInfo?.owner?.name?.takeIf { it.isNotBlank() } ?: video.author.takeIf { it.isNotBlank() },
-                episodePages?.firstOrNull { it.page == selectedPage }?.let { "P${it.page} ${it.part}".trim() },
-            ).joinToString(" · "),
+            subtitle = listenSubtitle(selectedPage),
             online = true,
             coverUrl = videoInfo?.pic?.takeIf { it.isNotBlank() }?.let(::normalizeImageUrl) ?: video.coverUrl,
         ),
+        listenQueue = listenQueue,
         details = { _ ->
             Box(Modifier.fillMaxWidth()) {
                 OnlineVideoDetails(

@@ -193,36 +193,25 @@ internal fun LocalVideoPlayer(
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val progressStore = remember(context) { PlaybackProgressStore(context) }
-    // File size also distinguishes a replacement file that reuses a MediaStore URI.
-    val progressKey = remember(video.uri, video.sizeBytes) { "${video.uri}|${video.sizeBytes}" }
-    val resumePosition = remember(progressKey) { progressStore.load(progressKey, video.durationMs) }
-    val player = remember(video.uri) { createCompatiblePlayer(context) }
+    // One player for the whole folder session: the queue switches files on it
+    // directly, so 连播 also works while the screen is locked (no recomposition).
+    val queue = remember { LocalPlaybackQueue(context, createCompatiblePlayer(context), progressStore, video) }
+    val player = queue.player
     var playbackError by remember(player) { mutableStateOf<String?>(null) }
     var playbackState by remember(player) { mutableIntStateOf(Player.STATE_IDLE) }
     var saved by remember(video.uri) { mutableStateOf(false) }
     // Survives a switch to the next folder item so 连播 keeps working.
     var queueMode by rememberSaveable { mutableStateOf(LocalQueueMode.LIST_LOOP) }
     var resumeDismissed by remember(video.uri) { mutableStateOf(false) }
-    val queueModeState = rememberUpdatedState(queueMode)
-    val playlistState = rememberUpdatedState(playlist)
-    val videoState = rememberUpdatedState(video)
-    val selectState = rememberUpdatedState(onVideoSelected)
-
-    fun savePlaybackProgress() {
-        // Ignore the empty/idle player during setup or a failed preparation.
-        if (player.mediaItemCount == 0 || player.playbackState == Player.STATE_IDLE) return
-        progressStore.save(
-            progressKey,
-            player.currentPosition,
-            player.duration.takeIf { it > 0L } ?: video.durationMs,
-            completed = player.playbackState == Player.STATE_ENDED
-        )
+    SideEffect {
+        queue.playlist = playlist
+        queue.mode = queueMode
+        queue.onCurrentChanged = onVideoSelected
     }
 
-    fun switchTo(next: LocalVideo) {
-        savePlaybackProgress()
-        onVideoSelected(next)
-    }
+    fun savePlaybackProgress() = queue.save()
+
+    fun switchTo(next: LocalVideo) = queue.moveTo(next)
 
     fun shareVideo() {
         runCatching {
@@ -239,7 +228,7 @@ internal fun LocalVideoPlayer(
         }.onFailure { Toast.makeText(context, "无法分享这个视频", Toast.LENGTH_SHORT).show() }
     }
 
-    DisposableEffect(player, activity) {
+    DisposableEffect(queue, activity) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 val detail = (error.cause?.message ?: error.message)?.takeIf { it.isNotBlank() }
@@ -249,64 +238,35 @@ internal fun LocalVideoPlayer(
             override fun onPlaybackStateChanged(state: Int) {
                 playbackState = state
                 if (state == Player.STATE_READY) playbackError = null
-                if (state == Player.STATE_ENDED) {
-                    val list = playlistState.value
-                    val current = videoState.value
-                    when (queueModeState.value) {
-                        LocalQueueMode.LIST_LOOP -> {
-                            val index = list.indexOfFirst { it.uri == current.uri }
-                            val next = list.getOrNull(index + 1) ?: list.firstOrNull()
-                            if (next != null && next.uri != current.uri) {
-                                savePlaybackProgress()
-                                selectState.value(next)
-                            } else {
-                                player.seekTo(0L)
-                                player.playWhenReady = true
-                            }
-                        }
-                        LocalQueueMode.SHUFFLE -> {
-                            val next = list.filter { it.uri != current.uri }.randomOrNull()
-                            if (next != null) {
-                                savePlaybackProgress()
-                                selectState.value(next)
-                            } else {
-                                player.seekTo(0L)
-                                player.playWhenReady = true
-                            }
-                        }
-                        else -> Unit
-                    }
-                }
-            }
-
-            override fun onEvents(player: Player, events: Player.Events) {
-                if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED,
-                        Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_POSITION_DISCONTINUITY)) {
-                    savePlaybackProgress()
-                }
             }
         }
         val lifecycleObserver = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
-                savePlaybackProgress()
+                queue.save()
             }
         }
         player.addListener(listener)
         activity?.lifecycle?.addObserver(lifecycleObserver)
-        player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri), resumePosition)
-        player.prepare()
-        player.playWhenReady = true
         onDispose {
-            savePlaybackProgress()
             activity?.lifecycle?.removeObserver(lifecycleObserver)
             player.removeListener(listener)
-            player.release()
+            queue.release()
         }
     }
-    LaunchedEffect(player) {
+    // Opens the first file, and files picked while the UI was paused are already
+    // current, so this is a no-op when the queue got there first.
+    LaunchedEffect(queue, video.uri) {
+        playbackError = null
+        queue.open(video)
+    }
+    // The queue remembers where it actually opened the file; the store may
+    // already hold a later position if playback ran on in the background.
+    val storedResume = remember(video.key) { progressStore.load(video.key, video.durationMs) }
+    val resumePosition = if (queue.current.uri == video.uri) queue.startPositionMs else storedResume
+    LaunchedEffect(queue) {
         while (true) {
             delay(5_000)
-            savePlaybackProgress()
+            queue.save()
         }
     }
     LaunchedEffect(player, playbackState) {
@@ -316,10 +276,6 @@ internal fun LocalVideoPlayer(
                 playbackError = "加载超时，请检查文件是否可读取或编码是否受支持"
             }
         }
-    }
-    LaunchedEffect(player, queueMode) {
-        player.repeatMode = if (queueMode == LocalQueueMode.SINGLE_LOOP) Player.REPEAT_MODE_ONE
-        else Player.REPEAT_MODE_OFF
     }
     val currentIndex = playlist.indexOfFirst { it.uri == video.uri }
     val nextVideo = if (currentIndex >= 0) playlist.getOrNull(currentIndex + 1) else null
@@ -339,13 +295,12 @@ internal fun LocalVideoPlayer(
         detailTabs = listOf("简介", "媒体信息"),
         sourcePill = true,
         listenInfo = ListenInfo(
-            subtitle = listOf(
-                video.relativeDirectory.ifBlank { video.bucketName },
-                video.extension.uppercase(),
-            ).filter { it.isNotBlank() }.joinToString(" · "),
+            subtitle = localListenSubtitle(video),
             online = false,
             coverBitmap = listenThumbnail,
         ),
+        listenQueue = queue,
+        mediaKey = video.uri,
         // Persist the exact exit position before the library recomposes its status list.
         onBack = {
             savePlaybackProgress()
@@ -353,11 +308,7 @@ internal fun LocalVideoPlayer(
         },
         onRetry = {
             playbackError = null
-            val retryPosition = player.currentPosition.coerceAtLeast(0L)
-            player.stop()
-            player.setMediaItem(androidx.media3.common.MediaItem.fromUri(video.uri), retryPosition)
-            player.prepare()
-            player.playWhenReady = true
+            queue.retry()
         },
         onNextEpisode = nextVideo?.let { next -> { switchTo(next) } },
         episodes = { dismiss ->
@@ -424,6 +375,9 @@ internal fun VideoPlayerScreen(
     extraDetailPane: (@Composable (duration: Long) -> Unit)? = null,
     playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     listenInfo: ListenInfo? = null,
+    listenQueue: ListenQueue? = null,
+    // Changes when the same player switches to another file; per-file UI resets.
+    mediaKey: Any? = null,
     details: @Composable (duration: Long) -> Unit,
 ) {
     val context = LocalContext.current
@@ -469,7 +423,7 @@ internal fun VideoPlayerScreen(
     var screenRootOffset by remember { mutableStateOf(Offset.Zero) }
     val listenTimer = remember { ListenSleepTimer() }
     val listenCover = rememberListenCover(listenInfo, enabled = listening)
-    ListenPlaybackEffect(player, listening, title, listenInfo?.subtitle.orEmpty(), listenCover)
+    ListenPlaybackEffect(player, listening, title, listenInfo?.subtitle.orEmpty(), listenCover, listenQueue)
     ListenSleepTimerEffect(player, listenTimer)
     LaunchedEffect(listenPageOpen) {
         listenReveal.animateTo(
@@ -666,6 +620,10 @@ internal fun VideoPlayerScreen(
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onRenderedFirstFrame() { hasVideoFrame = true }
+            // A queue can switch files on the same player; wait for the new first frame.
+            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                hasVideoFrame = false
+            }
             override fun onPlayWhenReadyChanged(ready: Boolean, reason: Int) { playWhenReady = ready }
             override fun onPlaybackStateChanged(state: Int) {
                 playbackState = state
@@ -677,15 +635,32 @@ internal fun VideoPlayerScreen(
             player.removeListener(listener)
         }
     }
+    val latestDefaultDuration by rememberUpdatedState(defaultDurationMs)
     LaunchedEffect(player) {
         while (true) {
-            duration = player.duration.takeIf { it > 0 } ?: defaultDurationMs
+            duration = player.duration.takeIf { it > 0 } ?: latestDefaultDuration
             if (!scrubbing) position = player.currentPosition.coerceAtLeast(0L)
             bufferedPosition = player.bufferedPosition.coerceAtLeast(0L)
             isPlaying = player.isPlaying
             speed = player.playbackParameters.speed
             delay(250)
         }
+    }
+    // The local queue keeps one player across files, so reset what a fresh player
+    // used to reset. Playback speed deliberately carries over to the next file.
+    var lastMediaKey by remember(player) { mutableStateOf(mediaKey) }
+    LaunchedEffect(player, mediaKey) {
+        if (mediaKey == lastMediaKey) return@LaunchedEffect
+        lastMediaKey = mediaKey
+        detailsTab = 0
+        controlsVisible = true
+        scrubbing = false
+        speedMenuExpanded = false
+        playbackModeExpanded = false
+        episodesExpanded = false
+        qualityMenuExpanded = false
+        duration = defaultDurationMs
+        position = player.currentPosition.coerceAtLeast(0L)
     }
     LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, playbackModeExpanded, episodesExpanded, qualityMenuExpanded) {
         if (controlsVisible && (isPlaying || screenLocked) && !scrubbing &&

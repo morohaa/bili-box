@@ -2138,7 +2138,7 @@ internal fun rememberVideoThumbnail(video: LocalVideo): Bitmap? {
     return bitmap
 }
 
-private fun loadVideoThumbnail(context: Context, uri: Uri, key: String): Bitmap? {
+internal fun loadVideoThumbnail(context: Context, uri: Uri, key: String): Bitmap? {
     thumbnailCache.get(key)?.let { return it }
     val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         runCatching { context.contentResolver.loadThumbnail(uri, Size(480, 270), null) }.getOrNull()

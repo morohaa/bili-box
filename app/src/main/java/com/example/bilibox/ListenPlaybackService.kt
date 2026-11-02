@@ -76,12 +76,23 @@ class ListenPlaybackService : MediaSessionService() {
     }
 }
 
+/**
+ * Playlist hooks that must work without the UI: background auto-advance and the
+ * notification / lock-screen "next" button call these directly on the main thread,
+ * because Compose stops recomposing once the activity is stopped.
+ */
+internal interface ListenQueue {
+    val hasNext: Boolean
+    fun skipToNext()
+}
+
 /** Connects the composable-owned player to [ListenPlaybackService]. */
 internal object ListenPlaybackBridge {
     private val main = Handler(Looper.getMainLooper())
     private var service: ListenPlaybackService? = null
     private var owner: Player? = null
     private var pendingStop: Runnable? = null
+    private var queue: ListenQueue? = null
 
     /** The wrapped player the session should expose, or null when not listening. */
     var currentPlayer: Player? = null
@@ -91,11 +102,12 @@ internal object ListenPlaybackBridge {
      * Starts (or updates) background playback for [player]. Calling again with
      * new metadata only swaps the session player and refreshes the notification.
      */
-    fun attach(context: Context, player: Player, metadata: MediaMetadata) {
+    fun attach(context: Context, player: Player, metadata: MediaMetadata, queue: ListenQueue? = null) {
         pendingStop?.let { main.removeCallbacks(it) }
         pendingStop = null
         owner = player
-        val wrapped = MetadataPlayer(player, metadata)
+        this.queue = queue
+        val wrapped = MetadataPlayer(player, metadata, queue)
         currentPlayer = wrapped
         val running = service
         if (running != null) {
@@ -108,6 +120,21 @@ internal object ListenPlaybackBridge {
                 app.startService(Intent(app, ListenPlaybackService::class.java))
             }
         }
+    }
+
+    /** True while [player] is the one exposed to the background session. */
+    fun isAttached(player: Player): Boolean = owner === player
+
+    /**
+     * Refreshes the notification after a queue switched items without the UI.
+     * Keeps the current artwork unless [artwork] is given; no-op when not listening.
+     */
+    fun updateMetadata(player: Player, title: String, subtitle: String, artwork: ByteArray? = null) {
+        if (owner !== player) return
+        val keepArtwork = artwork ?: currentPlayer?.mediaMetadata?.artworkData
+        val wrapped = MetadataPlayer(player, buildListenMetadata(title, subtitle, keepArtwork), queue)
+        currentPlayer = wrapped
+        service?.updatePlayer(wrapped)
     }
 
     /**
@@ -124,6 +151,7 @@ internal object ListenPlaybackBridge {
             if (owner !== player) return@Runnable
             owner = null
             currentPlayer = null
+            queue = null
             // Forget the instance right away: if listening restarts before
             // onDestroy runs, attach() must start a fresh service.
             service?.endSession()
@@ -143,10 +171,40 @@ internal object ListenPlaybackBridge {
     }
 }
 
-/** Supplies title/UP/cover to the notification without touching the MediaItem. */
+/**
+ * Supplies title/UP/cover to the notification without touching the MediaItem,
+ * and maps the session's "next" to [queue] (each file / part is its own item).
+ */
 @OptIn(UnstableApi::class)
-private class MetadataPlayer(player: Player, private val metadata: MediaMetadata) : ForwardingPlayer(player) {
+private class MetadataPlayer(
+    player: Player,
+    private val metadata: MediaMetadata,
+    private val queue: ListenQueue?,
+) : ForwardingPlayer(player) {
     override fun getMediaMetadata(): MediaMetadata = metadata
+
+    override fun getAvailableCommands(): Player.Commands {
+        val base = super.getAvailableCommands()
+        if (queue?.hasNext != true) return base
+        return base.buildUpon()
+            .add(Player.COMMAND_SEEK_TO_NEXT)
+            .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+            .build()
+    }
+
+    override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
+
+    override fun hasNextMediaItem(): Boolean = queue?.hasNext ?: super.hasNextMediaItem()
+
+    override fun seekToNext() {
+        val q = queue
+        if (q != null) { if (q.hasNext) q.skipToNext() } else super.seekToNext()
+    }
+
+    override fun seekToNextMediaItem() {
+        val q = queue
+        if (q != null) { if (q.hasNext) q.skipToNext() } else super.seekToNextMediaItem()
+    }
 }
 
 internal fun buildListenMetadata(title: String, subtitle: String, artwork: ByteArray?): MediaMetadata =
