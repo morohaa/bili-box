@@ -204,41 +204,41 @@ private fun BiliBoxApp() {
                     },
                 )
             } else {
-                // The scrollable page is captured once and shared by both glass surfaces.
-                Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                        .statusBarsPadding().padding(horizontal = 16.dp)
-                ) {
-                    Header()
-                    when (tab) {
-                        0 -> {
-                            // 搜索从原首页移到动态：输入即在这里出结果，
-                            // 未搜索时继续展示动态内容。
-                            VideoSearchField(
-                                query = searchQuery,
-                                onQueryChange = { searchQuery = it },
-                                onSearch = { runSearch(1, searchOrder) }
-                            )
-                            Spacer(Modifier.height(26.dp))
-                            when (val state = searchState) {
-                                SearchState.Idle -> CollectionPage(
-                                    "动态", "关注的人，分享的日常",
-                                    "今天的灵感", "沿着海岸线，收集一整个夏天",
+                Column(Modifier.fillMaxSize()) {
+                    // 固定顶栏：不跟随内容滚动，三个 Tab 共用同一高度与边距。
+                    AppTopBar()
+                    // The scrollable page is captured once and shared by both glass surfaces.
+                    Column(
+                        Modifier.weight(1f).fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        when (tab) {
+                            0 -> {
+                                // 搜索从原首页移到动态：输入即在这里出结果。
+                                VideoSearchField(
+                                    query = searchQuery,
+                                    onQueryChange = { searchQuery = it },
+                                    onSearch = { runSearch(1, searchOrder) }
                                 )
-                                SearchState.Loading -> SearchLoading()
-                                is SearchState.Error -> SearchError(state.message) { runSearch(state.page, state.order) }
-                                is SearchState.Success -> SearchResults(
-                                    state = state,
-                                    onVideoClick = { selectedVideo = it },
-                                    onOrderChange = { runSearch(1, it) },
-                                    onPageChange = { runSearch(it, state.order) },
-                                )
+                                Spacer(Modifier.height(26.dp))
+                                when (val state = searchState) {
+                                    SearchState.Idle -> Unit
+                                    SearchState.Loading -> SearchLoading()
+                                    is SearchState.Error -> SearchError(state.message) { runSearch(state.page, state.order) }
+                                    is SearchState.Success -> SearchResults(
+                                        state = state,
+                                        onVideoClick = { selectedVideo = it },
+                                        onOrderChange = { runSearch(1, it) },
+                                        onPageChange = { runSearch(it, state.order) },
+                                    )
+                                }
                             }
+                            else -> MyPage(0, session) { session = it }
                         }
-                        else -> MyPage(0, session) { session = it }
+                        Spacer(Modifier.height(150.dp))
+                        Spacer(Modifier.navigationBarsPadding())
                     }
-                    Spacer(Modifier.height(150.dp))
-                    Spacer(Modifier.navigationBarsPadding())
                 }
             }
         }

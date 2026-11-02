@@ -43,7 +43,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -289,7 +288,9 @@ internal fun LibraryPage(
     }
 
     Box(Modifier.fillMaxSize().background(LibraryBg)) {
-        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        Column(Modifier.fillMaxSize()) {
+            // 与动态/我的共用同一条固定顶栏。
+            AppTopBar()
             LibraryHeader(
                 searchOpen = searchOpen,
                 query = query,

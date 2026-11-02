@@ -134,32 +134,41 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 
+/**
+ * 固定顶栏容器：宽满屏、内容高 64dp，并带一条可见的下边界。
+ *
+ * 三个 Tab 共用同一条栏的高度与样式，但各自可以通过 [content] 放入不同的
+ * 内容；默认沿用品牌标题。
+ */
 @Composable
-internal fun Header() {
-    Row(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 32.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("bili", color = Pink, fontWeight = FontWeight.Black, fontSize = 28.sp, letterSpacing = (-1).sp)
-        Text("box", color = Ink, fontWeight = FontWeight.Light, fontSize = 28.sp, letterSpacing = (-1).sp)
-        Spacer(Modifier.weight(1f))
-        Text("让喜欢，自在发生", fontSize = 11.sp, color = Muted, letterSpacing = 1.sp)
+internal fun AppTopBar(
+    content: @Composable RowScope.() -> Unit = { BrandTopBarContent() },
+) {
+    Column(
+        Modifier.fillMaxWidth()
+            .background(Color(0xFFF4F6FA))
+            .statusBarsPadding()
+    ) {
+        Row(
+            Modifier.fillMaxWidth()
+                .height(64.dp)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content,
+        )
+        HorizontalDivider(
+            color = Color(0xFFE0E6ED),
+            thickness = 1.dp,
+        )
     }
 }
 
 @Composable
-private fun SectionTitle(title: String, subtitle: String) {
-    Text(title, fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Ink, letterSpacing = (-1).sp)
-    Spacer(Modifier.height(8.dp))
-    Text(subtitle, color = Muted, fontSize = 13.sp)
-}
-
-@Composable
-internal fun CollectionPage(title: String, subtitle: String, cardTitle: String, description: String) {
-    SectionTitle(title, subtitle)
-    Spacer(Modifier.height(26.dp))
-    Text("海边的阿树 · 今天 09:41", color = Muted, fontSize = 12.sp)
-    Spacer(Modifier.height(16.dp))
-    Text(description, color = Ink, fontSize = 17.sp)
-    Spacer(Modifier.height(16.dp))
-    VideoCard(cardTitle, "生活的片段，也可以很闪亮", 0)
+private fun RowScope.BrandTopBarContent() {
+    Text("bili", color = Pink, fontWeight = FontWeight.Black, fontSize = 28.sp, letterSpacing = (-1).sp)
+    Text("box", color = Ink, fontWeight = FontWeight.Light, fontSize = 28.sp, letterSpacing = (-1).sp)
+    Spacer(Modifier.weight(1f))
+    Text("让喜欢，自在发生", fontSize = 11.sp, color = Muted, letterSpacing = 1.sp)
 }
 
 @Composable
@@ -168,51 +177,6 @@ internal fun EmptyCard(title: String, text: String) {
         Text(title, color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
         Text(text, color = Muted, fontSize = 14.sp, lineHeight = 22.sp)
-    }
-}
-
-@Composable
-internal fun VideoCard(title: String, subtitle: String, variant: Int) {
-    Landscape(variant, Modifier.fillMaxWidth().aspectRatio(1.9f))
-    Spacer(Modifier.height(12.dp))
-    Text(title, color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-    Spacer(Modifier.height(5.dp))
-    Text(subtitle, color = Muted, fontSize = 11.sp)
-}
-
-/** Local artwork keeps the navigation demo usable offline; no video stream is attached. */
-@Composable
-private fun Landscape(variant: Int, modifier: Modifier = Modifier) {
-    val sky = when (variant) {
-        1 -> listOf(Color(0xFFAFCCCA), Color(0xFFE1E6D5), Color(0xFF789B8A))
-        2 -> listOf(Color(0xFFD6B8C0), Color(0xFFF3DECC), Color(0xFFA99DAE))
-        else -> listOf(Color(0xFF8DAEBE), Color(0xFFE9C8B4), Color(0xFF6B99A1))
-    }
-    Box(modifier.clip(RoundedCornerShape(24.dp)).background(Brush.verticalGradient(sky))) {
-        Canvas(Modifier.matchParentSize()) {
-            val w = size.width; val h = size.height
-            drawCircle(Color(0xFFFFE6B6), w * .095f, Offset(w * .72f, h * .36f))
-            drawRect(Color(0xFF6B96A0).copy(alpha = .55f), Offset(0f, h * .60f), androidx.compose.ui.geometry.Size(w, h * .4f))
-            val hill = Path().apply { moveTo(0f, h * .78f); cubicTo(w * .25f, h * .44f, w * .38f, h * .88f, w * .66f, h * .84f); cubicTo(w * .80f, h * .82f, w * .9f, h * .72f, w, h * .77f); lineTo(w, h); lineTo(0f, h); close() }
-            drawPath(hill, Color(0xFF344F58).copy(alpha = .80f))
-            for (i in 0..5) drawLine(Color.White.copy(alpha = .18f), Offset(w * .52f, h * (.66f + i * .025f)), Offset(w * .91f, h * (.66f + i * .025f)), 1.4f)
-        }
-        Column(Modifier.align(Alignment.BottomStart).padding(22.dp)) {
-            Text(if (variant == 1) "INTO THE WILD" else "A LITTLE ESCAPE", color = Color.White.copy(alpha = .8f), fontSize = 9.sp, letterSpacing = 3.sp)
-            Spacer(Modifier.height(7.dp))
-            Text(if (variant == 1) "去有风的地方" else "和日落，见一面。", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Light)
-        }
-        Text("画面预览", color = Color.White, fontSize = 10.sp, modifier = Modifier.align(Alignment.TopEnd).padding(14.dp).background(Color.Black.copy(alpha = .15f), CircleShape).padding(horizontal = 10.dp, vertical = 5.dp))
-        if (variant == 0) {
-            Box(Modifier.align(Alignment.Center).size(58.dp).background(Color.White.copy(alpha = .88f), CircleShape), contentAlignment = Alignment.Center) {
-                Text("▶", color = Color(0xFF4D6673), fontSize = 22.sp, modifier = Modifier.padding(start = 3.dp))
-            }
-            Row(Modifier.align(Alignment.BottomEnd).padding(16.dp).background(Color.Black.copy(alpha = .2f), CircleShape).padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.width(42.dp).height(2.dp).background(Color.White.copy(alpha = .55f), CircleShape))
-                Spacer(Modifier.width(7.dp))
-                Text("01:24 / 04:52", color = Color.White, fontSize = 10.sp)
-            }
-        }
     }
 }
 
