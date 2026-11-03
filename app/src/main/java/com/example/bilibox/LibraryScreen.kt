@@ -1,5 +1,6 @@
 package com.example.bilibox
 
+import com.example.bilibox.queryLocalVideoLibrary
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -128,6 +129,8 @@ private val LibraryCard = Color(0xFFFFFFFF)
 @Composable
 internal fun LibraryPage(
     refreshToken: Int = 0,
+    darkMode: Boolean = false,
+    onToggleDarkMode: () -> Unit = {},
     onVideoSelected: (LocalVideo, List<LocalVideo>) -> Unit,
 ) {
     val context = LocalContext.current
@@ -160,7 +163,7 @@ internal fun LibraryPage(
         }
         scanState = LocalVideoScanState.Loading
         scanState = try {
-            val result = withContext(Dispatchers.IO) { queryLocalVideoLibrary(context) }
+            val result = withContext<LocalVideoScanResult>(Dispatchers.IO) { queryLocalVideoLibrary(context) }
             LocalVideoScanState.Ready(result.videos, result.nomediaFolders)
         } catch (error: Exception) {
             LocalVideoScanState.Error(error.message ?: "扫描本地视频失败")
@@ -287,10 +290,11 @@ internal fun LibraryPage(
         settingsOpen = false
     }
 
-    Box(Modifier.fillMaxSize().background(LibraryBg)) {
+    val pageBackground = if (darkMode) Color(0xFF17191D) else LibraryBg
+    Box(Modifier.fillMaxSize().background(pageBackground)) {
         Column(Modifier.fillMaxSize()) {
             // 与动态/我的共用同一条固定顶栏。
-            AppTopBar()
+            AppTopBar(darkMode = darkMode, onToggleDarkMode = onToggleDarkMode)
             LibraryHeader(
                 searchOpen = searchOpen,
                 query = query,

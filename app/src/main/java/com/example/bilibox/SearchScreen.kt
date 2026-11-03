@@ -136,20 +136,20 @@ import kotlin.math.roundToInt
 
 
 @Composable
-internal fun SearchLoading() {
+internal fun SearchLoading(darkMode: Boolean = false) {
     Column(Modifier.fillMaxWidth().padding(top = 52.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         CircularProgressIndicator(color = Pink, strokeWidth = 2.dp)
         Spacer(Modifier.height(16.dp))
-        Text("正在搜索视频…", color = Muted, fontSize = 13.sp)
+        Text("正在搜索视频…", color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 13.sp)
     }
 }
 
 @Composable
-internal fun SearchError(message: String, onRetry: () -> Unit) {
+internal fun SearchError(message: String, darkMode: Boolean = false, onRetry: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("暂时没有搜到结果", color = Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Text("暂时没有搜到结果", color = if (darkMode) Color(0xFFE7E9ED) else Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
-        Text(message, color = Muted, fontSize = 12.sp)
+        Text(message, color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 12.sp)
         Spacer(Modifier.height(16.dp))
         TextButton(onClick = onRetry) { Text("重试", color = Pink) }
     }
@@ -158,18 +158,19 @@ internal fun SearchError(message: String, onRetry: () -> Unit) {
 @Composable
 internal fun SearchResults(
     state: SearchState.Success,
+    darkMode: Boolean = false,
     onVideoClick: (SearchVideo) -> Unit,
     onOrderChange: (SearchOrder) -> Unit,
     onPageChange: (Int) -> Unit,
 ) {
     var orderMenuExpanded by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("搜索结果", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("搜索结果", color = if (darkMode) Color(0xFFE7E9ED) else Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.weight(1f))
-        Text("${state.items.size} 个视频", color = Muted, fontSize = 12.sp)
+        Text("${state.items.size} 个视频", color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 12.sp)
     }
     Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("排序", color = Muted, fontSize = 12.sp)
+        Text("排序", color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 12.sp)
         Box {
             TextButton(onClick = { orderMenuExpanded = true }) {
                 Text(state.order.label, color = Pink, fontSize = 12.sp)
@@ -189,11 +190,11 @@ internal fun SearchResults(
         }
     }
     if (state.items.isEmpty()) {
-        EmptyCard("没有找到视频", "换个关键词试试看。")
+        EmptyCard("没有找到视频", "换个关键词试试看。", darkMode)
     } else {
         state.items.forEach { video ->
-            SearchResultCard(video, Modifier.offset(x = (-4).dp)) { onVideoClick(video) }
-            HorizontalDivider(color = Color(0xFFDDE3E8), thickness = 1.dp)
+            SearchResultCard(video, darkMode, Modifier.offset(x = (-4).dp)) { onVideoClick(video) }
+            HorizontalDivider(color = if (darkMode) Color(0xFF30343A) else Color(0xFFDDE3E8), thickness = 1.dp)
         }
     }
     Row(
@@ -204,7 +205,7 @@ internal fun SearchResults(
         TextButton(onClick = { onPageChange(state.page - 1) }, enabled = state.page > 1) {
             Text("上一页", color = if (state.page > 1) Pink else Muted)
         }
-        Text("第 ${state.page} 页", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
+        Text("第 ${state.page} 页", color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
         TextButton(onClick = { onPageChange(state.page + 1) }, enabled = state.hasMore) {
             Text("下一页", color = if (state.hasMore) Pink else Muted)
         }
@@ -213,7 +214,7 @@ internal fun SearchResults(
 
 
 @Composable
-private fun SearchResultCard(video: SearchVideo, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun SearchResultCard(video: SearchVideo, darkMode: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
         modifier.fillMaxWidth().clickable(onClick = onClick)
             .padding(vertical = 6.dp),
@@ -239,7 +240,7 @@ private fun SearchResultCard(video: SearchVideo, modifier: Modifier = Modifier, 
         Box(Modifier.weight(1f).height(90.dp)) {
             Text(
                 video.title,
-                color = Ink,
+                color = if (darkMode) Color(0xFFE7E9ED) else Ink,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
@@ -253,21 +254,21 @@ private fun SearchResultCard(video: SearchVideo, modifier: Modifier = Modifier, 
                             .size(width = 14.dp, height = 12.dp)
                             .clip(RoundedCornerShape(4.dp))
                             .background(Color.Transparent)
-                            .border(0.6.dp, Muted, RoundedCornerShape(4.dp)),
+                            .border(0.6.dp, if (darkMode) Color(0xFF9BA3AE) else Muted, RoundedCornerShape(4.dp)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("UP", color = Muted, fontSize = 6.sp, lineHeight = 7.sp, fontWeight = FontWeight.Medium)
+                        Text("UP", color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 6.sp, lineHeight = 7.sp, fontWeight = FontWeight.Medium)
                     }
                     Spacer(Modifier.width(4.dp))
-                    Text(video.author, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(video.author, color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    VideoMeta(icon = "play", value = video.playCount)
-                    VideoMeta(icon = "comment", value = video.commentCount.toString())
+                    VideoMeta(icon = "play", value = video.playCount, darkMode = darkMode)
+                    VideoMeta(icon = "comment", value = video.commentCount.toString(), darkMode = darkMode)
                 }
             }
         }
@@ -275,11 +276,11 @@ private fun SearchResultCard(video: SearchVideo, modifier: Modifier = Modifier, 
 }
 
 @Composable
-private fun VideoMeta(icon: String, value: String) {
+private fun VideoMeta(icon: String, value: String, darkMode: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.wrapContentWidth()) {
-        VideoMetaIcon(kind = icon, modifier = Modifier.size(width = 16.dp, height = 13.dp))
+        VideoMetaIcon(kind = icon, modifier = Modifier.size(width = 16.dp, height = 13.dp), tint = if (darkMode) Color(0xFF9BA3AE) else Muted)
         Spacer(Modifier.width(2.dp))
-        Text(value, color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

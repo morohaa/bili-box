@@ -64,6 +64,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -139,12 +140,27 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { BiliBoxTheme { BiliBoxApp() } }
+        setContent {
+            val preferences = remember { getSharedPreferences("appearance", Context.MODE_PRIVATE) }
+            var darkMode by remember { mutableStateOf(preferences.getBoolean("dark_mode", false)) }
+            SideEffect {
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !darkMode
+                    isAppearanceLightNavigationBars = !darkMode
+                }
+            }
+            BiliBoxTheme(darkTheme = darkMode, dynamicColor = false) {
+                BiliBoxApp(darkMode) {
+                    darkMode = !darkMode
+                    preferences.edit().putBoolean("dark_mode", darkMode).apply()
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun BiliBoxApp() {
+private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit = {}) {
     val context = LocalContext.current
     var selected by rememberSaveable { mutableIntStateOf(0) }
     // 0 动态 / 1 视频 / 2 我的. Clamp restored state from the old four-tab layout.
@@ -188,7 +204,8 @@ private fun BiliBoxApp() {
         return
     }
     val backdrop = rememberGraphicsLayer()
-    Box(Modifier.fillMaxSize().background(Color(0xFFF4F6FA))) {
+    val appBackground = if (darkMode) Color(0xFF17191D) else Color(0xFFF4F6FA)
+    Box(Modifier.fillMaxSize().background(appBackground)) {
         Box(Modifier.fillMaxSize().drawWithContent {
             backdrop.record { this@drawWithContent.drawContent() }
             drawLayer(backdrop)
@@ -198,6 +215,8 @@ private fun BiliBoxApp() {
                 // settings sheet and the floating resume card can use the whole screen.
                 LibraryPage(
                     refreshToken = libraryRefresh,
+                    darkMode = darkMode,
+                    onToggleDarkMode = onToggleDarkMode,
                     onVideoSelected = { video, playlist ->
                         localPlaylist = playlist
                         selectedLocalVideo = video
@@ -207,15 +226,18 @@ private fun BiliBoxApp() {
                 Column(Modifier.fillMaxSize()) {
                     // 固定顶栏：不跟随内容滚动，三个 Tab 共用尺寸与下边界。
                     if (tab == 0) {
-                        AppTopBar {
+                        AppTopBar(darkMode = darkMode) {
                             DynamicTopBarContent(
                                 query = searchQuery,
                                 onQueryChange = { searchQuery = it },
                                 onSearch = { runSearch(1, searchOrder) },
+                                darkMode = darkMode,
                             )
+                            Spacer(Modifier.width(2.dp))
+                            DarkModeToggle(darkMode, onToggleDarkMode)
                         }
                     } else {
-                        AppTopBar()
+                        AppTopBar(darkMode = darkMode, onToggleDarkMode = onToggleDarkMode)
                     }
                     // The scrollable page is captured once and shared by both glass surfaces.
                     Column(
@@ -226,19 +248,20 @@ private fun BiliBoxApp() {
                         when (tab) {
                             0 -> when (val state = searchState) {
                                 SearchState.Idle -> Unit
-                                SearchState.Loading -> SearchLoading()
-                                is SearchState.Error -> SearchError(state.message) { runSearch(state.page, state.order) }
+                                SearchState.Loading -> SearchLoading(darkMode)
+                                is SearchState.Error -> SearchError(state.message, darkMode) { runSearch(state.page, state.order) }
                                 is SearchState.Success -> {
                                     Spacer(Modifier.height(12.dp))
                                     SearchResults(
                                         state = state,
+                                        darkMode = darkMode,
                                         onVideoClick = { selectedVideo = it },
                                         onOrderChange = { runSearch(1, it) },
                                         onPageChange = { runSearch(it, state.order) },
                                     )
                                 }
                             }
-                            else -> MyPage(0, session) { session = it }
+                            else -> MyPage(0, session, darkMode) { session = it }
                         }
                         Spacer(Modifier.height(150.dp))
                         Spacer(Modifier.navigationBarsPadding())
@@ -247,7 +270,7 @@ private fun BiliBoxApp() {
             }
         }
         if (selectedLocalVideo == null) {
-            LiquidNavigation(tab, { selected = it.coerceIn(0, 2) }, backdrop,
+            LiquidNavigation(tab, { selected = it.coerceIn(0, 2) }, backdrop, darkMode,
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp))
         }
         // Keep the library composed underneath so its folder position, search and

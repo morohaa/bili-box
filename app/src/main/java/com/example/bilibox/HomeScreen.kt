@@ -72,6 +72,8 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.PathParser
@@ -133,20 +135,26 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+private val HomeInk = Color(0xFF24313D)
+private val HomePink = Color(0xFFEF7196)
+private val HomeMuted = Color(0xFF82909D)
+
 
 /**
  * 固定顶栏容器：宽满屏、内容高 64dp，并带一条可见的下边界。
  *
  * 三个 Tab 共用同一条栏的高度与样式，但各自可以通过 [content] 放入不同的
- * 内容；默认沿用品牌标题。
+ * 内容；默认沿用品牌标题与夜间模式开关。
  */
 @Composable
 internal fun AppTopBar(
-    content: @Composable RowScope.() -> Unit = { BrandTopBarContent() },
+    darkMode: Boolean = false,
+    onToggleDarkMode: () -> Unit = {},
+    content: @Composable RowScope.() -> Unit = { BrandTopBarContent(darkMode, onToggleDarkMode) },
 ) {
     Column(
         Modifier.fillMaxWidth()
-            .background(Color(0xFFF4F6FA))
+            .background(if (darkMode) Color(0xFF17191D) else Color(0xFFF4F6FA))
             .statusBarsPadding()
     ) {
         Row(
@@ -157,43 +165,80 @@ internal fun AppTopBar(
             content = content,
         )
         HorizontalDivider(
-            color = Color(0xFFE0E6ED),
+            color = if (darkMode) Color(0xFF30343A) else Color(0xFFE0E6ED),
             thickness = 1.dp,
         )
     }
 }
 
 @Composable
-private fun RowScope.BrandTopBarContent() {
-    Text("bili", color = Pink, fontWeight = FontWeight.Black, fontSize = 28.sp, letterSpacing = (-1).sp)
-    Text("box", color = Ink, fontWeight = FontWeight.Light, fontSize = 28.sp, letterSpacing = (-1).sp)
+private fun RowScope.BrandTopBarContent(darkMode: Boolean, onToggleDarkMode: () -> Unit) {
+    Text("bili", color =   HomePink, fontWeight = FontWeight.Black, fontSize = 28.sp, letterSpacing = (-1).sp)
+    Text("box", color = if (darkMode) Color(0xFFE9E9EC) else HomeInk, fontWeight = FontWeight.Light, fontSize = 28.sp, letterSpacing = (-1).sp)
     Spacer(Modifier.weight(1f))
-    Text("让喜欢，自在发生", fontSize = 11.sp, color = Muted, letterSpacing = 1.sp)
+    DarkModeToggle(darkMode, onToggleDarkMode)
 }
 
 @Composable
-internal fun EmptyCard(title: String, text: String) {
-    Column(Modifier.fillMaxWidth().background(Color.White.copy(alpha = .7f), RoundedCornerShape(24.dp)).padding(24.dp)) {
-        Text(title, color = Ink, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+internal fun DarkModeToggle(darkMode: Boolean, onToggle: () -> Unit) {
+    Box(
+        Modifier.size(42.dp).clip(CircleShape)
+            .background(if (darkMode) Color(0xFF292D33) else Color(0xFFE9EDF3))
+            .clickable(onClick = onToggle)
+            .semantics { contentDescription = if (darkMode) "切换日间模式" else "切换夜间模式" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(21.dp)) {
+            val unit = size.minDimension / 24f
+            val tint = if (darkMode) Color(0xFFFFC857) else Color(0xFF596779)
+            val stroke = Stroke(width = 1.8f * unit, cap = StrokeCap.Round)
+            if (darkMode) {
+                drawCircle(tint, 7f * unit, Offset(12f * unit, 12f * unit), style = stroke)
+                for (index in 0 until 8) {
+                    val angle = Math.PI * index / 4.0
+                    val inner = 9f * unit
+                    val outer = 11f * unit
+                    drawLine(tint,
+                        Offset(12f * unit + kotlin.math.cos(angle).toFloat() * inner, 12f * unit + kotlin.math.sin(angle).toFloat() * inner),
+                        Offset(12f * unit + kotlin.math.cos(angle).toFloat() * outer, 12f * unit + kotlin.math.sin(angle).toFloat() * outer),
+                        stroke.width, StrokeCap.Round)
+                }
+            } else {
+                drawCircle(tint, 8f * unit, Offset(10f * unit, 10f * unit))
+                drawCircle(if (darkMode) Color(0xFF292D33) else Color(0xFFE9EDF3), 7f * unit, Offset(14f * unit, 8f * unit))
+            }
+        }
+    }
+}
+
+@Composable
+internal fun EmptyCard(title: String, text: String, darkMode: Boolean = false) {
+    Column(Modifier.fillMaxWidth().background(if (darkMode) Color(0xFF24272D) else Color.White.copy(alpha = .7f), RoundedCornerShape(24.dp)).padding(24.dp)) {
+        Text(title, color = if (darkMode) Color(0xFFE7E9ED) else HomeInk, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
-        Text(text, color = Muted, fontSize = 14.sp, lineHeight = 22.sp)
+        Text(text, color = if (darkMode) Color(0xFF9BA3AE) else HomeMuted, fontSize = 14.sp, lineHeight = 22.sp)
     }
 }
 
 /** A single three-item capsule: (xxx). */
 @Composable
-internal fun LiquidNavigation(selected: Int, onSelect: (Int) -> Unit, backdrop: GraphicsLayer, modifier: Modifier = Modifier) {
+internal fun LiquidNavigation(selected: Int, onSelect: (Int) -> Unit, backdrop: GraphicsLayer, darkMode: Boolean = false, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
         val itemWidth = (maxWidth - 12.dp) / 3
         val indicatorOffset by animateDpAsState(itemWidth * selected.coerceIn(0, 2), label = "glass selection position")
-        GlassSurface(backdrop, Modifier.fillMaxWidth().height(68.dp)) {
+        GlassSurface(backdrop, darkMode, Modifier.fillMaxWidth().height(68.dp)) {
             Box(Modifier.fillMaxSize().padding(6.dp)) {
+                val indicatorColors = if (darkMode) {
+                    listOf(Color(0xFF464C55), Color(0xFF343A43))
+                } else {
+                    listOf(Color.White.copy(alpha = .9f), Color.White.copy(alpha = .38f))
+                }
                 Box(Modifier.offset(x = indicatorOffset).width(itemWidth).fillMaxHeight()
-                    .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .9f), Color.White.copy(alpha = .38f))), CircleShape)
+                    .background(Brush.verticalGradient(indicatorColors), CircleShape)
                     .then(Modifier.clip(CircleShape)))
                 Row(Modifier.fillMaxSize().selectableGroup()) {
                     listOf("动态", "视频", "我的").forEachIndexed { index, title ->
-                        NavigationItem(index, title, selected == index, { onSelect(index) }, Modifier.weight(1f))
+                        NavigationItem(index, title, selected == index, darkMode, { onSelect(index) }, Modifier.weight(1f))
                     }
                 }
             }
@@ -202,7 +247,7 @@ internal fun LiquidNavigation(selected: Int, onSelect: (Int) -> Unit, backdrop: 
 }
 
 @Composable
-private fun GlassSurface(backdrop: GraphicsLayer, modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+private fun GlassSurface(backdrop: GraphicsLayer, darkMode: Boolean, modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
     var position by remember { mutableStateOf(Offset.Zero) }
     val blur = with(LocalDensity.current) { 18.dp.toPx() }
     val supportsBlur = android.os.Build.VERSION.SDK_INT >= 31
@@ -213,13 +258,15 @@ private fun GlassSurface(backdrop: GraphicsLayer, modifier: Modifier = Modifier,
             Box(Modifier.matchParentSize().graphicsLayer {
                 if (supportsBlur) renderEffect = BlurEffect(blur, blur, TileMode.Clamp)
             }.drawWithContent { translate(-position.x, -position.y) { drawLayer(backdrop) } })
-            Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(
-                Color.White.copy(alpha = if (supportsBlur) .62f else .93f),
-                Color(0xFFF0F5FA).copy(alpha = if (supportsBlur) .38f else .92f)
-            ))))
+            Box(Modifier.matchParentSize().background(Brush.verticalGradient(if (darkMode) {
+                listOf(Color(0xFF2B3038).copy(alpha = if (supportsBlur) .78f else .98f), Color(0xFF20242A).copy(alpha = if (supportsBlur) .82f else .98f))
+            } else {
+                listOf(Color.White.copy(alpha = if (supportsBlur) .62f else .93f), Color(0xFFF0F5FA).copy(alpha = if (supportsBlur) .38f else .92f))
+            })))
             Canvas(Modifier.matchParentSize()) {
                 val stroke = 1.dp.toPx()
-                drawRoundRect(Brush.linearGradient(listOf(Color.White, Color.White.copy(alpha = .15f), Color.White.copy(alpha = .65f))),
+                val edge = if (darkMode) Color(0xFF58616D) else Color.White
+                drawRoundRect(Brush.linearGradient(listOf(edge, edge.copy(alpha = .15f), edge.copy(alpha = .65f))),
                     topLeft = Offset(stroke / 2, stroke / 2),
                     size = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2), style = Stroke(stroke))
@@ -230,8 +277,8 @@ private fun GlassSurface(backdrop: GraphicsLayer, modifier: Modifier = Modifier,
 }
 
 @Composable
-private fun NavigationItem(index: Int, title: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val color by animateColorAsState(if (selected) Pink else Color(0xFF667786), label = "navigation tint")
+private fun NavigationItem(index: Int, title: String, selected: Boolean, darkMode: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val color by animateColorAsState(if (selected) HomePink else if (darkMode) Color(0xFFB4BDC8) else Color(0xFF667786), label = "navigation tint")
     Column(modifier.fillMaxHeight().clip(CircleShape).selectable(selected, onClick = onClick, role = Role.Tab),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         NavIcon(index, color)

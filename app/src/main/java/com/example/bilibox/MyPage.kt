@@ -123,7 +123,7 @@ internal object BiliSessionStore {
 }
 
 @Composable
-internal fun MyPage(savedCount: Int, session: BiliSession?, onSessionChange: (BiliSession?) -> Unit) {
+internal fun MyPage(savedCount: Int, session: BiliSession?, darkMode: Boolean = false, onSessionChange: (BiliSession?) -> Unit) {
     val context = LocalContext.current
     var state by remember { mutableStateOf<LoginUiState>(LoginUiState.SignedOut) }
     var creating by rememberSaveable { mutableIntStateOf(0) }
@@ -168,11 +168,12 @@ internal fun MyPage(savedCount: Int, session: BiliSession?, onSessionChange: (Bi
         if (session == null) {
             SignedOutPanel(
                 state = state,
+                darkMode = darkMode,
                 onLogin = { creating++ },
                 onRetry = { creating++ }
             )
         } else {
-            SignedInPanel(session)
+            SignedInPanel(session, darkMode)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = {
                     BiliSessionStore.clear(context)
@@ -182,24 +183,27 @@ internal fun MyPage(savedCount: Int, session: BiliSession?, onSessionChange: (Bi
             }
         }
         Spacer(Modifier.height(24.dp))
-        Text("账号与安全", color = MyMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text("账号与安全", color = if (darkMode) Color(0xFF9BA3AE) else MyMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(10.dp))
-        InfoRow("登录方式", "哔哩哔哩扫码授权")
-        InfoRow("会话保存", "仅加密保存在本机")
-        InfoRow("我的收藏", "$savedCount 个视频")
+        InfoRow("登录方式", "哔哩哔哩扫码授权", darkMode)
+        InfoRow("会话保存", "仅加密保存在本机", darkMode)
+        InfoRow("我的收藏", "$savedCount 个视频", darkMode)
     }
 }
 
 @Composable
-private fun SignedOutPanel(state: LoginUiState, onLogin: () -> Unit, onRetry: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Color.White.copy(alpha = .86f)).padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+private fun SignedOutPanel(state: LoginUiState, darkMode: Boolean, onLogin: () -> Unit, onRetry: () -> Unit) {
+    val panel = if (darkMode) Color(0xFF24272D) else Color.White.copy(alpha = .86f)
+    val ink = if (darkMode) Color(0xFFE7E9ED) else MyInk
+    val muted = if (darkMode) Color(0xFFA0A7B0) else MyMuted
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(panel).padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.size(72.dp).background(MyPink.copy(alpha = .13f), CircleShape), contentAlignment = Alignment.Center) {
             Text("B", color = MyPink, fontSize = 32.sp, fontWeight = FontWeight.Black)
         }
         Spacer(Modifier.height(16.dp))
-        Text("登录哔哩哔哩账号", color = MyInk, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("登录哔哩哔哩账号", color = ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(7.dp))
-        Text("登录后可用账号权限获取更高画质视频", color = MyMuted, fontSize = 12.sp, textAlign = TextAlign.Center)
+        Text("登录后可用账号权限获取更高画质视频", color = muted, fontSize = 12.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(18.dp))
         when (state) {
             LoginUiState.SignedOut -> Button(onClick = onLogin, colors = ButtonDefaults.buttonColors(containerColor = MyPink)) { Text("扫码登录") }
@@ -207,7 +211,7 @@ private fun SignedOutPanel(state: LoginUiState, onLogin: () -> Unit, onRetry: ()
             is LoginUiState.WaitingForScan -> {
                 Image(state.bitmap, contentDescription = "哔哩哔哩登录二维码", modifier = Modifier.size(220.dp).clip(RoundedCornerShape(12.dp)))
                 Spacer(Modifier.height(10.dp))
-                Text(state.status, color = MyInk, fontSize = 13.sp)
+                Text(state.status, color = ink, fontSize = 13.sp)
                 Spacer(Modifier.height(8.dp))
                 TextButton(onClick = onRetry) { Text("刷新二维码", color = MyPink) }
             }
@@ -218,19 +222,19 @@ private fun SignedOutPanel(state: LoginUiState, onLogin: () -> Unit, onRetry: ()
             }
         }
         Spacer(Modifier.height(14.dp))
-        Text("登录二维码由哔哩哔哩提供。授权后会话凭证使用 Android Keystore 加密存储。", color = MyMuted, fontSize = 10.sp, lineHeight = 15.sp, textAlign = TextAlign.Center)
+        Text("登录二维码由哔哩哔哩提供。授权后会话凭证使用 Android Keystore 加密存储。", color = muted, fontSize = 10.sp, lineHeight = 15.sp, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
-private fun SignedInPanel(session: BiliSession) {
+private fun SignedInPanel(session: BiliSession, darkMode: Boolean) {
     val maxExp = session.nextExp.coerceAtLeast(0)
     val progress = if (maxExp > 0) (session.currentExp.toFloat() / maxExp).coerceIn(0f, 1f) else 0f
     Column(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(Color.White.copy(alpha = .82f))
-            .border(1.dp, Color.White.copy(alpha = .9f), RoundedCornerShape(10.dp))
+            .background(if (darkMode) Color(0xFF24272D) else Color.White.copy(alpha = .82f))
+            .border(1.dp, if (darkMode) Color(0xFF343941) else Color.White.copy(alpha = .9f), RoundedCornerShape(10.dp))
             .padding(horizontal = 18.dp, vertical = 20.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -238,19 +242,19 @@ private fun SignedInPanel(session: BiliSession) {
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(session.username, color = Color(0xFF242124), fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(session.username, color = if (darkMode) Color(0xFFE7E9ED) else Color(0xFF242124), fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.width(8.dp))
                     Text("LV${session.level}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFF47742)).padding(horizontal = 7.dp, vertical = 3.dp))
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("硬币 ${formatCoins(session.coins)}", color = Color(0xFF68636A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text("硬币 ${formatCoins(session.coins)}", color = if (darkMode) Color(0xFFB1B7C0) else Color(0xFF68636A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.width(14.dp))
-                    Text("经验 ${session.currentExp}/${session.nextExp}", color = Color(0xFF68636A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    Text("经验 ${session.currentExp}/${session.nextExp}", color = if (darkMode) Color(0xFFB1B7C0) else Color(0xFF68636A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
                 Spacer(Modifier.height(9.dp))
-                Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(Color(0xFFDEDADD))) {
+                Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(if (darkMode) Color(0xFF4A4E56) else Color(0xFFDEDADD))) {
                     Box(Modifier.fillMaxWidth(progress).fillMaxHeight().background(MyPink, CircleShape))
                 }
             }
@@ -284,13 +288,13 @@ private fun ProfileAvatar(session: BiliSession) {
 private fun formatCoins(coins: Double): String = if (coins % 1.0 == 0.0) coins.toLong().toString() else String.format(Locale.US, "%.1f", coins)
 
 @Composable
-private fun InfoRow(title: String, value: String) {
+private fun InfoRow(title: String, value: String, darkMode: Boolean) {
     Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, color = MyInk, fontSize = 14.sp)
+        Text(title, color = if (darkMode) Color(0xFFE0E3E8) else MyInk, fontSize = 14.sp)
         Spacer(Modifier.weight(1f))
-        Text(value, color = MyMuted, fontSize = 12.sp)
+        Text(value, color = if (darkMode) Color(0xFF9BA3AE) else MyMuted, fontSize = 12.sp)
     }
-    HorizontalDivider(color = Color(0xFFE7EBEF))
+    HorizontalDivider(color = if (darkMode) Color(0xFF30343A) else Color(0xFFE7EBEF))
 }
 
 private data class QrTicket(val key: String, val url: String, val cookie: String)

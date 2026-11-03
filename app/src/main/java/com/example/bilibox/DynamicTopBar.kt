@@ -37,6 +37,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+private val DynamicPink = Color(0xFFEF7196)
+private val DynamicInk = Color(0xFF24313D)
+private val DynamicMuted = Color(0xFF82909D)
+
 /**
  * 动态页固定顶栏的四个内容：头像框、搜索框、下载、历史。
  * 除搜索外，其余按钮目前只绘制图标。
@@ -46,6 +50,7 @@ internal fun RowScope.DynamicTopBarContent(
     query: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    darkMode: Boolean = false,
 ) {
     DynamicAvatar()
     Spacer(Modifier.width(10.dp))
@@ -53,12 +58,13 @@ internal fun RowScope.DynamicTopBarContent(
         query = query,
         onQueryChange = onQueryChange,
         onSearch = onSearch,
+        darkMode = darkMode,
         modifier = Modifier.weight(1f),
     )
     Spacer(Modifier.width(6.dp))
-    TopBarGlyph(LocalIcon.DOWNLOAD, "下载")
+    TopBarGlyph(TopBarAction.DOWNLOAD, "下载", darkMode)
     Spacer(Modifier.width(2.dp))
-    TopBarGlyph(LocalIcon.HISTORY, "历史")
+    TopBarGlyph(TopBarAction.HISTORY, "历史", darkMode)
 }
 
 @Composable
@@ -93,6 +99,7 @@ private fun DynamicSearchBox(
     query: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    darkMode: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
@@ -103,8 +110,8 @@ private fun DynamicSearchBox(
     Row(
         modifier.height(40.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White)
-            .border(1.dp, Color(0xFFE4E9EF), RoundedCornerShape(20.dp))
+            .background(if (darkMode) Color(0xFF292D33) else Color.White)
+            .border(1.dp, if (darkMode) Color(0xFF3B4048) else Color(0xFFE4E9EF), RoundedCornerShape(20.dp))
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -114,7 +121,11 @@ private fun DynamicSearchBox(
                 .semantics { contentDescription = "搜索" },
             contentAlignment = Alignment.Center,
         ) {
-            LocalGlyphIcon(LocalIcon.SEARCH, Pink, Modifier.size(17.dp), 2f)
+            Canvas(Modifier.size(17.dp)) {
+                val stroke = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
+                drawCircle(DynamicPink, radius = size.minDimension * .31f, center = Offset(size.width * .42f, size.height * .42f), style = stroke)
+                drawLine(DynamicPink, Offset(size.width * .64f, size.height * .64f), Offset(size.width * .9f, size.height * .9f), stroke.width, StrokeCap.Round)
+            }
         }
         Spacer(Modifier.width(7.dp))
         BasicTextField(
@@ -122,14 +133,14 @@ private fun DynamicSearchBox(
             onValueChange = onQueryChange,
             modifier = Modifier.weight(1f),
             singleLine = true,
-            textStyle = TextStyle(color = Ink, fontSize = 13.5.sp),
-            cursorBrush = SolidColor(Pink),
+            textStyle = TextStyle(color = if (darkMode) Color(0xFFE7E9ED) else DynamicInk, fontSize = 13.5.sp),
+            cursorBrush = SolidColor(DynamicPink),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { submit() }),
             decorationBox = { inner ->
                 Box(contentAlignment = Alignment.CenterStart) {
                     if (query.isEmpty()) {
-                        Text("搜索 B 站视频", color = Muted, fontSize = 13.sp, maxLines = 1)
+                        Text("搜索 B 站视频", color = if (darkMode) Color(0xFF9BA3AE) else DynamicMuted, fontSize = 13.sp, maxLines = 1)
                     }
                     inner()
                 }
@@ -140,11 +151,29 @@ private fun DynamicSearchBox(
 
 /** 仅绘制图标，点击行为留待后续接入。 */
 @Composable
-private fun TopBarGlyph(icon: LocalIcon, description: String) {
+private fun TopBarGlyph(icon: TopBarAction, description: String, darkMode: Boolean) {
     Box(
         Modifier.size(40.dp).semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        LocalGlyphIcon(icon, Color(0xFF4C5B68), Modifier.size(23.dp), 1.8f)
+        Canvas(Modifier.size(23.dp)) {
+            val tint = if (darkMode) Color(0xFFB4BDC8) else Color(0xFF4C5B68)
+            val stroke = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
+            when (icon) {
+                TopBarAction.DOWNLOAD -> {
+                    drawLine(tint, Offset(size.width * .5f, size.height * .12f), Offset(size.width * .5f, size.height * .62f), stroke.width, StrokeCap.Round)
+                    drawLine(tint, Offset(size.width * .31f, size.height * .43f), Offset(size.width * .5f, size.height * .62f), stroke.width, StrokeCap.Round)
+                    drawLine(tint, Offset(size.width * .69f, size.height * .43f), Offset(size.width * .5f, size.height * .62f), stroke.width, StrokeCap.Round)
+                    drawLine(tint, Offset(size.width * .2f, size.height * .78f), Offset(size.width * .8f, size.height * .78f), stroke.width, StrokeCap.Round)
+                }
+                TopBarAction.HISTORY -> {
+                    drawArc(tint, 45f, 300f, false, topLeft = Offset(size.width * .14f, size.height * .14f), size = androidx.compose.ui.geometry.Size(size.width * .72f, size.height * .72f), style = stroke)
+                    drawLine(tint, Offset(size.width * .5f, size.height * .28f), Offset(size.width * .5f, size.height * .5f), stroke.width, StrokeCap.Round)
+                    drawLine(tint, Offset(size.width * .5f, size.height * .5f), Offset(size.width * .67f, size.height * .58f), stroke.width, StrokeCap.Round)
+                }
+            }
+        }
     }
 }
+
+private enum class TopBarAction { DOWNLOAD, HISTORY }
