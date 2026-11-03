@@ -1,7 +1,6 @@
 package com.example.bilibox
 
 import android.Manifest
-import android.content.ContentUris
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -16,7 +15,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import android.os.SystemClock
-import android.provider.MediaStore
 import android.provider.Settings
 import android.text.format.Formatter
 import android.util.Size
@@ -130,9 +128,6 @@ import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -156,10 +151,12 @@ private fun OnlineVideoDetails(
     onAutoPlayNextChange: (Boolean) -> Unit,
     onPageSelected: (Int) -> Unit,
     onOpenEpisodes: () -> Unit,
+    cacheLabel: String,
+    cacheSelected: Boolean,
+    onCache: () -> Unit,
 ) {
     var following by rememberSaveable(video.bvid) { mutableStateOf(false) }
     var liked by rememberSaveable(video.bvid) { mutableStateOf(false) }
-    var disliked by rememberSaveable(video.bvid) { mutableStateOf(false) }
     var coined by rememberSaveable(video.bvid) { mutableStateOf(false) }
     var saved by rememberSaveable(video.bvid) { mutableStateOf(false) }
     var expanded by rememberSaveable(video.bvid) { mutableStateOf(false) }
@@ -290,14 +287,10 @@ private fun OnlineVideoDetails(
         ) {
             OnlineAction("like", "点赞", formatOptionalCount(stat?.like ?: 0L), liked) {
                 liked = !liked
-                if (liked) disliked = false
-            }
-            OnlineAction("dislike", "不喜欢", "", disliked) {
-                disliked = !disliked
-                if (disliked) liked = false
             }
             OnlineAction("coin", "投币", formatOptionalCount(stat?.coin ?: 0L), coined) { coined = !coined }
             OnlineAction("favorite", "收藏", formatOptionalCount(stat?.favorite ?: 0L), saved) { saved = !saved }
+            OnlineAction("cache", "缓存", cacheLabel, cacheSelected, onCache)
             OnlineAction("share", "分享", "", false) {
                 val intent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
@@ -497,8 +490,8 @@ private fun OnlineActionIcon(kind: String, tint: Color, modifier: Modifier = Mod
     val path = remember(kind) {
         val data = when (kind) {
             "like" -> "M14.6 3.4c-.6-.4-1.4-.2-1.8.4l-3.2 5.4c-.2.3-.5.5-.9.5H5.5C4.1 9.7 3 10.8 3 12.2v6.3C3 19.9 4.1 21 5.5 21h11.3c1.2 0 2.2-.8 2.5-1.9l1.6-6.8c.4-1.6-.8-3.1-2.5-3.1h-3.6l.8-3.8c.2-.8-.2-1.6-1-2zM7 19H5.5c-.3 0-.5-.2-.5-.5v-6.3c0-.3.2-.5.5-.5H7V19z"
-            "dislike" -> "M9.4 20.6c.6.4 1.4.2 1.8-.4l3.2-5.4c.2-.3.5-.5.9-.5h3.2c1.4 0 2.5-1.1 2.5-2.5V5.5C21 4.1 19.9 3 18.5 3H7.2C6 3 5 3.8 4.7 4.9L3.1 11.7c-.4 1.6.8 3.1 2.5 3.1h3.6l-.8 3.8c-.2.8.2 1.6 1 2zM17 5h1.5c.3 0 .5.2.5.5v6.3c0 .3-.2.5-.5.5H17V5z"
             "favorite" -> "M12 2.8c.4 0 .8.2 1 .6l2.4 4.9 5.4.8c.9.1 1.2 1.2.6 1.8l-3.9 3.8.9 5.4c.2.9-.8 1.5-1.6 1.1L12 18.7l-4.8 2.5c-.8.4-1.8-.2-1.6-1.1l.9-5.4-3.9-3.8c-.6-.6-.3-1.7.6-1.8l5.4-.8 2.4-4.9c.2-.4.6-.6 1-.6z"
+            "cache" -> "M12 3v11m0 0 4-4m-4 4-4-4M5 18v2h14v-2"
             "share" -> "M13.8 4.2c0-.9 1.1-1.3 1.7-.7l6.2 6.2c.4.4.4 1 0 1.4l-6.2 6.2c-.6.6-1.7.2-1.7-.7v-3.1c-4.8 0-8.2 1.5-10.3 4.7-.4.6-1.4.2-1.3-.5 1.1-6.5 5.2-9.8 11.6-10.2V4.2z"
             else -> ""
         }
@@ -514,6 +507,8 @@ private fun OnlineActionIcon(kind: String, tint: Color, modifier: Modifier = Mod
                     moveTo(14f, 9.2f); lineTo(14f, 15.5f)
                     moveTo(7.8f, 12.2f); lineTo(16.2f, 12.2f)
                 }, tint, style = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            } else if (kind == "cache") {
+                drawPath(path, tint, style = Stroke(1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
             } else {
                 drawPath(path, tint)
             }
@@ -645,6 +640,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     var autoPlayNext by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(true) }
     var episodesInGridView by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(false) }
     var creatorCard by remember(video.bvid, session?.cookie) { mutableStateOf<com.example.bilibox.bili.UserCardData?>(null) }
+    var cacheStatus by remember(video.bvid, selectedPage, session?.cookie) { mutableStateOf(OnlineVideoCacheStatus.IDLE) }
     // Cache entries belong to one quality, so do not reuse 1080P urls after a quality change.
     val episodePlayCache = remember(video.bvid, session?.cookie, selectedQn) { EpisodePlayCache() }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
@@ -946,6 +942,53 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     LaunchedEffect(playbackData) {
         playbackData?.quality?.takeIf { it > 0 }?.let { actualQn = it }
     }
+    fun beginCacheDownload() {
+        if (cacheStatus == OnlineVideoCacheStatus.DOWNLOADING) return
+        if (cacheStatus == OnlineVideoCacheStatus.SAVED) {
+            Toast.makeText(context, "当前分 P 已缓存", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val cid = playbackCid
+        if (cid <= 0L) {
+            Toast.makeText(context, "播放地址尚未准备好，请稍后重试", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val cacheTitle = videoInfo?.title?.takeIf { it.isNotBlank() } ?: video.title
+        val updateCacheStatus: (OnlineVideoCacheStatus) -> Unit = { cacheStatus = it }
+        startOnlineVideoCache(
+            scope = scope,
+            context = context,
+            client = client,
+            bvid = video.bvid,
+            cid = cid,
+            qn = selectedQn,
+            title = cacheTitle,
+            cookie = session?.cookie,
+            onStatus = updateCacheStatus,
+        )
+    }
+    val cachePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) beginCacheDownload()
+        else Toast.makeText(context, "需要存储权限才能缓存视频", Toast.LENGTH_SHORT).show()
+    }
+    val cacheLabel = when (cacheStatus) {
+        OnlineVideoCacheStatus.DOWNLOADING -> "缓存中"
+        OnlineVideoCacheStatus.SAVED -> "已缓存"
+        OnlineVideoCacheStatus.IDLE -> ""
+    }
+    val cacheSelected = cacheStatus != OnlineVideoCacheStatus.IDLE
+    val onCache: () -> Unit = {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P && context.checkSelfPermission(
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            cachePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            beginCacheDownload()
+        }
+    }
     val episodePages = videoInfo?.pages?.takeIf { it.size > 1 }
     val latestEpisodePages by rememberUpdatedState(episodePages)
     val latestAutoPlayNext by rememberUpdatedState(autoPlayNext)
@@ -1090,7 +1133,10 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                     autoPlayNext = autoPlayNext,
                     onAutoPlayNextChange = { autoPlayNext = it },
                     onPageSelected = { selectedPage = it },
-                    onOpenEpisodes = { episodesSheetVisible = true }
+                    onOpenEpisodes = { episodesSheetVisible = true },
+                    cacheLabel = cacheLabel,
+                    cacheSelected = cacheSelected,
+                    onCache = onCache,
                 )
             }
         }
