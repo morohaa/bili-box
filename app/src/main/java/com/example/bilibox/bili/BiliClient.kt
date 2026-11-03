@@ -124,6 +124,15 @@ class BiliClient(
             // flag lets an anonymous request try the 64/80 streams documented
             // by Bilibili, while logged-in requests remain compatible.
             "try_look" to "1",
+            // PiliPlus sends the same risk-control payload; without it the
+            // playurl response can be degraded to low-quality/PCDN-only URLs.
+            "dm_img_list" to "[]",
+            "dm_img_str" to randomBase64(16, 64),
+            "dm_cover_img_str" to randomBase64(32, 128),
+            "dm_img_inter" to """{"ds":[],"wh":[0,0,0],"of":[0,0,0]}""",
+            "gaia_source" to "pre-load",
+            "isGaiaAvoided" to "true",
+            "web_location" to "1315873",
         )
         return requestPlayData(params)
     }
@@ -215,6 +224,14 @@ class BiliClient(
         if (response.code != 0) throw BiliException(response.code, response.message.ifBlank { "未知错误" })
     }
 
+    private fun randomBase64(minLength: Int, maxLength: Int): String {
+        val random = java.util.Random()
+        val length = minLength + random.nextInt(maxLength - minLength + 1)
+        val bytes = ByteArray(length) { (0x26 + random.nextInt(0x59)).toByte() }
+        val encoded = java.util.Base64.getEncoder().encodeToString(bytes)
+        return encoded.dropLast(2)
+    }
+
     companion object {
         const val QN_MAX = 127
         const val FNVAL_DASH_ALL = 4048
@@ -239,6 +256,9 @@ class BiliClient(
         fun defaultHttpClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
+            // Bound metadata/playurl requests too: a stalled API call used to keep
+            // the player on "正在获取视频流" for the whole read timeout.
+            .callTimeout(10, TimeUnit.SECONDS)
             .build()
     }
 }

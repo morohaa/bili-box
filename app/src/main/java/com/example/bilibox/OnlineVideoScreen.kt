@@ -601,9 +601,11 @@ internal fun RowScope.VideoAction(index: Int, label: String, selected: Boolean, 
 
 
 /** Startup gets this long before a non-progressing CDN host is abandoned. */
-private const val STARTUP_STALL_TIMEOUT_MS = 8_000L
+private const val STARTUP_STALL_TIMEOUT_MS = 6_000L
 /** Buffered position must not have grown for this long to count as stalled. */
-private const val STARTUP_NO_PROGRESS_MS = 4_000L
+private const val STARTUP_NO_PROGRESS_MS = 3_000L
+/** Hard cap for one URL set: a trickling CDN can keep "progressing" forever. */
+private const val STARTUP_DEADLINE_MS = 12_000L
 
 @Composable
 internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: () -> Unit) {
@@ -680,142 +682,150 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
             error.message ?: "HTML5 单文件流也不可用"
         }
     }
+
+    /**
+     * Shared failure path for player errors and startup timeouts. A timeout skips
+     * candidate rotation and the 1080P refresh so it can fall back quickly.
+     */
+    fun handlePlaybackFailure(error: PlaybackException?, skipCandidateRotation: Boolean = false) {
+        if (!skipCandidateRotation && rotateCandidate()) return
+        // Signed CDN URLs are short-lived and a CDN can reject one
+        // host while another URL returned by a fresh playurl request
+        // is still usable. Refresh DASH once before falling back to
+        // the older single-file format.
+        if (!playbackRefreshTried && playbackCid > 0) {
+            playbackRefreshTried = true
+            playbackState = PlaybackState.Loading
+            scope.launch {
+                try {
+                    val refreshed = client.playUrl(
+                        bvid = video.bvid,
+                        cid = playbackCid,
+                        qn = BiliQn.P1080,
+                        fnval = BiliClient.FNVAL_DASH_ALL,
+                    )
+                    attachPlayData(refreshed, BiliQn.P1080)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    // The DURL fallback below provides the next
+                    // compatibility path and its error is user-facing.
+                    playbackState = PlaybackState.Loading
+                    durlFallbackTried = true
+                    try {
+                        val fallback = client.playUrl(
+                            bvid = video.bvid,
+                            cid = playbackCid,
+                            qn = BiliQn.P720,
+                            fnval = BiliClient.FNVAL_DURL,
+                        )
+                        attachPlayData(fallback, BiliQn.P720)
+                    } catch (error2: CancellationException) {
+                        throw error2
+                    } catch (error2: Exception) {
+                        val html5Error = tryHtml5Fallback()
+                        if (html5Error != null) {
+                            playbackState = PlaybackState.Error("播放器无法读取视频流：${error2.message ?: "单文件流也不可用"}；HTML5 回退失败：$html5Error")
+                        }
+                    }
+                }
+            }
+            return
+        }
+        if (!dashFallbackTried && !durlFallbackTried && playbackCid > 0) {
+            dashFallbackTried = true
+            playbackState = PlaybackState.Loading
+            scope.launch {
+                try {
+                    val fallback = client.playUrl(
+                        bvid = video.bvid,
+                        cid = playbackCid,
+                        qn = BiliQn.P720,
+                        fnval = BiliClient.FNVAL_DASH_ALL,
+                    )
+                    durlFallbackTried = fallback.dash == null
+                    attachPlayData(fallback, BiliQn.P720)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (_: Exception) {
+                    durlFallbackTried = true
+                    try {
+                        val fallback = client.playUrl(
+                            bvid = video.bvid,
+                            cid = playbackCid,
+                            qn = BiliQn.P720,
+                            fnval = BiliClient.FNVAL_DURL,
+                        )
+                        attachPlayData(fallback, BiliQn.P720)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        val html5Error = tryHtml5Fallback()
+                        if (html5Error != null) {
+                            playbackState = PlaybackState.Error("播放器无法读取视频流：${error.message ?: "低清晰度视频流也不可用"}；HTML5 回退失败：$html5Error")
+                        }
+                    }
+                }
+            }
+            return
+        }
+        // DASH uses separate audio/video URLs. If every CDN pair is rejected,
+        // request the older single-file stream format as a compatibility fallback.
+        if (!durlFallbackTried && playbackCid > 0) {
+            durlFallbackTried = true
+            playbackState = PlaybackState.Loading
+            scope.launch {
+                try {
+                    val fallback = client.playUrl(
+                        bvid = video.bvid,
+                        cid = playbackCid,
+                        qn = BiliQn.P720,
+                        fnval = BiliClient.FNVAL_DURL,
+                    )
+                    attachPlayData(fallback, BiliQn.P720)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    val html5Error = tryHtml5Fallback()
+                    if (html5Error != null) {
+                        playbackState = PlaybackState.Error("播放器无法读取视频流：${error.message ?: "单文件流也不可用"}；HTML5 回退失败：$html5Error")
+                    }
+                }
+            }
+            return
+        }
+        if (!html5FallbackTried && playbackCid > 0) {
+            playbackState = PlaybackState.Loading
+            scope.launch {
+                val fallbackError = tryHtml5Fallback()
+                if (fallbackError != null) {
+                    playbackState = PlaybackState.Error("播放器无法读取视频流：$fallbackError")
+                }
+            }
+            return
+        }
+        val httpStatus = generateSequence(error as Throwable?) { it.cause }
+            .mapNotNull { (it as? HttpDataSource.InvalidResponseCodeException)?.responseCode }
+            .firstOrNull()
+        val detail = error?.cause?.message?.takeIf { it.isNotBlank() }
+        val message = when {
+            error == null -> "视频源响应超时，请重试"
+            httpStatus == 403 ||
+                (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && detail?.contains("403") == true) ->
+                "CDN 返回 HTTP 403，当前网络出口可能被 B 站拒绝"
+            else -> "播放器无法读取视频流：${error.errorCodeName}${detail?.let { "（$it）" }.orEmpty()}"
+        }
+        playbackState = PlaybackState.Error(message)
+    }
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_READY) playbackState = PlaybackState.Ready
+                if (state == Player.STATE_READY) {
+                    playbackState = PlaybackState.Ready
+                }
             }
 
-            override fun onPlayerError(error: PlaybackException) {
-                if (rotateCandidate()) return
-                // Signed CDN URLs are short-lived and a CDN can reject one
-                // host while another URL returned by a fresh playurl request
-                // is still usable. Refresh DASH once before falling back to
-                // the older single-file format.
-                if (!playbackRefreshTried && playbackCid > 0) {
-                    playbackRefreshTried = true
-                    playbackState = PlaybackState.Loading
-                    scope.launch {
-                        try {
-                            val refreshed = client.playUrl(
-                                bvid = video.bvid,
-                                cid = playbackCid,
-                                qn = BiliQn.P1080,
-                                fnval = BiliClient.FNVAL_DASH_ALL,
-                            )
-                            attachPlayData(refreshed, BiliQn.P1080)
-                        } catch (error: CancellationException) {
-                            throw error
-                        } catch (_: Exception) {
-                            // The DURL fallback below provides the next
-                            // compatibility path and its error is user-facing.
-                            playbackState = PlaybackState.Loading
-                            durlFallbackTried = true
-                            try {
-                                val fallback = client.playUrl(
-                                    bvid = video.bvid,
-                                    cid = playbackCid,
-                                    qn = BiliQn.P720,
-                                    fnval = BiliClient.FNVAL_DURL,
-                                )
-                                attachPlayData(fallback, BiliQn.P720)
-                            } catch (error2: CancellationException) {
-                                throw error2
-                            } catch (error2: Exception) {
-                                val html5Error = tryHtml5Fallback()
-                                if (html5Error != null) {
-                                    playbackState = PlaybackState.Error("播放器无法读取视频流：${error2.message ?: "单文件流也不可用"}；HTML5 回退失败：$html5Error")
-                                }
-                            }
-                        }
-                    }
-                    return
-                }
-                if (!dashFallbackTried && !durlFallbackTried && playbackCid > 0) {
-                    dashFallbackTried = true
-                    playbackState = PlaybackState.Loading
-                    scope.launch {
-                        try {
-                            val fallback = client.playUrl(
-                                bvid = video.bvid,
-                                cid = playbackCid,
-                                qn = BiliQn.P720,
-                                fnval = BiliClient.FNVAL_DASH_ALL,
-                            )
-                            durlFallbackTried = fallback.dash == null
-                            attachPlayData(fallback, BiliQn.P720)
-                        } catch (error: CancellationException) {
-                            throw error
-                        } catch (_: Exception) {
-                            durlFallbackTried = true
-                            try {
-                                val fallback = client.playUrl(
-                                    bvid = video.bvid,
-                                    cid = playbackCid,
-                                    qn = BiliQn.P720,
-                                    fnval = BiliClient.FNVAL_DURL,
-                                )
-                                attachPlayData(fallback, BiliQn.P720)
-                            } catch (error: CancellationException) {
-                                throw error
-                            } catch (error: Exception) {
-                                val html5Error = tryHtml5Fallback()
-                                if (html5Error != null) {
-                                    playbackState = PlaybackState.Error("播放器无法读取视频流：${error.message ?: "低清晰度视频流也不可用"}；HTML5 回退失败：$html5Error")
-                                }
-                            }
-                        }
-                    }
-                    return
-                }
-                // DASH uses separate audio/video URLs. If every CDN pair is rejected,
-                // request the older single-file stream format as a compatibility fallback.
-                if (!durlFallbackTried && playbackCid > 0) {
-                    durlFallbackTried = true
-                    playbackState = PlaybackState.Loading
-                    scope.launch {
-                        try {
-                            val fallback = client.playUrl(
-                                bvid = video.bvid,
-                                cid = playbackCid,
-                                qn = BiliQn.P720,
-                                fnval = BiliClient.FNVAL_DURL,
-                            )
-                            attachPlayData(fallback, BiliQn.P720)
-                        } catch (error: CancellationException) {
-                            throw error
-                        } catch (error: Exception) {
-                            val html5Error = tryHtml5Fallback()
-                            if (html5Error != null) {
-                                playbackState = PlaybackState.Error("播放器无法读取视频流：${error.message ?: "单文件流也不可用"}；HTML5 回退失败：$html5Error")
-                            }
-                        }
-                    }
-                    return
-                }
-                if (!html5FallbackTried && playbackCid > 0) {
-                    playbackState = PlaybackState.Loading
-                    scope.launch {
-                        val fallbackError = tryHtml5Fallback()
-                        if (fallbackError != null) {
-                            playbackState = PlaybackState.Error("播放器无法读取视频流：$fallbackError")
-                        }
-                    }
-                    return
-                }
-                val httpStatus = generateSequence(error as Throwable?) { it.cause }
-                    .mapNotNull { (it as? HttpDataSource.InvalidResponseCodeException)?.responseCode }
-                    .firstOrNull()
-                val detail = error.cause?.message?.takeIf { it.isNotBlank() }
-                val message = if (httpStatus == 403 ||
-                    (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && detail?.contains("403") == true)
-                ) {
-                    "CDN 返回 HTTP 403，当前网络出口可能被 B 站拒绝"
-                } else {
-                    "播放器无法读取视频流：${error.errorCodeName}${detail?.let { "（$it）" }.orEmpty()}"
-                }
-                playbackState = PlaybackState.Error(message)
-            }
+            override fun onPlayerError(error: PlaybackException) = handlePlaybackFailure(error)
         }
         exoPlayer.addListener(listener)
         onDispose {
@@ -825,26 +835,36 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     }
     // A CDN node can accept the connection and then trickle or stall without
     // ever raising an error, leaving the player on "正在获取视频流". If startup
-    // makes no buffering progress for a while, move to the next backup host.
+    // makes no meaningful progress for a while, move to the next backup host;
+    // a hard deadline also stops a slow trickle from looking like progress.
+    val loadStartedAt = remember(playbackData) { SystemClock.elapsedRealtime() }
     LaunchedEffect(playbackData, playbackCandidateIndex) {
         if (playbackData == null) return@LaunchedEffect
-        val startedAt = SystemClock.elapsedRealtime()
+        val candidateStartedAt = SystemClock.elapsedRealtime()
         var lastBuffered = -1L
-        var lastProgressAt = startedAt
+        var lastProgressAt = candidateStartedAt
         while (playbackState == PlaybackState.Loading) {
-            delay(1_000)
+            delay(500)
             val now = SystemClock.elapsedRealtime()
             val buffered = exoPlayer.bufferedPosition
             if (buffered > lastBuffered) {
                 lastBuffered = buffered
                 lastProgressAt = now
             }
-            if (now - startedAt >= STARTUP_STALL_TIMEOUT_MS &&
+            if (now - loadStartedAt >= STARTUP_DEADLINE_MS) {
+                // Do not retry the same quality again; jump to the 720P/DURL/
+                // HTML5 fallbacks so this load cannot hang indefinitely.
+                playbackRefreshTried = true
+                handlePlaybackFailure(null, skipCandidateRotation = true)
+                return@LaunchedEffect
+            }
+            if (now - candidateStartedAt >= STARTUP_STALL_TIMEOUT_MS &&
                 now - lastProgressAt >= STARTUP_NO_PROGRESS_MS
             ) {
-                // No more hosts here: let the read timeout raise an error so
-                // onPlayerError walks the refresh / DURL / HTML5 fallbacks.
-                rotateCandidate()
+                if (!rotateCandidate()) {
+                    playbackRefreshTried = true
+                    handlePlaybackFailure(null, skipCandidateRotation = true)
+                }
                 return@LaunchedEffect
             }
         }
@@ -887,8 +907,9 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                 ?: info.pages.firstOrNull()?.also { selectedPage = it.page }
             val cid = page?.cid ?: info.cid
             if (cid <= 0) throw IllegalStateException("B 站没有返回视频分 P 信息")
+            val resolvedBvid = info.bvid.ifBlank { video.bvid }
             val play = episodePlayCache.take(cid)
-                ?: client.playUrl(info.bvid.ifBlank { video.bvid }, cid, qn = selectedQn)
+                ?: client.playUrl(resolvedBvid, cid, qn = selectedQn)
             playbackCid = cid
             attachPlayData(play, selectedQn, resumeMs = resumeAtMs)
             if (!resumePlaying) exoPlayer.playWhenReady = false
@@ -1016,7 +1037,10 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         player = exoPlayer,
         title = video.title,
         playbackError = (playbackState as? PlaybackState.Error)?.message,
-        loadingMessage = if (playbackState == PlaybackState.Loading) "正在获取视频流…" else null,
+        loadingMessage = if (playbackState == PlaybackState.Loading) {
+            // 区分“请求播放地址”和“连接视频源”，等待时能看出卡在哪一步。
+            if (playbackData == null) "正在获取播放地址…" else "正在连接视频源…"
+        } else null,
         sourceLabel = "哔哩哔哩",
         commentMessage = "暂不支持查看在线评论",
         onBack = onBack,

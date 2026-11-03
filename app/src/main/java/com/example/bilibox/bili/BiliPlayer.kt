@@ -19,7 +19,10 @@ import java.net.URI
 object BiliPlayback {
     const val CDN_CONNECT_TIMEOUT_MS = 6_000
     const val CDN_READ_TIMEOUT_MS = 8_000
-    private const val UA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+    // Bilibili's upos/edge CDN hosts reject the mobile Chrome UA on some
+    // signed URLs with HTTP 403. PiliPlus uses a desktop UA for media requests;
+    // the same UA keeps the official mirrors usable here.
+    private const val UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
     fun dataSourceFactory(cookie: String? = null, bvid: String? = null): DataSource.Factory {
         val referer = bvid?.takeIf { it.isNotBlank() }
