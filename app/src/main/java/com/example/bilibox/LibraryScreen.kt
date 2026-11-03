@@ -293,27 +293,28 @@ internal fun LibraryPage(
     val pageBackground = if (darkMode) Color(0xFF17191D) else LibraryBg
     Box(Modifier.fillMaxSize().background(pageBackground)) {
         Column(Modifier.fillMaxSize()) {
-            // 与动态/我的共用同一条固定顶栏。
-            AppTopBar(darkMode = darkMode, onToggleDarkMode = onToggleDarkMode)
-            LibraryHeader(
-                searchOpen = searchOpen,
-                query = query,
-                onSearchOpen = { searchOpen = true },
-                onSearchClose = {
-                    searchOpen = false
-                    query = ""
-                    keyboard?.hide()
-                },
-                onQueryChange = { value ->
-                    query = value
-                    if (value.isNotBlank()) quickFilter = null
-                },
-                onSettings = {
-                    draftSettings = settings
-                    settingsOpen = true
-                },
-                focusSearcher = searchOpen,
-            )
+            // 视频页顶栏直接承载本地视频标题和操作按钮；品牌顶栏仅保留给其他页面。
+            AppTopBar(darkMode = darkMode, onToggleDarkMode = onToggleDarkMode) {
+                LibraryHeader(
+                    searchOpen = searchOpen,
+                    query = query,
+                    onSearchOpen = { searchOpen = true },
+                    onSearchClose = {
+                        searchOpen = false
+                        query = ""
+                        keyboard?.hide()
+                    },
+                    onQueryChange = { value ->
+                        query = value
+                        if (value.isNotBlank()) quickFilter = null
+                    },
+                    onSettings = {
+                        draftSettings = settings
+                        settingsOpen = true
+                    },
+                    focusSearcher = searchOpen,
+                )
+            }
 
             if (scanState is LocalVideoScanState.Ready) {
                 QuickFilterRow(
@@ -489,7 +490,7 @@ private fun LibraryHeader(
     }
 
     Row(
-        Modifier.fillMaxWidth().padding(start = 18.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
+        Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (searchOpen) {
