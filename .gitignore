@@ -10,3 +10,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# 本地 UI 设计原型与预览截图，仅作参考，不参与构建
+/bili[-_]*.html
+/bili[-_]*.png
