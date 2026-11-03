@@ -1,11 +1,13 @@
 package com.example.bilibox
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,7 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -36,6 +40,7 @@ import java.net.URL
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.KeyStore
+import java.util.Locale
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -45,7 +50,15 @@ private val MyInk = Color(0xFF24313D)
 private val MyPink = Color(0xFFEF7196)
 private val MyMuted = Color(0xFF82909D)
 
-internal data class BiliSession(val username: String, val avatarUrl: String, val cookie: String)
+internal data class BiliSession(
+    val username: String,
+    val avatarUrl: String,
+    val cookie: String,
+    val level: Int = 0,
+    val coins: Double = 0.0,
+    val currentExp: Int = 0,
+    val nextExp: Int = 0,
+)
 
 private sealed interface LoginUiState {
     data object SignedOut : LoginUiState
@@ -67,14 +80,25 @@ internal object BiliSessionStore {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, getKey(), GCMParameterSpec(128, iv))
         val json = JSONObject(String(cipher.doFinal(encrypted), Charsets.UTF_8))
-        BiliSession(json.getString("username"), json.optString("avatar"), json.getString("cookie"))
+        BiliSession(
+            username = json.getString("username"),
+            avatarUrl = json.optString("avatar"),
+            cookie = json.getString("cookie"),
+            level = json.optInt("level"),
+            coins = json.optDouble("coins"),
+            currentExp = json.optInt("current_exp"),
+            nextExp = json.optInt("next_exp"),
+        )
     }.getOrNull()
 
     fun save(context: Context, session: BiliSession) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, getKey())
         val encrypted = cipher.doFinal(JSONObject().put("username", session.username)
-            .put("avatar", session.avatarUrl).put("cookie", session.cookie).toString().toByteArray(Charsets.UTF_8))
+            .put("avatar", session.avatarUrl).put("cookie", session.cookie)
+            .put("level", session.level).put("coins", session.coins)
+            .put("current_exp", session.currentExp).put("next_exp", session.nextExp)
+            .toString().toByteArray(Charsets.UTF_8))
         val stored = cipher.iv + encrypted
         context.getSharedPreferences(prefsName, Context.MODE_PRIVATE).edit()
             .putString(dataKey, Base64.encodeToString(stored, Base64.NO_WRAP)).apply()
@@ -140,11 +164,7 @@ internal fun MyPage(savedCount: Int, session: BiliSession?, onSessionChange: (Bi
         }
     }
 
-    Column(Modifier.fillMaxWidth()) {
-        Text("我的", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = MyInk)
-        Spacer(Modifier.height(8.dp))
-        Text("每一次好奇，都值得被记录", color = MyMuted, fontSize = 13.sp)
-        Spacer(Modifier.height(28.dp))
+    Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
         if (session == null) {
             SignedOutPanel(
                 state = state,
@@ -152,10 +172,13 @@ internal fun MyPage(savedCount: Int, session: BiliSession?, onSessionChange: (Bi
                 onRetry = { creating++ }
             )
         } else {
-            SignedInPanel(session, savedCount) {
-                BiliSessionStore.clear(context)
-                onSessionChange(null)
-                state = LoginUiState.SignedOut
+            SignedInPanel(session)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = {
+                    BiliSessionStore.clear(context)
+                    onSessionChange(null)
+                    state = LoginUiState.SignedOut
+                }) { Text("退出登录", color = MyPink) }
             }
         }
         Spacer(Modifier.height(24.dp))
@@ -200,26 +223,65 @@ private fun SignedOutPanel(state: LoginUiState, onLogin: () -> Unit, onRetry: ()
 }
 
 @Composable
-private fun SignedInPanel(session: BiliSession, savedCount: Int, onLogout: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Color.White.copy(alpha = .86f)).padding(22.dp)) {
+private fun SignedInPanel(session: BiliSession) {
+    val maxExp = session.nextExp.coerceAtLeast(0)
+    val progress = if (maxExp > 0) (session.currentExp.toFloat() / maxExp).coerceIn(0f, 1f) else 0f
+    Column(
+        Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color.White.copy(alpha = .82f))
+            .border(1.dp, Color.White.copy(alpha = .9f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 18.dp, vertical = 20.dp)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(62.dp).background(MyPink.copy(alpha = .13f), CircleShape), contentAlignment = Alignment.Center) {
-                Text(session.username.take(1), color = MyPink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            ProfileAvatar(session)
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(session.username, color = Color(0xFF242124), fontSize = 21.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.width(8.dp))
+                    Text("LV${session.level}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Color(0xFFF47742)).padding(horizontal = 7.dp, vertical = 3.dp))
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("硬币 ${formatCoins(session.coins)}", color = Color(0xFF68636A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.width(14.dp))
+                    Text("经验 ${session.currentExp}/${session.nextExp}", color = Color(0xFF68636A), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
+                Spacer(Modifier.height(9.dp))
+                Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(Color(0xFFDEDADD))) {
+                    Box(Modifier.fillMaxWidth(progress).fillMaxHeight().background(MyPink, CircleShape))
+                }
             }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(session.username, color = MyInk, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(4.dp))
-                Text("哔哩哔哩账号已登录", color = MyMuted, fontSize = 12.sp)
-            }
-        }
-        Spacer(Modifier.height(20.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Column { Text("$savedCount", color = MyInk, fontSize = 18.sp, fontWeight = FontWeight.Bold); Text("我的收藏", color = MyMuted, fontSize = 11.sp) }
-            TextButton(onClick = onLogout) { Text("退出登录", color = MyPink) }
         }
     }
 }
+
+@Composable
+private fun ProfileAvatar(session: BiliSession) {
+    var avatar by remember(session.avatarUrl) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(session.avatarUrl) {
+        avatar = if (session.avatarUrl.isBlank()) null else withContext(Dispatchers.IO) {
+            runCatching {
+                val connection = URL(session.avatarUrl).openConnection() as HttpURLConnection
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
+                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                connection.inputStream.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+            }.getOrNull()
+        }
+    }
+    Box(Modifier.size(72.dp).clip(CircleShape).background(MyPink.copy(alpha = .13f)), contentAlignment = Alignment.Center) {
+        if (avatar != null) {
+            Image(avatar!!, contentDescription = "头像", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else {
+            Text(session.username.take(1), color = MyPink, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+private fun formatCoins(coins: Double): String = if (coins % 1.0 == 0.0) coins.toLong().toString() else String.format(Locale.US, "%.1f", coins)
 
 @Composable
 private fun InfoRow(title: String, value: String) {
@@ -274,7 +336,16 @@ private fun pollLoginQr(key: String, initialCookie: String): QrPollResult {
                 throw IllegalStateException("登录成功，但无法读取账号信息")
             }
             val user = account
-            QrPollResult.Success(BiliSession(user.optString("uname", "B 站用户"), secureImageUrl(user.optString("face")), cookie))
+            val levelInfo = user.optJSONObject("level_info")
+            QrPollResult.Success(BiliSession(
+                username = user.optString("uname", "B 站用户"),
+                avatarUrl = secureImageUrl(user.optString("face")),
+                cookie = cookie,
+                level = levelInfo?.optInt("current_level") ?: 0,
+                coins = user.optDouble("money", 0.0),
+                currentExp = levelInfo?.optInt("current_exp") ?: 0,
+                nextExp = levelInfo?.optInt("next_exp") ?: 0,
+            ))
         }
         else -> throw IllegalStateException(root.optString("message").ifBlank { "二维码登录失败（$code）" })
     }
