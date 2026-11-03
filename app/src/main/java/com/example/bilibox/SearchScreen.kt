@@ -87,7 +87,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
@@ -159,38 +162,29 @@ internal fun SearchError(message: String, darkMode: Boolean = false, onRetry: ()
 internal fun SearchResults(
     state: SearchState.Success,
     darkMode: Boolean = false,
+    gridLayout: Boolean = false,
     onVideoClick: (SearchVideo) -> Unit,
-    onOrderChange: (SearchOrder) -> Unit,
     onPageChange: (Int) -> Unit,
 ) {
-    var orderMenuExpanded by remember { mutableStateOf(false) }
-    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("搜索结果", color = if (darkMode) Color(0xFFE7E9ED) else Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.weight(1f))
-        Text("${state.items.size} 个视频", color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 12.sp)
-    }
-    Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("排序", color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 12.sp)
-        Box {
-            TextButton(onClick = { orderMenuExpanded = true }) {
-                Text(state.order.label, color = Pink, fontSize = 12.sp)
-                Text("⌄", color = Pink, fontSize = 14.sp)
-            }
-            DropdownMenu(expanded = orderMenuExpanded, onDismissRequest = { orderMenuExpanded = false }) {
-                SearchOrder.entries.forEach { order ->
-                    DropdownMenuItem(
-                        text = { Text(order.label) },
-                        onClick = {
-                            orderMenuExpanded = false
-                            if (order != state.order) onOrderChange(order)
-                        },
-                    )
+    SearchResultBar(
+        count = if (state.total > 0) state.total else state.items.size,
+        darkMode = darkMode,
+    )
+    if (state.items.isEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        EmptyCard("没有找到视频", "换个关键词再试试，或调整筛选条件。", darkMode)
+    } else if (gridLayout) {
+        state.items.chunked(2).forEach { rowItems ->
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                rowItems.forEach { video ->
+                    SearchGridCard(video, darkMode, Modifier.weight(1f)) { onVideoClick(video) }
                 }
+                if (rowItems.size == 1) Spacer(Modifier.weight(1f))
             }
         }
-    }
-    if (state.items.isEmpty()) {
-        EmptyCard("没有找到视频", "换个关键词试试看。", darkMode)
     } else {
         state.items.forEach { video ->
             SearchResultCard(video, darkMode, Modifier.offset(x = (-4).dp)) { onVideoClick(video) }
@@ -212,6 +206,20 @@ internal fun SearchResults(
     }
 }
 
+@Composable
+private fun SearchResultBar(count: Int, darkMode: Boolean) {
+    val muted = if (darkMode) Color(0xFF9BA3AE) else Muted
+    val strong = if (darkMode) Color(0xFFE7E9ED) else Ink
+    Text(
+        text = buildAnnotatedString {
+            withStyle(SpanStyle(color = muted)) { append("找到 ") }
+            withStyle(SpanStyle(color = strong, fontWeight = FontWeight.SemiBold)) { append(count.toString()) }
+            withStyle(SpanStyle(color = muted)) { append(" 个视频") }
+        },
+        fontSize = 12.sp,
+        modifier = Modifier.offset(x = (-2).dp).padding(top = 12.dp, bottom = 2.dp),
+    )
+}
 
 @Composable
 private fun SearchResultCard(video: SearchVideo, darkMode: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
@@ -245,23 +253,11 @@ private fun SearchResultCard(video: SearchVideo, darkMode: Boolean, modifier: Mo
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
                 lineHeight = 17.sp,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.align(Alignment.TopStart),
             )
             Column(Modifier.align(Alignment.BottomStart)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.padding(start = 2.dp)
-                            .size(width = 14.dp, height = 12.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color.Transparent)
-                            .border(0.6.dp, if (darkMode) Color(0xFF9BA3AE) else Muted, RoundedCornerShape(4.dp)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("UP", color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 6.sp, lineHeight = 7.sp, fontWeight = FontWeight.Medium)
-                    }
-                    Spacer(Modifier.width(4.dp))
-                    Text(video.author, color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
+                AuthorRow(video.author, darkMode)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -272,6 +268,70 @@ private fun SearchResultCard(video: SearchVideo, darkMode: Boolean, modifier: Mo
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SearchGridCard(video: SearchVideo, darkMode: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(modifier.clickable(onClick = onClick).padding(bottom = 12.dp)) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            RemoteCover(video.coverUrl, Modifier.fillMaxSize(), RoundedCornerShape(10.dp))
+            Text(
+                formatSearchDuration(video.duration),
+                color = Color.White,
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+                modifier = Modifier
+                    .padding(end = 5.dp, bottom = 5.dp)
+                    .background(Color.Black.copy(alpha = .68f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+            )
+        }
+        Spacer(Modifier.height(7.dp))
+        Text(
+            video.title,
+            color = if (darkMode) Color(0xFFE7E9ED) else Ink,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = 18.sp,
+            minLines = 2,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(6.dp))
+        AuthorRow(video.author, darkMode)
+        Spacer(Modifier.height(5.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            VideoMeta(icon = "play", value = video.playCount, darkMode = darkMode)
+            VideoMeta(icon = "comment", value = video.commentCount.toString(), darkMode = darkMode)
+        }
+    }
+}
+
+@Composable
+private fun AuthorRow(author: String, darkMode: Boolean) {
+    val muted = if (darkMode) Color(0xFF9BA3AE) else Muted
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.padding(start = 2.dp)
+                .size(width = 14.dp, height = 12.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.Transparent)
+                .border(0.6.dp, muted, RoundedCornerShape(4.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("UP", color = muted, fontSize = 6.sp, lineHeight = 7.sp, fontWeight = FontWeight.Medium)
+        }
+        Spacer(Modifier.width(4.dp))
+        Text(author, color = muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

@@ -93,6 +93,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -123,6 +124,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -169,6 +171,12 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchState by remember { mutableStateOf<SearchState>(SearchState.Idle) }
     var searchOrder by rememberSaveable { mutableStateOf(SearchOrder.RELEVANCE) }
+    var searchDuration by rememberSaveable { mutableStateOf<SearchDuration?>(null) }
+    var searchTimeRange by rememberSaveable { mutableStateOf<SearchTimeRange?>(null) }
+    var searchGrid by rememberSaveable { mutableStateOf(false) }
+    var searchJob by remember { mutableStateOf<Job?>(null) }
+    val pageScroll = rememberScrollState()
+    val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val searchClient = remember(session?.cookie) {
         BiliClient().also { it.cookieHeader = session?.cookie }
@@ -176,16 +184,29 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     val runSearch: (Int, SearchOrder) -> Unit = { page, order ->
         val keyword = searchQuery.trim()
         if (keyword.isNotEmpty()) {
+            val nowSeconds = System.currentTimeMillis() / 1000L
+            val requestedDuration = searchDuration
+            val requestedRange = searchTimeRange
             searchOrder = order
             searchState = SearchState.Loading
-            scope.launch {
+            searchJob?.cancel()
+            searchJob = scope.launch {
+                pageScroll.scrollTo(0)
                 searchState = try {
-                    val result = searchClient.searchVideos(keyword, page, order.apiValue)
+                    val result = searchClient.searchVideos(
+                        keyword = keyword,
+                        page = page,
+                        order = order.apiValue,
+                        duration = requestedDuration?.apiValue,
+                        pubtimeBegin = requestedRange?.let { nowSeconds - it.days * 86_400L },
+                        pubtimeEnd = requestedRange?.let { nowSeconds },
+                    )
                     SearchState.Success(
                         items = result.items.map(::toSearchVideo),
                         page = result.page,
                         hasMore = result.hasMore,
                         order = order,
+                        total = result.total,
                     )
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -199,10 +220,18 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     var selectedLocalVideo by remember { mutableStateOf<LocalVideo?>(null) }
     var localPlaylist by remember { mutableStateOf<List<LocalVideo>>(emptyList()) }
     var libraryRefresh by remember { mutableIntStateOf(0) }
+    val searchActive = tab == 0 && searchState != SearchState.Idle
+    val closeSearch = {
+        searchJob?.cancel()
+        searchState = SearchState.Idle
+        focusManager.clearFocus()
+    }
     selectedVideo?.let { video ->
         BiliVideoDetail(video, session) { selectedVideo = null }
         return
     }
+    // 搜索结果是独立页面：系统返回键先退出搜索，再交给外层页面处理。
+    BackHandler(enabled = searchActive) { closeSearch() }
     val backdrop = rememberGraphicsLayer()
     val appBackground = if (darkMode) Color(0xFF17191D) else Color(0xFFF4F6FA)
     Box(Modifier.fillMaxSize().background(appBackground)) {
@@ -225,7 +254,26 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
             } else {
                 Column(Modifier.fillMaxSize()) {
                     // 固定顶栏：不跟随内容滚动，三个 Tab 共用尺寸与下边界。
-                    if (tab == 0) {
+                    if (searchActive) {
+                        SearchTopBar(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it },
+                            onSubmit = { runSearch(1, searchOrder) },
+                            onBack = closeSearch,
+                            order = searchOrder,
+                            onOrderChange = { runSearch(1, it) },
+                            duration = searchDuration,
+                            timeRange = searchTimeRange,
+                            onFiltersChange = { duration, timeRange ->
+                                searchDuration = duration
+                                searchTimeRange = timeRange
+                                runSearch(1, searchOrder)
+                            },
+                            gridLayout = searchGrid,
+                            onToggleLayout = { searchGrid = !searchGrid },
+                            darkMode = darkMode,
+                        )
+                    } else if (tab == 0) {
                         AppTopBar(darkMode = darkMode) {
                             DynamicTopBarContent(
                                 query = searchQuery,
@@ -242,7 +290,7 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
                     // The scrollable page is captured once and shared by both glass surfaces.
                     Column(
                         Modifier.weight(1f).fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(pageScroll)
                             .padding(horizontal = 16.dp)
                     ) {
                         when (tab) {
@@ -251,12 +299,11 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
                                 SearchState.Loading -> SearchLoading(darkMode)
                                 is SearchState.Error -> SearchError(state.message, darkMode) { runSearch(state.page, state.order) }
                                 is SearchState.Success -> {
-                                    Spacer(Modifier.height(12.dp))
                                     SearchResults(
                                         state = state,
                                         darkMode = darkMode,
+                                        gridLayout = searchGrid,
                                         onVideoClick = { selectedVideo = it },
-                                        onOrderChange = { runSearch(1, it) },
                                         onPageChange = { runSearch(it, state.order) },
                                     )
                                 }

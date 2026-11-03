@@ -167,4 +167,5 @@ data class VideoSearchPage(
     val items: List<VideoSearchItem> = emptyList(),
     val page: Int = 1,
     val hasMore: Boolean = false,
+    val total: Int = 0,
 )

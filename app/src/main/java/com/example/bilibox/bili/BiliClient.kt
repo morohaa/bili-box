@@ -55,24 +55,32 @@ class BiliClient(
         return response.data ?: throw BiliException(response.code, "card 返回空 data")
     }
 
-    /** 使用 Web 端 WBI 签名搜索视频，支持排序和分页。 */
+    /** 使用 Web 端 WBI 签名搜索视频，支持排序、时长 / 发布时间筛选和分页。 */
     suspend fun searchVideos(
         keyword: String,
         page: Int = 1,
         order: String = SEARCH_ORDER_TOTALRANK,
+        duration: String? = null,
+        pubtimeBegin: Long? = null,
+        pubtimeEnd: Long? = null,
         pageSize: Int = 20,
     ): VideoSearchPage {
         require(keyword.isNotBlank()) { "搜索关键词不能为空" }
         val currentPage = page.coerceAtLeast(1)
         val size = pageSize.coerceIn(1, 50)
-        val params = mapOf(
-            "search_type" to "video",
-            "keyword" to keyword.trim(),
-            "page" to currentPage.toString(),
-            "pagesize" to size.toString(),
-            "order" to order,
-            "web_location" to "1430654",
-        )
+        val params = buildMap {
+            put("search_type", "video")
+            put("keyword", keyword.trim())
+            put("page", currentPage.toString())
+            put("pagesize", size.toString())
+            put("order", order)
+            put("web_location", "1430654")
+            if (!duration.isNullOrBlank()) put("duration", duration)
+            if (pubtimeBegin != null && pubtimeEnd != null) {
+                put("pubtime_begin_s", pubtimeBegin.toString())
+                put("pubtime_end_s", pubtimeEnd.toString())
+            }
+        }
         buvid()
         var response = getJson<JsonObject>(signedSearchUrl(params, false))
         if (response.code == CODE_RISK || response.code == CODE_SIGN_EXPIRED) {
@@ -104,7 +112,7 @@ class BiliClient(
         val totalResults = data.stringValue("numResults").toIntOrNull() ?: 0
         val hasMore = totalPages > currentPage ||
             (totalPages == 0 && (totalResults > currentPage * size || items.size >= size))
-        return VideoSearchPage(items, currentPage, hasMore)
+        return VideoSearchPage(items, currentPage, hasMore, totalResults)
     }
 
     suspend fun playUrl(
