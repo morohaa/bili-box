@@ -11,3 +11,19 @@ internal fun formatVideoDuration(durationMs: Long): String {
         "%d:%02d".format(minutes, seconds)
     }
 }
+
+/**
+ * Search results return durations as unbounded minutes and seconds (for example
+ * `4511:45`). Convert those values to the same readable format used elsewhere.
+ */
+internal fun formatSearchDuration(duration: String): String {
+    val parts = duration.trim().split(':')
+    if (parts.size !in 2..3) return duration
+    val values = parts.map { it.toLongOrNull() ?: return duration }
+    val totalSeconds = when (values.size) {
+        2 -> values[0] * 60L + values[1]
+        else -> values[0] * 3600L + values[1] * 60L + values[2]
+    }
+    if (totalSeconds < 0L) return duration
+    return formatVideoDuration(totalSeconds * 1_000L)
+}

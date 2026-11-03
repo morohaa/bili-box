@@ -226,7 +226,7 @@ private fun SearchResultCard(video: SearchVideo, darkMode: Boolean, modifier: Mo
         ) {
             RemoteCover(video.coverUrl, Modifier.fillMaxSize())
             Text(
-                video.duration,
+                formatSearchDuration(video.duration),
                 color = Color.White,
                 fontSize = 10.sp,
                 lineHeight = 12.sp,

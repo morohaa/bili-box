@@ -14,4 +14,11 @@ class ExampleUnitTest {
     fun addition_isCorrect() {
         assertEquals(4, 2 + 2)
     }
+
+    @Test
+    fun searchDurationConvertsUnboundedMinutesToHours() {
+        assertEquals("75:11:45", formatSearchDuration("4511:45"))
+        assertEquals("15:08", formatSearchDuration("15:8"))
+        assertEquals("--:--", formatSearchDuration("--:--"))
+    }
 }
