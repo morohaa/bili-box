@@ -37,7 +37,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.KeyStore
 import java.util.Locale
@@ -127,6 +126,16 @@ internal fun MyPage(savedCount: Int, session: BiliSession?, darkMode: Boolean = 
     val context = LocalContext.current
     var state by remember { mutableStateOf<LoginUiState>(LoginUiState.SignedOut) }
     var creating by rememberSaveable { mutableIntStateOf(0) }
+    var webLoginOpen by remember { mutableStateOf(false) }
+    var nativeLoginOpen by remember { mutableStateOf(false) }
+
+    fun applySession(loggedIn: BiliSession) {
+        BiliSessionStore.save(context, loggedIn)
+        onSessionChange(loggedIn)
+        state = LoginUiState.SignedOut
+        webLoginOpen = false
+        nativeLoginOpen = false
+    }
 
     LaunchedEffect(creating) {
         if (creating == 0) return@LaunchedEffect
@@ -170,7 +179,8 @@ internal fun MyPage(savedCount: Int, session: BiliSession?, darkMode: Boolean = 
                 state = state,
                 darkMode = darkMode,
                 onLogin = { creating++ },
-                onRetry = { creating++ }
+                onRetry = { creating++ },
+                onCredentialLogin = { nativeLoginOpen = true },
             )
         } else {
             SignedInPanel(session, darkMode)
@@ -185,14 +195,40 @@ internal fun MyPage(savedCount: Int, session: BiliSession?, darkMode: Boolean = 
         Spacer(Modifier.height(24.dp))
         Text("账号与安全", color = if (darkMode) Color(0xFF9BA3AE) else MyMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(10.dp))
-        InfoRow("登录方式", "哔哩哔哩扫码授权", darkMode)
+        InfoRow("登录方式", "扫码 / 密码 / 短信", darkMode)
         InfoRow("会话保存", "仅加密保存在本机", darkMode)
         InfoRow("我的收藏", "$savedCount 个视频", darkMode)
+    }
+
+    if (nativeLoginOpen) {
+        BiliNativeLoginDialog(
+            darkMode = darkMode,
+            onDismiss = { nativeLoginOpen = false },
+            onSuccess = { applySession(it) },
+            onUseWebLogin = {
+                nativeLoginOpen = false
+                webLoginOpen = true
+            },
+        )
+    }
+
+    if (webLoginOpen) {
+        BiliWebLoginDialog(
+            darkMode = darkMode,
+            onDismiss = { webLoginOpen = false },
+            onSuccess = { applySession(it) },
+        )
     }
 }
 
 @Composable
-private fun SignedOutPanel(state: LoginUiState, darkMode: Boolean, onLogin: () -> Unit, onRetry: () -> Unit) {
+private fun SignedOutPanel(
+    state: LoginUiState,
+    darkMode: Boolean,
+    onLogin: () -> Unit,
+    onRetry: () -> Unit,
+    onCredentialLogin: () -> Unit,
+) {
     val panel = if (darkMode) Color(0xFF24272D) else Color.White.copy(alpha = .86f)
     val ink = if (darkMode) Color(0xFFE7E9ED) else MyInk
     val muted = if (darkMode) Color(0xFFA0A7B0) else MyMuted
@@ -221,8 +257,11 @@ private fun SignedOutPanel(state: LoginUiState, darkMode: Boolean, onLogin: () -
                 Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = MyPink)) { Text("重新获取二维码") }
             }
         }
+        if (state is LoginUiState.SignedOut || state is LoginUiState.Failed) {
+            TextButton(onClick = onCredentialLogin) { Text("密码 / 短信验证码登录", color = MyPink, fontSize = 13.sp) }
+        }
         Spacer(Modifier.height(14.dp))
-        Text("登录二维码由哔哩哔哩提供。授权后会话凭证使用 Android Keystore 加密存储。", color = muted, fontSize = 10.sp, lineHeight = 15.sp, textAlign = TextAlign.Center)
+        Text("二维码由哔哩哔哩提供；密码与短信登录在应用内完成，仅人机验证使用官方组件。会话凭证使用 Android Keystore 加密存储。", color = muted, fontSize = 10.sp, lineHeight = 15.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -334,83 +373,10 @@ private fun pollLoginQr(key: String, initialCookie: String): QrPollResult {
             // Some B 站 edge responses use code=0 before returning the auth cookies.
             // Keep polling in that case instead of treating the transient response as a failed login.
             if (!hasLoginCookies(cookie)) return QrPollResult.Pending
-            val nav = biliLoginRequest("https://api.bilibili.com/x/web-interface/nav", cookie = cookie).json
-            val account = nav.optJSONObject("data")
-            if (nav.optInt("code", -1) != 0 || account?.optBoolean("isLogin", false) != true) {
-                throw IllegalStateException("登录成功，但无法读取账号信息")
-            }
-            val user = account
-            val levelInfo = user.optJSONObject("level_info")
-            QrPollResult.Success(BiliSession(
-                username = user.optString("uname", "B 站用户"),
-                avatarUrl = secureImageUrl(user.optString("face")),
-                cookie = cookie,
-                level = levelInfo?.optInt("current_level") ?: 0,
-                coins = user.optDouble("money", 0.0),
-                currentExp = levelInfo?.optInt("current_exp") ?: 0,
-                nextExp = levelInfo?.optInt("next_exp") ?: 0,
-            ))
+            QrPollResult.Success(fetchBiliSession(cookie))
         }
         else -> throw IllegalStateException(root.optString("message").ifBlank { "二维码登录失败（$code）" })
     }
-}
-
-private data class LoginResponse(val json: JSONObject, val cookies: String)
-
-private fun biliLoginRequest(endpoint: String, cookie: String? = null, includeCookies: Boolean = true): LoginResponse {
-    val connection = URL(endpoint).openConnection() as HttpURLConnection
-    connection.connectTimeout = 10000
-    connection.readTimeout = 10000
-    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36")
-    connection.setRequestProperty("Referer", "https://www.bilibili.com/")
-    if (cookie != null) connection.setRequestProperty("Cookie", cookie)
-    return try {
-        val status = connection.responseCode
-        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        val body = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-        if (status !in 200..299) throw IllegalStateException("B 站登录服务暂不可用（HTTP $status）")
-        val cookies = if (includeCookies) connection.headerFields.entries
-            .filter { it.key?.equals("Set-Cookie", ignoreCase = true) == true }
-            .flatMap { it.value.orEmpty() }
-            .map { it.substringBefore(';').trim() }
-            .filter { it.contains('=') }
-            .distinctBy { it.substringBefore('=') }
-            .joinToString("; ") else ""
-        LoginResponse(JSONObject(body), cookies)
-    } finally {
-        connection.disconnect()
-    }
-}
-
-private val loginCookieNames = setOf("DedeUserID", "DedeUserID__ckMd5", "SESSDATA", "bili_jct", "sid")
-
-private fun cookieFromCallbackUrl(callbackUrl: String): String {
-    if (callbackUrl.isBlank()) return ""
-    val query = runCatching { URL(callbackUrl).query.orEmpty() }.getOrDefault("")
-    return query.split('&').asSequence()
-        .mapNotNull { pair ->
-            val separator = pair.indexOf('=')
-            if (separator <= 0) return@mapNotNull null
-            val name = URLDecoder.decode(pair.substring(0, separator), Charsets.UTF_8.name())
-            if (name !in loginCookieNames) return@mapNotNull null
-            val value = URLDecoder.decode(pair.substring(separator + 1), Charsets.UTF_8.name())
-            "$name=$value"
-        }
-        .joinToString("; ")
-}
-
-private fun mergeCookies(vararg cookieSources: String): String {
-    val values = linkedMapOf<String, String>()
-    cookieSources.flatMap { it.split(';') }
-        .map { it.trim() }
-        .filter { it.contains('=') }
-        .forEach { value -> values[value.substringBefore('=').trim()] = value.substringAfter('=').trim() }
-    return values.entries.joinToString("; ") { "${it.key}=${it.value}" }
-}
-
-private fun hasLoginCookies(cookie: String): Boolean {
-    val names = cookie.split(';').mapNotNull { it.trim().substringBefore('=').takeIf(String::isNotBlank) }.toSet()
-    return "SESSDATA" in names && "bili_jct" in names
 }
 
 private fun createQrImage(content: String): ImageBitmap {
@@ -421,5 +387,3 @@ private fun createQrImage(content: String): ImageBitmap {
     }
     return bitmap.asImageBitmap()
 }
-
-private fun secureImageUrl(url: String): String = if (url.startsWith("http://")) url.replaceFirst("http://", "https://") else url
