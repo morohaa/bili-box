@@ -144,8 +144,8 @@ internal fun DynamicPage(
 
     Box(Modifier.fillMaxSize().background(colors.background)) {
         BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
-            // 参考稿把搜索框推到视觉中心：logo 顶边 ≈ 屏高一半 - 100。
-            val homeTop = (maxHeight * 0.5f - 80.dp).coerceAtLeast(16.dp)
+            // 参考稿把 logo 顶边放在屏高一半 - 100；这里再上移 40dp，搜索框正好落在视觉中心。
+            val homeTop = (maxHeight * 0.5f - 120.dp).coerceAtLeast(16.dp)
             val topSpace = lerp(16.dp, homeTop, 1f - travel)
             val logoHeight = 48.dp * (1f - travel)
 
@@ -562,11 +562,14 @@ private fun BrandLogo(colors: DynamicColors, darkMode: Boolean, modifier: Modifi
     val rightDark = if (darkMode) Color(0xFFE59B72) else Color(0xFFC77E56)
 
     Canvas(modifier.width(totalWidth).height(logoSize)) {
-        val baseline = layouts.bili.firstBaseline
+        // 显式把基线放在字标盒内 94% 处，而不是用 layout.firstBaseline：
+        // 系统字体放大后行高会变化，按 layout 基线绘制会把字底顶到盒底并被裁掉；
+        // 留 3dp 余量给圆形笔画的下沿过冲，同时保持字标与搜索框之间的设计间距。
+        val baseline = size.height * 0.94f
         var x = 0f
-        drawText(layouts.bili, topLeft = Offset(x, 0f))
+        drawText(layouts.bili, topLeft = Offset(x, baseline - layouts.bili.firstBaseline))
         x += layouts.bili.size.width
-        drawText(layouts.bridge, topLeft = Offset(x, 0f))
+        drawText(layouts.bridge, topLeft = Offset(x, baseline - layouts.bridge.firstBaseline))
         x += layouts.bridge.size.width + cubeMargin
         drawCube(
             left = x,
@@ -589,7 +592,7 @@ private fun BrandLogo(colors: DynamicColors, darkMode: Boolean, modifier: Modifi
             ),
         )
         x += cubeSize + cubeMargin
-        drawText(layouts.cross, topLeft = Offset(x, 0f))
+        drawText(layouts.cross, topLeft = Offset(x, baseline - layouts.cross.firstBaseline))
     }
 }
 
