@@ -13,6 +13,8 @@ internal val DarkInkSoft = Color(0xFFC9CED6)
 internal data class DynamicColors(
     val background: Color,
     val card: Color,
+    val chip: Color,
+    val chipBorder: Color,
     val ink: Color,
     val ink2: Color,
     val ink3: Color,
@@ -33,6 +35,8 @@ internal fun dynamicColors(darkMode: Boolean): DynamicColors = if (darkMode) {
     DynamicColors(
         background = Color(0xFF121314),
         card = Color(0xFF1D1F21),
+        chip = Color(0xFF26292E),
+        chipBorder = Color(0xFF3B3F45),
         ink = DarkInkSoft,
         ink2 = Color(0xFFA2A7AE),
         ink3 = Color(0xFF6D7278),
@@ -52,6 +56,8 @@ internal fun dynamicColors(darkMode: Boolean): DynamicColors = if (darkMode) {
     DynamicColors(
         background = Color(0xFFF6F7F8),
         card = Color(0xFFFFFFFF),
+        chip = Color(0xFFFFFFFF),
+        chipBorder = Color(0xFFE0E4E9),
         ink = Color(0xFF18191C),
         ink2 = Color(0xFF61666D),
         ink3 = Color(0xFF9499A0),

@@ -116,7 +116,7 @@ private fun SortChip(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val background by animateColorAsState(
-        if (expanded) colors.pinkSoft else colors.card,
+        if (expanded) colors.pinkSoft else colors.chip,
         label = "sort chip background",
     )
     val content by animateColorAsState(
@@ -130,6 +130,11 @@ private fun SortChip(
             Modifier.height(30.dp)
                 .clip(RoundedCornerShape(15.dp))
                 .background(background)
+                .border(
+                    1.dp,
+                    if (expanded) colors.pink.copy(alpha = .35f) else colors.chipBorder,
+                    RoundedCornerShape(15.dp),
+                )
                 .clickable(role = Role.Button) { expanded = !expanded }
                 .semantics { contentDescription = "排序方式：${order.label}" }
                 .padding(start = 12.dp, end = 10.dp),
@@ -199,7 +204,12 @@ private fun FilterChip(
     Row(
         Modifier.height(30.dp)
             .clip(RoundedCornerShape(15.dp))
-            .background(if (active) colors.pinkSoft else colors.card)
+            .background(if (active) colors.pinkSoft else colors.chip)
+            .border(
+                1.dp,
+                if (active) colors.pink.copy(alpha = .35f) else colors.chipBorder,
+                RoundedCornerShape(15.dp),
+            )
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = if (active) "筛选，已启用" else "筛选" }
             .padding(horizontal = 11.dp),
@@ -229,7 +239,8 @@ private fun LayoutButton(
     Box(
         Modifier.size(30.dp)
             .clip(CircleShape)
-            .background(colors.card)
+            .background(colors.chip)
+            .border(1.dp, colors.chipBorder, CircleShape)
             .clickable(role = Role.Button, onClick = onToggle)
             .semantics { contentDescription = if (gridLayout) "切换单列布局" else "切换双列布局" },
         contentAlignment = Alignment.Center,

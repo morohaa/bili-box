@@ -495,7 +495,8 @@ private fun HistoryChip(
         }
             .height(34.dp)
             .clip(RoundedCornerShape(17.dp))
-            .background(colors.card)
+            .background(colors.chip)
+            .border(1.dp, colors.chipBorder, RoundedCornerShape(17.dp))
             .clickable(enabled = !clearing, role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
