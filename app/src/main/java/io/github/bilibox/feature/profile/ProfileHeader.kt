@@ -1,0 +1,269 @@
+package io.github.bilibox.feature.profile
+
+import android.os.Build
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import io.github.bilibox.data.auth.BiliSession
+
+@Composable
+internal fun ProfileHeader(
+    session: BiliSession?,
+    avatar: ImageBitmap?,
+    darkMode: Boolean,
+    onToggleDarkMode: () -> Unit,
+) {
+    val background = if (darkMode) MyBgDark else MyBgLight
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val bannerHeight = 200.dp + statusBar
+
+    Box(Modifier.fillMaxWidth().height(bannerHeight + 56.dp)) {
+        Banner(avatar, darkMode, Modifier.fillMaxWidth().height(bannerHeight))
+        ProfileAvatar(
+            session = session,
+            avatar = avatar,
+            ring = background,
+            darkMode = darkMode,
+            modifier = Modifier.align(Alignment.TopStart).offset(x = 20.dp, y = bannerHeight - 45.dp),
+        )
+        ThemeToggle(
+            darkMode = darkMode,
+            onToggle = onToggleDarkMode,
+            modifier = Modifier.align(Alignment.TopEnd).offset(x = (-16).dp, y = bannerHeight + 10.dp),
+        )
+    }
+
+    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 4.dp)) {
+        Text(
+            text = session?.username ?: "未登录",
+            color = if (darkMode) MyInkDark else MyInkLight,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 0.5.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(if (session != null) 18.dp else 10.dp))
+        if (session != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LevelBadge(session.level)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = if (session.nextExp > 0) "${session.currentExp}/${session.nextExp}" else "MAX",
+                    color = if (darkMode) MySubDark else MySubLight,
+                    fontSize = 12.sp,
+                    lineHeight = 12.sp,
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            ExpProgress(
+                fraction = if (session.nextExp > 0) session.currentExp.toFloat() / session.nextExp else 1f,
+                darkMode = darkMode,
+            )
+        } else {
+            Text(
+                text = "登录后可同步收藏、历史与稍后再看",
+                color = if (darkMode) MySubDark else MySubLight,
+                fontSize = 12.sp,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun Banner(avatar: ImageBitmap?, darkMode: Boolean, modifier: Modifier = Modifier) {
+    val blurPx = with(LocalDensity.current) { 26.dp.toPx() }
+    val canBlur = Build.VERSION.SDK_INT >= 31
+    // BlurEffect 会把图层向外扩散，必须裁掉，否则头图会糊到信息区里。
+    Box(modifier.clipToBounds()) {
+        Box(
+            Modifier.matchParentSize().background(
+                Brush.linearGradient(listOf(Color(0xFFF87CA1), Color(0xFFB0335D)))
+            )
+        )
+        if (avatar != null) {
+            Image(
+                bitmap = avatar,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize().graphicsLayer {
+                    alpha = 0.94f
+                    if (canBlur) renderEffect = BlurEffect(blurPx, blurPx, TileMode.Clamp)
+                },
+            )
+            // 统一成品牌粉调，避免头像放大后喧宾夺主。
+            Box(Modifier.matchParentSize().background(Color(0x33F1739B)))
+        }
+        // 状态栏图标是白色，顶部压一层深色保证可读。
+        Box(
+            Modifier.matchParentSize().background(
+                Brush.verticalGradient(0f to Color.Black.copy(alpha = .34f), 0.42f to Color.Transparent)
+            )
+        )
+    }
+}
+
+@Composable
+internal fun ProfileAvatar(
+    session: BiliSession?,
+    avatar: ImageBitmap?,
+    ring: Color,
+    darkMode: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier.size(86.dp).clip(CircleShape)
+            .background(if (darkMode) Color(0xFF2A2D33) else Color(0xFFE7ECF3)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (avatar != null) {
+            Image(
+                bitmap = avatar,
+                contentDescription = "头像",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Text(
+                text = session?.username?.take(1) ?: "B",
+                color = MyPink,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Box(Modifier.matchParentSize().border(3.dp, ring, CircleShape))
+    }
+}
+
+@Composable
+internal fun ThemeToggle(darkMode: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    val sunAlpha by animateFloatAsState(if (darkMode) 0f else 1f, label = "sun")
+    val moonAlpha by animateFloatAsState(if (darkMode) 1f else 0f, label = "moon")
+    Box(
+        modifier.size(44.dp).clip(CircleShape)
+            .focusProperties { canFocus = false }
+            .clickable(onClick = onToggle),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(24.dp).graphicsLayer { alpha = sunAlpha }) {
+            val unit = size.minDimension / 24f
+            val tint = Color(0xFFF59E0B)
+            val stroke = Stroke(2f * unit, cap = StrokeCap.Round)
+            drawCircle(tint, 4f * unit, Offset(12f * unit, 12f * unit), style = stroke)
+            for (index in 0 until 8) {
+                val angle = Math.PI * index / 4.0
+                val cos = kotlin.math.cos(angle).toFloat()
+                val sin = kotlin.math.sin(angle).toFloat()
+                drawLine(
+                    tint,
+                    Offset(12f * unit + cos * 7.5f * unit, 12f * unit + sin * 7.5f * unit),
+                    Offset(12f * unit + cos * 9.5f * unit, 12f * unit + sin * 9.5f * unit),
+                    stroke.width,
+                    StrokeCap.Round,
+                )
+            }
+        }
+        Canvas(Modifier.size(24.dp).graphicsLayer { alpha = moonAlpha }) {
+            val unit = size.minDimension / 24f
+            val path = PathParser().parsePathString("M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z").toPath()
+            scale(unit, unit, pivot = Offset.Zero) {
+                drawPath(
+                    path,
+                    color = Color(0xFFE2E8F0),
+                    style = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                )
+            }
+        }
+    }
+}
+
+private val LevelBadgeShape = GenericShape { size, _ ->
+    val u = size.width / 36f
+    moveTo(4 * u, 0f)
+    lineTo(30 * u, 0f)
+    lineTo(36 * u, 6 * u)
+    lineTo(36 * u, 18 * u)
+    lineTo(4 * u, 18 * u)
+    arcTo(Rect(Offset(0f, 10 * u), Size(8 * u, 8 * u)), 90f, 90f, false)
+    lineTo(0f, 4 * u)
+    arcTo(Rect(Offset(0f, 0f), Size(8 * u, 8 * u)), 180f, 90f, false)
+    close()
+}
+
+@Composable
+internal fun LevelBadge(level: Int) {
+    Box(
+        Modifier.width(32.dp).height(16.dp).background(MyOrange, LevelBadgeShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "LV${level.coerceAtLeast(0)}",
+            color = Color.White,
+            style = TextStyle(
+                fontSize = 9.5.sp,
+                lineHeight = 9.5.sp,
+                fontWeight = FontWeight.Black,
+                fontStyle = FontStyle.Italic,
+                letterSpacing = 0.3.sp,
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
+            ),
+        )
+    }
+}
+
+@Composable
+internal fun ExpProgress(fraction: Float, darkMode: Boolean) {
+    Box(
+        Modifier.fillMaxWidth().height(3.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(if (darkMode) MyTrackDark else MyTrackLight)
+    ) {
+        Box(
+            Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).fillMaxHeight()
+                .background(
+                    Brush.horizontalGradient(listOf(Color(0xFFFF6600), Color(0xFFFF3300))),
+                    RoundedCornerShape(2.dp),
+                )
+        )
+    }
+}
