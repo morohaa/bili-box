@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0b0e">
+<title>BiliBox · 应用图标</title>
+<style>
+  :root{
+    --pink:#ef7196; --pink-deep:#cb3d66; --cream:#ffe4ec;
+    --ink:#0a0b0e; --panel:rgba(255,255,255,.035); --line:rgba(255,255,255,.07);
+    --text:#e9ebef; --muted:#98a0ab; --dim:#7f8793;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility}
+  body{
+    margin:0; color:var(--text); font-size:14px; line-height:1.5;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:
+      radial-gradient(900px 620px at 8% -8%, #2a1a26 0%, rgba(42,26,38,0) 62%),
+      radial-gradient(820px 560px at 96% 4%, #1b2231 0%, rgba(27,34,49,0) 64%),
+      #0a0b0e;
+    min-height:100vh;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:56px 46px 64px}
+  .eyebrow{font-size:10.5px; letter-spacing:.24em; text-transform:uppercase; color:var(--dim); font-weight:600}
+  h1{font-size:44px; line-height:1.08; letter-spacing:-.02em; margin:14px 0 12px; font-weight:600}
+  h1 em{font-style:normal; color:var(--pink)}
+  .sub{max-width:600px; margin:0; color:var(--muted); font-size:14.5px}
+  .hero{display:flex; gap:34px; align-items:center; margin-top:44px}
+  .hero-icons{display:flex; gap:26px}
+  .hero-icons figure{margin:0; text-align:center}
+  .big{width:206px; height:206px; display:block; filter:drop-shadow(0 26px 54px rgba(0,0,0,.55))}
+  .cap{font-size:9.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); margin-top:12px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:24px 26px}
+  .ladder{flex:1; min-width:0}
+  .sizes{display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-top:20px}
+  .sz{margin:0; text-align:center}
+  .szbox{display:grid; place-items:center}
+  .szbox .ico{width:100%; height:100%}
+  .sz figcaption{font-size:9.5px; color:var(--dim); margin-top:8px; letter-spacing:.08em}
+  .rows{display:grid; grid-template-columns:1.08fr 1fr 1fr; gap:18px; margin-top:20px}
+  .chips{display:flex; gap:18px; margin-top:18px}
+  .chip{text-align:center}
+  .chip .frame{width:88px; height:88px; display:grid; place-items:center; border-radius:18px; background:#13151b; border:1px solid rgba(255,255,255,.05)}
+  .chip .frame .ico{width:74px; height:74px}
+  .chip .frame.full .ico{width:74px; height:74px}
+  .chip span{display:block; font-size:9px; color:var(--dim); margin-top:8px; letter-spacing:.1em; text-transform:uppercase}
+  .layers{display:flex; gap:14px; margin-top:18px}
+  .layer{text-align:center}
+  .layer .frame{
+    width:88px; height:88px; border-radius:16px; overflow:hidden; display:grid; place-items:center;
+    background-image:
+      linear-gradient(45deg,#191c23 25%,transparent 25%,transparent 75%,#191c23 75%),
+      linear-gradient(45deg,#191c23 25%,transparent 25%,transparent 75%,#191c23 75%);
+    background-size:16px 16px; background-position:0 0,8px 8px; background-color:#14161b;
+  }
+  .layer .ico{width:76px; height:76px}
+  .layer span{display:block; font-size:9px; color:var(--dim); margin-top:8px; letter-spacing:.1em; text-transform:uppercase}
+  .mono{display:flex; gap:14px; margin-top:18px}
+  .mono .frame{width:88px; height:88px; border-radius:20px; display:grid; place-items:center}
+  .mono .ico{width:60px; height:60px}
+  .mono .light{background:#e8def8}
+  .mono .dark{background:#2b2930}
+  .walls{display:flex; gap:16px; margin-top:18px}
+  .wall{position:relative; width:232px; height:124px; border-radius:20px; overflow:hidden;
+        display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+  .wall.light{background:
+      radial-gradient(150px 110px at 18% 8%, #ffe3ec 0%, rgba(255,227,236,0) 70%),
+      radial-gradient(190px 150px at 92% 92%, #d8e6ff 0%, rgba(216,230,255,0) 70%),
+      linear-gradient(150deg,#f7f0f3,#e9eef8)}
+  .wall.dark{background:
+      radial-gradient(170px 130px at 12% 0%, #3a2233 0%, rgba(58,34,51,0) 70%),
+      radial-gradient(190px 150px at 96% 100%, #1e2c44 0%, rgba(30,44,68,0) 70%),
+      linear-gradient(150deg,#1b1a20,#0e1118)}
+  .wall .ico{width:58px; height:58px; filter:drop-shadow(0 8px 16px rgba(0,0,0,.35))}
+  .wall .name{font-size:11px}
+  .wall.light .name{color:#20242b}
+  .wall.dark .name{color:#eef1f5}
+  .palette{display:flex; gap:0; margin-top:18px; border-radius:14px; overflow:hidden}
+  .sw{flex:1; height:74px; display:flex; flex-direction:column; justify-content:flex-end; padding:8px 9px}
+  .sw b{font-size:9.5px; font-weight:600; letter-spacing:.04em}
+  .sw span{font-size:8.5px; opacity:.75; letter-spacing:.06em}
+  .sw.on-light{color:#3b2a30}
+  .palette-note{font-size:11px; color:var(--dim); margin:12px 0 0}
+  .notes{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:20px}
+  .note{padding:20px 22px; border-radius:18px; background:rgba(255,255,255,.022); border:1px solid rgba(255,255,255,.05)}
+  .note .n{font-size:10px; letter-spacing:.16em; color:var(--pink); font-weight:600}
+  .note h3{font-size:14px; margin:8px 0 6px; font-weight:600; letter-spacing:.01em}
+  .note p{margin:0; font-size:12.5px; color:var(--muted); line-height:1.55}
+  details.source{margin-top:20px; border-radius:18px; border:1px solid var(--line); background:rgba(255,255,255,.022); overflow:hidden}
+  details.source summary{cursor:pointer; padding:16px 22px; font-size:12.5px; color:#c6ccd4; list-style:none; display:flex; align-items:center; gap:10px}
+  details.source summary::-webkit-details-marker{display:none}
+  details.source summary::before{content:"＋"; color:var(--pink); font-size:14px; line-height:1}
+  details.source[open] summary::before{content:"－"}
+  .coderow{display:flex; justify-content:space-between; align-items:center; padding:0 22px 10px; gap:12px}
+  .coderow p{margin:0; font-size:11px; color:var(--dim)}
+  button{font:inherit; font-size:11.5px; color:#0f1115; background:var(--cream); border:0; border-radius:999px; padding:7px 14px; cursor:pointer}
+  button:hover{background:#fff}
+  pre{margin:0; padding:0 22px 22px; max-height:280px; overflow:auto; font:11px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:#b9c2cc; white-space:pre}
+  footer{margin-top:30px; display:flex; justify-content:space-between; align-items:center; color:#6f7782; font-size:10.5px; letter-spacing:.04em}
+  footer .dot{color:var(--pink)}
+  @media (max-width:1020px){
+    .hero{flex-direction:column; align-items:flex-start}
+    .rows{grid-template-columns:1fr}
+    .notes{grid-template-columns:1fr}
+    .wrap{padding:40px 24px 52px}
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EF6E91"/>
+      <stop offset="0.55" stop-color="#CB3D66"/>
+      <stop offset="1" stop-color="#8E2144"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.34" cy="0.14" r="0.72">
+      <stop offset="0" stop-color="#FFA8C0" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#FFA8C0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cream" x1="0" y1="0" x2="0.06" y2="1">
+      <stop offset="0" stop-color="#FFFDFC"/>
+      <stop offset="1" stop-color="#FFE4EC"/>
+    </linearGradient>
+    <clipPath id="clip-sq"><path d="M 54 18 C 86.72 18 90 21.28 90 54 C 90 86.72 86.72 90 54 90 C 21.28 90 18 86.72 18 54 C 18 21.28 21.28 18 54 18 Z"/></clipPath>
+    <clipPath id="clip-circle"><circle cx="54" cy="54" r="36"/></clipPath>
+    <g id="art">
+      <rect width="108" height="108" fill="url(#tile)"/>
+      <rect width="108" height="108" fill="url(#halo)"/>
+      <g transform="rotate(-6 54 54)"><path d="M 34.5 32.4 H 73.5 A 4.5 4.5 0 0 1 78 36.9 V 40.1 A 1.9 1.9 0 0 1 76.1 42 H 31.9 A 1.9 1.9 0 0 1 30 40.1 V 36.9 A 4.5 4.5 0 0 1 34.5 32.4 Z M 33.9 43.7 H 74.1 A 1.9 1.9 0 0 1 76 45.6 V 66.1 A 9.6 9.6 0 0 1 66.4 75.7 H 41.6 A 9.6 9.6 0 0 1 32 66.1 V 45.6 A 1.9 1.9 0 0 1 33.9 43.7 Z M 49.21 53.06 Q 46.7 51.6 46.7 54.5 L 46.7 65.7 Q 46.7 68.6 49.21 67.14 L 58.79 61.56 Q 61.3 60.1 58.79 58.64 Z" fill="url(#cream)" fill-rule="evenodd"/></g>
+    </g>
+    <g id="layer-bg">
+      <rect width="108" height="108" fill="url(#tile)"/>
+      <rect width="108" height="108" fill="url(#halo)"/>
+    </g>
+    <g id="layer-fg">
+      <g transform="rotate(-6 54 54)"><path d="M 34.5 32.4 H 73.5 A 4.5 4.5 0 0 1 78 36.9 V 40.1 A 1.9 1.9 0 0 1 76.1 42 H 31.9 A 1.9 1.9 0 0 1 30 40.1 V 36.9 A 4.5 4.5 0 0 1 34.5 32.4 Z M 33.9 43.7 H 74.1 A 1.9 1.9 0 0 1 76 45.6 V 66.1 A 9.6 9.6 0 0 1 66.4 75.7 H 41.6 A 9.6 9.6 0 0 1 32 66.1 V 45.6 A 1.9 1.9 0 0 1 33.9 43.7 Z M 49.21 53.06 Q 46.7 51.6 46.7 54.5 L 46.7 65.7 Q 46.7 68.6 49.21 67.14 L 58.79 61.56 Q 61.3 60.1 58.79 58.64 Z" fill="url(#cream)" fill-rule="evenodd"/></g>
+    </g>
+    <g id="mono">
+      <g transform="rotate(-6 54 54)"><path d="M 34.5 32.4 H 73.5 A 4.5 4.5 0 0 1 78 36.9 V 40.1 A 1.9 1.9 0 0 1 76.1 42 H 31.9 A 1.9 1.9 0 0 1 30 40.1 V 36.9 A 4.5 4.5 0 0 1 34.5 32.4 Z M 33.9 43.7 H 74.1 A 1.9 1.9 0 0 1 76 45.6 V 66.1 A 9.6 9.6 0 0 1 66.4 75.7 H 41.6 A 9.6 9.6 0 0 1 32 66.1 V 45.6 A 1.9 1.9 0 0 1 33.9 43.7 Z M 49.21 53.06 Q 46.7 51.6 46.7 54.5 L 46.7 65.7 Q 46.7 68.6 49.21 67.14 L 58.79 61.56 Q 61.3 60.1 58.79 58.64 Z" fill="#FFFFFF" fill-rule="evenodd"/></g>
+    </g>
+</defs></svg>
+
+<main class="wrap">
+  <div class="eyebrow">BiliBox · 应用图标</div>
+  <h1>会<em>播放</em>的盒子</h1>
+  <p class="sub">奶油色的「箱子」加一扇镂空的播放窗，整体倾斜 6°，落在主色 #EF7196 的深玫瑰渐变上。一个轮廓，24 px 也认得出。</p>
+
+  <section class="hero">
+    <div class="hero-icons">
+      <figure><svg class="ico big" viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-sq)"><use href="#art"/></g></svg><div class="cap">圆角矩形遮罩</div></figure>
+      <figure><svg class="ico big" viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-circle)"><use href="#art"/></g></svg><div class="cap">圆形遮罩</div></figure>
+    </div>
+    <div class="card ladder">
+      <div class="eyebrow">尺寸阶梯</div>
+      <div class="sizes"><figure class="sz"><div class="szbox" style="width:152px;height:152px"><svg class="ico " viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-sq)"><use href="#art"/></g></svg></div><figcaption>152 px</figcaption></figure><figure class="sz"><div class="szbox" style="width:96px;height:96px"><svg class="ico " viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-sq)"><use href="#art"/></g></svg></div><figcaption>96 px</figcaption></figure><figure class="sz"><div class="szbox" style="width:64px;height:64px"><svg class="ico " viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-sq)"><use href="#art"/></g></svg></div><figcaption>64 px</figcaption></figure><figure class="sz"><div class="szbox" style="width:48px;height:48px"><svg class="ico " viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-sq)"><use href="#art"/></g></svg></div><figcaption>48 px</figcaption></figure><figure class="sz"><div class="szbox" style="width:32px;height:32px"><svg class="ico " viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-sq)"><use href="#art"/></g></svg></div><figcaption>32 px</figcaption></figure><figure class="sz"><div class="szbox" style="width:24px;height:24px"><svg class="ico " viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-sq)"><use href="#art"/></g></svg></div><figcaption>24 px</figcaption></figure></div>
+    </div>
+  </section>
+
+  <section class="rows">
+    <div class="card">
+      <div class="eyebrow">遮罩测试</div>
+      <div class="chips">
+        <div class="chip"><div class="frame full"><svg class="ico " viewBox="0 0 108 108" role="img" aria-label="BiliBox 应用图标"><use href="#art"/></svg></div><span>整幅画布</span></div>
+        <div class="chip"><div class="frame"><svg class="ico " viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-sq)"><use href="#art"/></g></svg></div><span>圆角矩形</span></div>
+        <div class="chip"><div class="frame"><svg class="ico " viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-circle)"><use href="#art"/></g></svg></div><span>圆形</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">自适应图层</div>
+      <div class="layers">
+        <div class="layer"><div class="frame"><svg class="ico" viewBox="0 0 108 108"><use href="#layer-bg"/></svg></div><span>背景</span></div>
+        <div class="layer"><div class="frame"><svg class="ico" viewBox="0 0 108 108"><use href="#layer-fg"/></svg></div><span>前景</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">单色主题图标</div>
+      <div class="mono">
+        <div class="frame light"><svg class="ico" viewBox="0 0 108 108" style="filter:brightness(0) opacity(.78)"><use href="#mono"/></svg></div>
+        <div class="frame dark"><svg class="ico" viewBox="0 0 108 108"><use href="#mono"/></svg></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="rows" style="grid-template-columns:1.35fr 1fr">
+    <div class="card">
+      <div class="eyebrow">桌面效果</div>
+      <div class="walls">
+        <div class="wall light"><svg class="ico " viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-sq)"><use href="#art"/></g></svg><div class="name">BiliBox</div></div>
+        <div class="wall dark"><svg class="ico " viewBox="18 18 72 72" role="img" aria-label="BiliBox 应用图标"><g clip-path="url(#clip-sq)"><use href="#art"/></g></svg><div class="name">BiliBox</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">色彩</div>
+      <div class="palette">
+        <div class="sw" style="background:#EF6E91"><b>#EF6E91</b><span>底色高光</span></div>
+        <div class="sw" style="background:#CB3D66"><b>#CB3D66</b><span>主色</span></div>
+        <div class="sw" style="background:#8E2144"><b>#8E2144</b><span>底色阴影</span></div>
+        <div class="sw on-light" style="background:#FFE4EC"><b>#FFE4EC</b><span>箱体</span></div>
+      </div>
+      <p class="palette-note">取自 App 主色 #EF7196，压深一档作为画布，奶油白拉开对比。</p>
+    </div>
+  </section>
+
+  <section class="notes">
+    <div class="note"><div class="n">01</div><h3>箱子 = Box</h3><p>盖板、箱体、1.7 单位的缝隙：远看是盒子，近看才发现正面是一枚播放键。</p></div>
+    <div class="note"><div class="n">02</div><h3>播放键是挖空的</h3><p>evenOdd 真正镂空，透出底色而不是盖一块颜色；换成单色主题也成立。</p></div>
+    <div class="note"><div class="n">03</div><h3>为 24 px 调过</h3><p>全部落在 66 × 66 安全区内，圆角与缝隙按小尺寸反复微调，缩到 24 px 仍可读。</p></div>
+  </section>
+
+  <details class="source">
+    <summary>SVG 源码（512 × 512，可直接使用）</summary>
+    <div class="coderow"><p>圆角矩形版本，含渐变与镂空播放键。</p><button id="copy">复制 SVG</button></div>
+    <pre id="code">&lt;svg xmlns=&quot;http://www.w3.org/2000/svg&quot; width=&quot;512&quot; height=&quot;512&quot; viewBox=&quot;18 18 72 72&quot;&gt;
+  &lt;defs&gt;
+    &lt;linearGradient id=&quot;tile&quot; x1=&quot;0&quot; y1=&quot;0&quot; x2=&quot;1&quot; y2=&quot;1&quot;&gt;
+      &lt;stop offset=&quot;0&quot; stop-color=&quot;#EF6E91&quot;/&gt;
+      &lt;stop offset=&quot;0.55&quot; stop-color=&quot;#CB3D66&quot;/&gt;
+      &lt;stop offset=&quot;1&quot; stop-color=&quot;#8E2144&quot;/&gt;
+    &lt;/linearGradient&gt;
+    &lt;radialGradient id=&quot;halo&quot; cx=&quot;0.34&quot; cy=&quot;0.14&quot; r=&quot;0.72&quot;&gt;
+      &lt;stop offset=&quot;0&quot; stop-color=&quot;#FFA8C0&quot; stop-opacity=&quot;0.5&quot;/&gt;
+      &lt;stop offset=&quot;1&quot; stop-color=&quot;#FFA8C0&quot; stop-opacity=&quot;0&quot;/&gt;
+    &lt;/radialGradient&gt;
+    &lt;linearGradient id=&quot;cream&quot; x1=&quot;0&quot; y1=&quot;0&quot; x2=&quot;0.06&quot; y2=&quot;1&quot;&gt;
+      &lt;stop offset=&quot;0&quot; stop-color=&quot;#FFFDFC&quot;/&gt;
+      &lt;stop offset=&quot;1&quot; stop-color=&quot;#FFE4EC&quot;/&gt;
+    &lt;/linearGradient&gt;
+    &lt;clipPath id=&quot;squircle&quot;&gt;&lt;path d=&quot;M 54 18 C 86.72 18 90 21.28 90 54 C 90 86.72 86.72 90 54 90 C 21.28 90 18 86.72 18 54 C 18 21.28 21.28 18 54 18 Z&quot;/&gt;&lt;/clipPath&gt;
+  &lt;/defs&gt;
+  &lt;g clip-path=&quot;url(#squircle)&quot;&gt;
+    &lt;rect width=&quot;108&quot; height=&quot;108&quot; fill=&quot;url(#tile)&quot;/&gt;
+    &lt;rect width=&quot;108&quot; height=&quot;108&quot; fill=&quot;url(#halo)&quot;/&gt;
+    &lt;g transform=&quot;rotate(-6 54 54)&quot;&gt;
+      &lt;path d=&quot;M 34.5 32.4 H 73.5 A 4.5 4.5 0 0 1 78 36.9 V 40.1 A 1.9 1.9 0 0 1 76.1 42 H 31.9 A 1.9 1.9 0 0 1 30 40.1 V 36.9 A 4.5 4.5 0 0 1 34.5 32.4 Z M 33.9 43.7 H 74.1 A 1.9 1.9 0 0 1 76 45.6 V 66.1 A 9.6 9.6 0 0 1 66.4 75.7 H 41.6 A 9.6 9.6 0 0 1 32 66.1 V 45.6 A 1.9 1.9 0 0 1 33.9 43.7 Z M 49.21 53.06 Q 46.7 51.6 46.7 54.5 L 46.7 65.7 Q 46.7 68.6 49.21 67.14 L 58.79 61.56 Q 61.3 60.1 58.79 58.64 Z&quot; fill=&quot;url(#cream)&quot; fill-rule=&quot;evenodd&quot;/&gt;
+    &lt;/g&gt;
+  &lt;/g&gt;
+&lt;/svg&gt;</pre>
+  </details>
+
+  <footer><span>BiliBox · 108 × 108 adaptive grid <span class="dot">·</span> 安全区 66 × 66</span><span>2026</span></footer>
+</main>
+<script>
+  const btn = document.getElementById('copy');
+  const done = () => {
+    btn.textContent = '已复制 ✓';
+    setTimeout(() => { btn.textContent = '复制 SVG'; }, 1500);
+  };
+  const fallback = (text) => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    ta.remove();
+  };
+  btn.addEventListener('click', () => {
+    const text = document.getElementById('code').textContent;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallback(text));
+    } else {
+      fallback(text);
+    }
+  });
+</script>
+</body>
+</html>

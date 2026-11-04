@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BiliBox themed icon: the same silhouette, single colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Screen frame, antennae and eyes. The frame is an outer plus an
+         inner rounded rectangle (even-odd) because its sides are 6.66 dp
+         and its top/bottom 6.44 dp, as in the reference. -->
+    <path
+        android:pathData="M 38.31 36.78 L 69.69 36.78 A 12.56 12.56 0 0 1 82.25 49.33 L 82.25 66.61 A 12.56 12.56 0 0 1 69.69 79.17 L 38.31 79.17 A 12.56 12.56 0 0 1 25.75 66.61 L 25.75 49.33 A 12.56 12.56 0 0 1 38.31 36.78 Z M 38.28 42.84 L 69.72 42.84 A 6.25 6.25 0 0 1 75.97 49.1 L 75.97 66.84 A 6.25 6.25 0 0 1 69.72 73.1 L 38.28 73.1 A 6.25 6.25 0 0 1 32.03 66.84 L 32.03 49.1 A 6.25 6.25 0 0 1 38.28 42.84 Z"
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd" />
+    <path
+        android:pathData="M 39.56 31.91 L 46.86 39.01"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6.16"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M 68.44 31.91 L 61.14 39.01"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6.16"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M 44.59 55.07 L 44.59 57.85"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6.29"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M 63.41 55.07 L 63.41 57.85"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6.29"
+        android:strokeLineCap="round" />
+</vector>

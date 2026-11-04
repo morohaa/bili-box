@@ -1,0 +1,116 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; width:1500px; font:14px/1.45 -apple-system,"SF Pro Text","Helvetica Neue",sans-serif;
+         background:
+           radial-gradient(900px 620px at 12% -10%, #2a1a26 0%, rgba(42,26,38,0) 60%),
+           radial-gradient(760px 520px at 92% 8%, #1c2230 0%, rgba(28,34,48,0) 62%),
+           #0a0b0e;
+         color:#e9ebef; padding:40px 52px 34px; }
+  .eyebrow { font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#8d95a1; }
+  h1 { font-size:26px; letter-spacing:-.01em; margin:8px 0 4px; font-weight:600; }
+  h1 span { color:#f87ba0; }
+  .sub { font-size:13px; color:#98a0ab; margin:0 0 28px; }
+  .top { display:flex; gap:34px; align-items:center; }
+  .hero { display:flex; gap:30px; }
+  .hero > div { text-align:center; }
+  .hero-tile { width:226px; height:226px; border-radius:30%; overflow:hidden;
+               box-shadow:0 26px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05); }
+  .hero-round { width:226px; height:226px; border-radius:50%; overflow:hidden;
+                box-shadow:0 26px 60px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05); }
+  .hero-tile img, .hero-round img { width:100%; height:100%; display:block; }
+  .caption { font-size:10px; color:#7f8793; margin-top:10px; letter-spacing:.12em; }
+  .panel { background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.06);
+           border-radius:20px; padding:24px 28px 18px; flex:1; }
+  .sizes { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; }
+  .sizes .cell { text-align:center; }
+  .masked { overflow:hidden; border-radius:26%; display:block; }
+  .masked.round { border-radius:50%; }
+  .masked img { display:block; width:100%; height:100%; }
+  .num { font-size:10px; color:#7f8793; margin-top:7px; letter-spacing:.08em; }
+  .divider { height:1px; background:linear-gradient(90deg,rgba(255,255,255,.09),rgba(255,255,255,0)); margin:26px 0 0; }
+  .bottom { display:flex; gap:30px; margin-top:24px; align-items:flex-start; }
+  .layers { display:flex; gap:14px; }
+  .layer { background:#12141a; border:1px solid rgba(255,255,255,.06); border-radius:16px;
+           padding:12px; text-align:center; }
+  .layer .chk { width:92px; height:92px; border-radius:14px; overflow:hidden; display:grid; place-items:center;
+                background-image:linear-gradient(45deg,#1a1d24 25%,transparent 25%,transparent 75%,#1a1d24 75%),
+                                 linear-gradient(45deg,#1a1d24 25%,transparent 25%,transparent 75%,#1a1d24 75%);
+                background-size:16px 16px; background-position:0 0,8px 8px; }
+  .layer img { width:92px; height:92px; }
+  .layer .cap { font-size:9px; color:#838b97; margin-top:8px; letter-spacing:.1em; }
+  .mono { display:flex; gap:14px; }
+  .mono .bg { width:92px; height:92px; border-radius:24%; display:grid; place-items:center; }
+  .mono .bg img { width:72%; height:72%; }
+  .walls { display:flex; gap:16px; }
+  .wall { width:236px; height:124px; border-radius:22px; position:relative; overflow:hidden;
+          display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+          box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); }
+  .wall.light { background:
+      radial-gradient(160px 120px at 20% 10%, #ffe3ec 0%, rgba(255,227,236,0) 70%),
+      radial-gradient(200px 160px at 90% 90%, #d8e6ff 0%, rgba(216,230,255,0) 70%),
+      linear-gradient(150deg,#f7f0f3,#e9eef8); }
+  .wall.dark { background:
+      radial-gradient(180px 140px at 15% 0%, #3a2233 0%, rgba(58,34,51,0) 70%),
+      radial-gradient(200px 160px at 95% 100%, #1e2c44 0%, rgba(30,44,68,0) 70%),
+      linear-gradient(150deg,#1b1a20,#0e1118); }
+  .wall .masked { width:58px; height:58px; box-shadow:0 8px 18px rgba(0,0,0,.35); }
+  .wall .name { font-size:11px; letter-spacing:.01em; }
+  .wall.light .name { color:#20242b; }
+  .wall.dark .name { color:#eef1f5; }
+  .footer { margin-top:26px; display:flex; gap:10px; align-items:center; color:#7c8490; font-size:11px; }
+  .swatch { width:14px; height:14px; border-radius:50%; display:inline-block; }
+</style></head><body>
+  <div class="eyebrow">BiliBox &middot; launcher icon</div>
+  <h1>A pink box, <span>tuned in</span>.</h1>
+  <p class="sub">The reference mark redrawn as geometry &mdash; a white TV outline on #FA729A, sized to the 66&nbsp;dp safe circle so no launcher mask crops it.</p>
+
+  <div class="top">
+    <div class="hero">
+      <div>
+        <div class="hero-tile"><img src="icon-squircle.svg"></div>
+        <div class="caption">SQUIRCLE MASK</div>
+      </div>
+      <div>
+        <div class="hero-round"><img src="icon-squircle.svg"></div>
+        <div class="caption">CIRCLE MASK</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="eyebrow" style="margin-bottom:18px">Size ladder &middot; squircle mask</div>
+      <div class="sizes"><div class="cell"><div class="masked" style="width:192px;height:192px"><img src="icon-squircle.svg"></div><div class="num">192 px</div></div><div class="cell"><div class="masked" style="width:128px;height:128px"><img src="icon-squircle.svg"></div><div class="num">128 px</div></div><div class="cell"><div class="masked" style="width:96px;height:96px"><img src="icon-squircle.svg"></div><div class="num">96 px</div></div><div class="cell"><div class="masked" style="width:64px;height:64px"><img src="icon-squircle.svg"></div><div class="num">64 px</div></div><div class="cell"><div class="masked" style="width:48px;height:48px"><img src="icon-squircle.svg"></div><div class="num">48 px</div></div><div class="cell"><div class="masked" style="width:32px;height:32px"><img src="icon-squircle.svg"></div><div class="num">32 px</div></div><div class="cell"><div class="masked" style="width:24px;height:24px"><img src="icon-squircle.svg"></div><div class="num">24 px</div></div></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="bottom">
+    <div>
+      <div class="eyebrow" style="margin-bottom:12px">Adaptive layers</div>
+      <div class="layers">
+        <div class="layer"><div class="chk"><img src="layer-background.svg"></div><div class="cap">BACKGROUND</div></div>
+        <div class="layer"><div class="chk"><img src="layer-foreground.svg"></div><div class="cap">FOREGROUND</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:12px">Themed icon</div>
+      <div class="mono">
+        <div class="bg" style="background:#e8def8"><img src="icon-monochrome.svg" style="filter:brightness(0) opacity(.78)"></div>
+        <div class="bg" style="background:#2b2930"><img src="icon-monochrome.svg"></div>
+      </div>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:12px">On the home screen</div>
+      <div class="walls">
+        <div class="wall light"><div class="masked"><img src="icon-squircle.svg"></div><div class="name">BiliBox</div></div>
+        <div class="wall dark"><div class="masked"><img src="icon-squircle.svg"></div><div class="name">BiliBox</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="swatch" style="background:#FA729A"></span>
+    <span class="swatch" style="background:#FF9BB7"></span>
+    <span class="swatch" style="background:#FFFFFF"></span>
+    <span style="margin-left:6px">reference mark &rarr; geometry &middot; 108&times;108 grid &middot; 56.5 dp mark inside the 66 dp safe circle</span>
+  </div>
+</body></html>
