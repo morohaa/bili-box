@@ -30,8 +30,11 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.bilibox.bili.Page
+import com.example.bilibox.danmaku.DanmakuSettings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -97,6 +100,7 @@ class VideoPlayerScreenTest {
                     commentMessage = "暂不支持查看在线评论",
                     onBack = {},
                     onRetry = {},
+                    danmakuSupported = true,
                     details = { Text("搜索视频简介") }
                 )
             }
@@ -130,6 +134,7 @@ class VideoPlayerScreenTest {
                     commentMessage = "暂不支持查看在线评论",
                     onBack = {},
                     onRetry = {},
+                    danmakuSupported = true,
                     details = { Text("搜索视频简介") }
                 )
             }
@@ -140,7 +145,9 @@ class VideoPlayerScreenTest {
         compose.onNodeWithContentDescription("退出全屏").assertDoesNotExist()
         compose.onNodeWithContentDescription("下一集").assertExists()
         compose.onNodeWithContentDescription("画质 选择").assertDoesNotExist()
-        compose.onNodeWithContentDescription("弹幕开关（开发中）").assertExists()
+        compose.onNodeWithContentDescription("关闭弹幕").assertExists()
+        compose.onNodeWithContentDescription("弹幕设置").assertExists()
+        compose.onNodeWithContentDescription("登录后发送弹幕").assertExists()
         compose.onNodeWithContentDescription("切换横屏").assertDoesNotExist()
         compose.onNodeWithContentDescription("播放进度").assertExists()
         compose.onNodeWithText("00:00 / --:--").assertExists()
@@ -150,6 +157,46 @@ class VideoPlayerScreenTest {
         compose.onNodeWithContentDescription("截取视频画面").assertDoesNotExist()
         compose.onNodeWithContentDescription("解锁屏幕").performClick()
         compose.onNodeWithContentDescription("截取视频画面").assertExists()
+    }
+
+    @Test
+    fun danmakuControlsToggleAndOpenSettings() {
+        var settings by mutableStateOf(DanmakuSettings())
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            val landscape = Configuration(LocalConfiguration.current).apply {
+                orientation = Configuration.ORIENTATION_LANDSCAPE
+            }
+            CompositionLocalProvider(LocalConfiguration provides landscape) {
+                VideoPlayerScreen(
+                    player = player,
+                    title = "搜索视频",
+                    sourceLabel = "哔哩哔哩",
+                    commentMessage = "暂不支持查看在线评论",
+                    onBack = {},
+                    onRetry = {},
+                    danmakuSupported = true,
+                    danmakuSettings = settings,
+                    onDanmakuSettingsChange = { settings = it },
+                    onSendDanmaku = { _, _ -> Result.success(Unit) },
+                    details = { Text("搜索视频简介") },
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("关闭弹幕").assertExists().performClick()
+        compose.runOnIdle { assertFalse(settings.enabled) }
+        compose.onNodeWithContentDescription("开启弹幕").assertExists().performClick()
+        compose.runOnIdle { assertTrue(settings.enabled) }
+
+        compose.onNodeWithContentDescription("弹幕设置").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("弹幕设置").assertExists()
+        compose.onNodeWithText("不透明度").assertExists()
+        compose.onNodeWithText("显示区域").assertExists()
+        compose.onNodeWithText("半屏").assertExists()
     }
 
     @Test

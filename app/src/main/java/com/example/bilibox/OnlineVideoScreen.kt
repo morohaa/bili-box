@@ -116,6 +116,10 @@ import com.example.bilibox.bili.BiliQn
 import com.example.bilibox.bili.PlayData
 import com.example.bilibox.bili.VideoInfo
 import com.example.bilibox.bili.VideoSearchItem
+import com.example.bilibox.danmaku.Danmaku
+import com.example.bilibox.danmaku.DanmakuParser
+import com.example.bilibox.danmaku.DanmakuPreferences
+import com.example.bilibox.danmaku.DanmakuSettings
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.HttpDataSource
@@ -644,6 +648,61 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     // Cache entries belong to one quality, so do not reuse 1080P urls after a quality change.
     val episodePlayCache = remember(video.bvid, session?.cookie, selectedQn) { EpisodePlayCache() }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
+    // 弹幕偏好跨视频保留；每条分 P 的弹幕列表按 cid 单独加载。
+    val danmakuPreferences = remember(context) { DanmakuPreferences(context) }
+    var danmakuSettings by remember { mutableStateOf(danmakuPreferences.load()) }
+    var danmakuItems by remember(video.bvid) { mutableStateOf<List<Danmaku>>(emptyList()) }
+    var danmakuLoading by remember(video.bvid) { mutableStateOf(false) }
+    var danmakuError by remember(video.bvid) { mutableStateOf<String?>(null) }
+    LaunchedEffect(playbackCid) {
+        val cid = playbackCid
+        if (cid <= 0L) return@LaunchedEffect
+        danmakuItems = emptyList()
+        danmakuError = null
+        danmakuLoading = true
+        try {
+            danmakuItems = DanmakuParser.parse(client.danmakuXml(cid))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            danmakuError = error.message ?: "弹幕加载失败"
+        } finally {
+            danmakuLoading = false
+        }
+    }
+    /** 保存用户刚调整的弹幕偏好，让下一个分 P / 下一个视频继续沿用。 */
+    val updateDanmakuSettings: (DanmakuSettings) -> Unit = { updated ->
+        danmakuSettings = updated
+        danmakuPreferences.save(updated)
+    }
+    /** 登录后才允许发送；成功后立即插入本地时间轴。 */
+    val sendDanmaku: (suspend (String, Long) -> Result<Unit>)? =
+        if (session != null && hasLoginCookies(session.cookie)) {
+            { message, progressMs ->
+                try {
+                    client.sendDanmaku(
+                        bvid = video.bvid,
+                        cid = playbackCid,
+                        message = message,
+                        progressMs = progressMs,
+                    )
+                    danmakuItems = (danmakuItems + Danmaku(
+                        timeMs = progressMs.coerceAtLeast(0L),
+                        mode = Danmaku.Mode.SCROLL,
+                        fontSize = 25,
+                        color = 0xFFFFFF,
+                        text = message,
+                    )).sortedBy { it.timeMs }
+                    Result.success(Unit)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Result.failure(error)
+                }
+            }
+        } else {
+            null
+        }
     /** Attaches fresh playurl data, resuming where the failed stream stopped. */
     fun attachPlayData(data: com.example.bilibox.bili.PlayData, qn: Int, resumeMs: Long = exoPlayer.currentPosition) {
         playbackData = data
@@ -1104,6 +1163,13 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                 qualityRequestToken++
             }
         },
+        danmakuSupported = true,
+        danmakuItems = danmakuItems,
+        danmakuSettings = danmakuSettings,
+        danmakuLoading = danmakuLoading,
+        danmakuError = danmakuError,
+        onDanmakuSettingsChange = updateDanmakuSettings,
+        onSendDanmaku = sendDanmaku,
         episodes = episodePicker,
         episodeOverlay = episodeOverlayContent,
         episodeOverlayVisible = episodeOverlayVisible,

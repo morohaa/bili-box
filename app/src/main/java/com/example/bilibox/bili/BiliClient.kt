@@ -11,6 +11,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -53,6 +54,101 @@ class BiliClient(
         val response = getJson<UserCardData>("$USER_CARD_URL?mid=$mid")
         ensureOk(response)
         return response.data ?: throw BiliException(response.code, "card 返回空 data")
+    }
+
+    /**
+     * 拉取一个分 P 的弹幕 XML。接口用 `Content-Encoding: deflate` 返回原始压缩
+     * 数据，[decodeDanmakuPayload] 会在交给解析器前统一解压。
+     */
+    suspend fun danmakuXml(cid: Long): String {
+        require(cid > 0L) { "cid 必须大于 0" }
+        return withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url("$DANMAKU_URL?oid=$cid")
+                .header("User-Agent", UA)
+                .header("Referer", "https://www.bilibili.com/")
+                .header("Accept", "text/xml, application/xml, */*")
+            buildCookieHeader()?.let { request.header("Cookie", it) }
+            http.newCall(request.build()).execute().use { response ->
+                val body = response.body?.bytes() ?: throw BiliException(
+                    response.code,
+                    "弹幕接口返回空内容",
+                )
+                if (!response.isSuccessful) {
+                    throw BiliException(response.code, "弹幕加载失败（HTTP ${response.code}）")
+                }
+                decodeDanmakuPayload(body)
+            }
+        }
+    }
+
+    /**
+     * 发送一条滚动弹幕。需要登录 Cookie 中的 `bili_jct` 作为 CSRF 令牌；
+     * 发送成功后由调用方把新弹幕立即插入本地时间轴，无需重新拉取整段 XML。
+     */
+    suspend fun sendDanmaku(
+        bvid: String,
+        cid: Long,
+        message: String,
+        progressMs: Long,
+        color: Int = 0xFFFFFF,
+        fontSize: Int = 25,
+    ) {
+        val text = message.trim()
+        require(text.isNotEmpty()) { "弹幕内容不能为空" }
+        require(text.length <= 100) { "弹幕最多 100 个字符" }
+        require(cid > 0L) { "cid 必须大于 0" }
+        val csrf = csrfToken() ?: throw BiliException(-101, "请先登录后发送弹幕")
+        val form = FormBody.Builder()
+            .add("type", "1")
+            .add("oid", cid.toString())
+            .add("msg", text)
+            .add("bvid", bvid)
+            .add("progress", progressMs.coerceAtLeast(0L).toString())
+            .add("color", (color and 0xFFFFFF).toString())
+            .add("fontsize", fontSize.coerceIn(12, 64).toString())
+            .add("pool", "0")
+            .add("mode", "1")
+            .add("plat", "2")
+            .add("csrf", csrf)
+            .build()
+        withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url(DANMAKU_POST_URL)
+                .post(form)
+                .header("User-Agent", UA)
+                .header("Referer", "https://www.bilibili.com/video/$bvid")
+                .header("Origin", "https://www.bilibili.com")
+                .header("Accept", "application/json, text/plain, */*")
+            buildCookieHeader()?.let { request.header("Cookie", it) }
+            http.newCall(request.build()).execute().use { response ->
+                val payload = response.body?.string().orEmpty()
+                if (!response.isSuccessful || payload.isEmpty()) {
+                    throw BiliException(response.code, "发送弹幕失败（HTTP ${response.code}）")
+                }
+                val parsed = json.decodeFromString<ApiResponse<JsonObject>>(payload)
+                if (parsed.code != 0) {
+                    throw BiliException(parsed.code, danmakuPostMessage(parsed.code, parsed.message))
+                }
+            }
+        }
+    }
+
+    private fun csrfToken(): String? = cookieHeader
+        .orEmpty()
+        .split(';')
+        .map { it.trim() }
+        .firstOrNull { it.startsWith("bili_jct=") }
+        ?.substringAfter('=')
+        ?.takeIf { it.isNotBlank() }
+
+    private fun danmakuPostMessage(code: Int, message: String): String = when (code) {
+        -101 -> "请先登录后发送弹幕"
+        -111 -> "登录凭证已失效，请重新登录"
+        -400 -> "弹幕内容不符合规范"
+        -403 -> "发送过于频繁或权限不足，请稍后再试"
+        -412 -> "发送请求被风控拦截，请稍后再试"
+        else -> message.ifBlank { "发送弹幕失败（$code）" }
     }
 
     /** 使用 Web 端 WBI 签名搜索视频，支持排序、时长 / 发布时间筛选和分页。 */
@@ -259,6 +355,8 @@ class BiliClient(
         private const val NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
         private const val VIEW_URL = "https://api.bilibili.com/x/web-interface/view"
         private const val USER_CARD_URL = "https://api.bilibili.com/x/web-interface/card"
+        private const val DANMAKU_URL = "https://api.bilibili.com/x/v1/dm/list.so"
+        private const val DANMAKU_POST_URL = "https://api.bilibili.com/x/v2/dm/post"
         private const val PLAY_URL = "https://api.bilibili.com/x/player/wbi/playurl"
         private const val SEARCH_URL = "https://api.bilibili.com/x/web-interface/wbi/search/type"
         private const val SPI_URL = "https://api.bilibili.com/x/frontend/finger/spi"

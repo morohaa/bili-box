@@ -122,6 +122,12 @@ import com.example.bilibox.bili.BiliPlayback
 import com.example.bilibox.bili.BiliQn
 import com.example.bilibox.bili.VideoInfo
 import com.example.bilibox.bili.VideoSearchItem
+import com.example.bilibox.danmaku.Danmaku
+import com.example.bilibox.danmaku.DanmakuComposerDialog
+import com.example.bilibox.danmaku.DanmakuControlBar
+import com.example.bilibox.danmaku.DanmakuOverlay
+import com.example.bilibox.danmaku.DanmakuSettings
+import com.example.bilibox.danmaku.DanmakuSettingsSheet
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.HttpDataSource
@@ -390,6 +396,14 @@ internal fun VideoPlayerScreen(
     qualityOptions: List<PlayerQualityOption> = emptyList(),
     selectedQuality: Int? = null,
     onQualitySelected: ((Int) -> Unit)? = null,
+    // 只有在线视频提供弹幕；本地视频保持原来的播放器布局。
+    danmakuSupported: Boolean = false,
+    danmakuItems: List<Danmaku> = emptyList(),
+    danmakuSettings: DanmakuSettings = DanmakuSettings(),
+    danmakuLoading: Boolean = false,
+    danmakuError: String? = null,
+    onDanmakuSettingsChange: (DanmakuSettings) -> Unit = {},
+    onSendDanmaku: (suspend (text: String, progressMs: Long) -> Result<Unit>)? = null,
     detailsBackground: Color = Color.White,
     showDetailTabs: Boolean = true,
     detailTabs: List<String> = listOf("简介", "评论"),
@@ -425,6 +439,10 @@ internal fun VideoPlayerScreen(
     var detailsTab by remember(player) { mutableIntStateOf(0) }
     var playbackModeExpanded by remember(player) { mutableStateOf(false) }
     var sleepTimerOpen by remember(player) { mutableStateOf(false) }
+    var danmakuSettingsOpen by remember(player) { mutableStateOf(false) }
+    var danmakuComposerOpen by remember(player) { mutableStateOf(false) }
+    var danmakuSending by remember(player) { mutableStateOf(false) }
+    var danmakuSendError by remember(player) { mutableStateOf<String?>(null) }
     var controlsVisible by remember(player) { mutableStateOf(true) }
     var screenLocked by remember(player) { mutableStateOf(false) }
     var orientationBeforeLock by remember(player) { mutableStateOf<Int?>(null) }
@@ -504,6 +522,7 @@ internal fun VideoPlayerScreen(
         sleepTimerOpen = false
         episodesExpanded = false
         qualityMenuExpanded = false
+        danmakuSettingsOpen = false
         if (!fullScreen) screenLocked = false
         activity?.let {
             WindowCompat.getInsetsController(it.window, it.window.decorView).apply {
@@ -754,6 +773,8 @@ internal fun VideoPlayerScreen(
     BackHandler(enabled = !listenPageOpen) {
         when {
             screenLocked -> controlsVisible = true
+            danmakuComposerOpen -> if (!danmakuSending) danmakuComposerOpen = false
+            danmakuSettingsOpen -> danmakuSettingsOpen = false
             episodeOverlayDismiss != null -> episodeOverlayDismiss()
             qualityMenuExpanded -> qualityMenuExpanded = false
             episodesExpanded -> episodesExpanded = false
@@ -806,6 +827,14 @@ internal fun VideoPlayerScreen(
                 onSpeedBoostEnd = { endSpeedBoost() },
                 modifier = Modifier.fillMaxSize()
             )
+            if (danmakuSupported && !listening && !listenPageOpen) {
+                DanmakuOverlay(
+                    player = player,
+                    items = danmakuItems,
+                    settings = danmakuSettings,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             if (listening && !listenPageOpen) {
                 CollapsedListenOverlay(
                     cover = listenCover,
@@ -904,15 +933,36 @@ internal fun VideoPlayerScreen(
                                 modifier = Modifier.padding(start = 6.dp, end = 4.dp)
                             )
                             Spacer(Modifier.width(12.dp))
-                            // Center: danmaku hub placeholder, capped so the
-                            // send field does not stretch across the whole bar.
+                            // Center: danmaku controls, capped so the send field
+                            // does not stretch across the whole control bar.
                             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                DanmakuPlaceholderBar(
-                                    onPlaceholderClick = {
-                                        Toast.makeText(context, "弹幕功能正在开发中，敬请期待", Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth()
-                                )
+                                if (danmakuSupported) {
+                                    DanmakuControlBar(
+                                        settings = danmakuSettings,
+                                        loading = danmakuLoading,
+                                        error = danmakuError,
+                                        canSend = onSendDanmaku != null,
+                                        onToggle = {
+                                            onDanmakuSettingsChange(
+                                                danmakuSettings.copy(enabled = !danmakuSettings.enabled)
+                                            )
+                                        },
+                                        onOpenSettings = { danmakuSettingsOpen = true },
+                                        onSend = {
+                                            if (onSendDanmaku == null) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "登录后才能发送弹幕",
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            } else {
+                                                danmakuSendError = null
+                                                danmakuComposerOpen = true
+                                            }
+                                        },
+                                        modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth()
+                                    )
+                                }
                             }
                             Spacer(Modifier.width(12.dp))
                             // Right: episodes, speed and quality. The fullscreen
@@ -1293,6 +1343,43 @@ internal fun VideoPlayerScreen(
             )
         }
     }
+    // 弹幕输入与设置放在播放器外层：弹层要盖住视频和详情，而不是被视频 Box 裁掉。
+    if (danmakuSupported && danmakuComposerOpen) {
+        val send = onSendDanmaku
+        if (send != null) {
+            DanmakuComposerDialog(
+                sending = danmakuSending,
+                error = danmakuSendError,
+                onDismiss = { if (!danmakuSending) danmakuComposerOpen = false },
+                onSend = { text ->
+                    if (!danmakuSending) {
+                        danmakuSending = true
+                        danmakuSendError = null
+                        captureScope.launch {
+                            try {
+                                send(text, player.currentPosition.coerceAtLeast(0L))
+                                danmakuComposerOpen = false
+                                Toast.makeText(context, "弹幕已发送", Toast.LENGTH_SHORT).show()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                danmakuSendError = error.message ?: "弹幕发送失败"
+                            } finally {
+                                danmakuSending = false
+                            }
+                        }
+                    }
+                },
+            )
+        }
+    }
+    if (danmakuSupported && danmakuSettingsOpen) {
+        DanmakuSettingsSheet(
+            settings = danmakuSettings,
+            onDismiss = { danmakuSettingsOpen = false },
+            onSettingsChange = onDanmakuSettingsChange,
+        )
+    }
     // 听视频 page: stays composed while its reveal animation is running.
     val info = listenInfo
     if (info != null && listenVisible) {
@@ -1531,95 +1618,6 @@ private fun PlayerQualityChip(label: String, onClick: () -> Unit) {
             fontWeight = FontWeight.SemiBold,
             maxLines = 1
         )
-    }
-}
-
-@Composable
-private fun DanmakuPlaceholderBar(
-    onPlaceholderClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier.height(32.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        // Master switch pill from the reference bar, kept as a visible placeholder.
-        Row(
-            Modifier.height(30.dp).clip(RoundedCornerShape(8.dp))
-                .background(Color.White.copy(alpha = .12f))
-                .clickable(role = Role.Button, onClick = onPlaceholderClick)
-                .semantics { contentDescription = "弹幕开关（开发中）" }
-                .padding(horizontal = 7.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("弹", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(3.dp))
-            Box(
-                Modifier.size(13.dp).background(OnlinePink, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("✓", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold,
-                    lineHeight = 8.sp)
-            }
-        }
-        // Danmaku settings pill (弹 + gear).
-        Row(
-            Modifier.height(30.dp).clip(RoundedCornerShape(8.dp))
-                .background(Color.White.copy(alpha = .12f))
-                .clickable(role = Role.Button, onClick = onPlaceholderClick)
-                .semantics { contentDescription = "弹幕设置（开发中）" }
-                .padding(horizontal = 7.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("弹", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(3.dp))
-            Canvas(Modifier.size(13.dp)) {
-                val center = Offset(size.width / 2f, size.height / 2f)
-                val radius = size.minDimension / 2f
-                drawCircle(OnlinePink, radius * .42f, center,
-                    style = Stroke(1.4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-                repeat(8) { index ->
-                    val angle = Math.toRadians(index * 45.0)
-                    val cos = kotlin.math.cos(angle).toFloat()
-                    val sin = kotlin.math.sin(angle).toFloat()
-                    drawLine(
-                        OnlinePink,
-                        Offset(center.x + cos * radius * .56f, center.y + sin * radius * .56f),
-                        Offset(center.x + cos * radius * .9f, center.y + sin * radius * .9f),
-                        strokeWidth = 1.8.dp.toPx(),
-                        cap = StrokeCap.Round
-                    )
-                }
-                drawCircle(OnlinePink, radius * .12f, center)
-            }
-        }
-        // Frosted input pill, matching the "发个友善的弹幕…" entry.
-        Row(
-            Modifier.weight(1f).height(30.dp).clip(CircleShape)
-                .background(Color.White.copy(alpha = .14f))
-                .border(1.dp, Color.White.copy(alpha = .08f), CircleShape)
-                .clickable(role = Role.Button, onClick = onPlaceholderClick)
-                .semantics { contentDescription = "发送弹幕（开发中）" }
-                .padding(start = 12.dp, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "发个友善的弹幕见证当下…",
-                color = Color.White.copy(alpha = .68f),
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                "发送",
-                color = OnlinePink,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-        }
     }
 }
 
