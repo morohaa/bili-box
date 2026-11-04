@@ -92,6 +92,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
@@ -145,12 +146,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             val preferences = remember { getSharedPreferences("appearance", Context.MODE_PRIVATE) }
             var darkMode by remember { mutableStateOf(preferences.getBoolean("dark_mode", false)) }
-            SideEffect {
-                WindowCompat.getInsetsController(window, window.decorView).apply {
-                    isAppearanceLightStatusBars = !darkMode
-                    isAppearanceLightNavigationBars = !darkMode
-                }
-            }
             BiliBoxTheme(darkTheme = darkMode, dynamicColor = false) {
                 BiliBoxApp(darkMode) {
                     darkMode = !darkMode
@@ -164,10 +159,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit = {}) {
     val context = LocalContext.current
+    val view = LocalView.current
     var selected by rememberSaveable { mutableIntStateOf(0) }
     // 0 动态 / 1 视频 / 2 我的. Clamp restored state from the old four-tab layout.
     val tab = selected.coerceIn(0, 2)
     var session by remember { mutableStateOf<BiliSession?>(BiliSessionStore.load(context)) }
+    var libraryFilter by remember { mutableStateOf<LocalVideoQuickFilter?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchState by remember { mutableStateOf<SearchState>(SearchState.Idle) }
     var searchOrder by rememberSaveable { mutableStateOf(SearchOrder.RELEVANCE) }
@@ -176,6 +173,24 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     var searchGrid by rememberSaveable { mutableStateOf(false) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
     val pageScroll = rememberScrollState()
+    // “我的”页是通栏头图，状态栏图标默认用白色压在图片上；头图滚出屏幕后
+    // 状态栏落到浅色页面上，需要换回深色图标，否则会看不见。
+    val bannerScrollPx = with(LocalDensity.current) { 200.dp.toPx() }
+    val pastBanner by remember(bannerScrollPx) {
+        derivedStateOf { pageScroll.value > bannerScrollPx }
+    }
+    SideEffect {
+        val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+        WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = when {
+                tab != 2 -> !darkMode
+                else -> !darkMode && pastBanner
+            }
+            isAppearanceLightNavigationBars = !darkMode
+        }
+    }
+    // 进入“我的”页时回到顶部：头图与头像需要从顶部完整露出。
+    LaunchedEffect(tab) { if (tab == 2) pageScroll.scrollTo(0) }
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val searchClient = remember(session?.cookie) {
@@ -245,6 +260,7 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
                 LibraryPage(
                     refreshToken = libraryRefresh,
                     darkMode = darkMode,
+                    initialFilter = libraryFilter,
                     onToggleDarkMode = onToggleDarkMode,
                     onVideoSelected = { video, playlist ->
                         localPlaylist = playlist
@@ -253,45 +269,48 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
                 )
             } else {
                 Column(Modifier.fillMaxSize()) {
+                    // “我的”页使用通栏头图，不再叠加固定顶栏；其余 Tab 共用同一条栏。
                     // 固定顶栏：不跟随内容滚动，三个 Tab 共用尺寸与下边界。
-                    if (searchActive) {
-                        SearchTopBar(
-                            query = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            onSubmit = { runSearch(1, searchOrder) },
-                            onBack = closeSearch,
-                            order = searchOrder,
-                            onOrderChange = { runSearch(1, it) },
-                            duration = searchDuration,
-                            timeRange = searchTimeRange,
-                            onFiltersChange = { duration, timeRange ->
-                                searchDuration = duration
-                                searchTimeRange = timeRange
-                                runSearch(1, searchOrder)
-                            },
-                            gridLayout = searchGrid,
-                            onToggleLayout = { searchGrid = !searchGrid },
-                            darkMode = darkMode,
-                        )
-                    } else if (tab == 0) {
-                        AppTopBar(darkMode = darkMode) {
-                            DynamicTopBarContent(
+                    if (tab != 2) {
+                        if (searchActive) {
+                            SearchTopBar(
                                 query = searchQuery,
                                 onQueryChange = { searchQuery = it },
-                                onSearch = { runSearch(1, searchOrder) },
+                                onSubmit = { runSearch(1, searchOrder) },
+                                onBack = closeSearch,
+                                order = searchOrder,
+                                onOrderChange = { runSearch(1, it) },
+                                duration = searchDuration,
+                                timeRange = searchTimeRange,
+                                onFiltersChange = { duration, timeRange ->
+                                    searchDuration = duration
+                                    searchTimeRange = timeRange
+                                    runSearch(1, searchOrder)
+                                },
+                                gridLayout = searchGrid,
+                                onToggleLayout = { searchGrid = !searchGrid },
                                 darkMode = darkMode,
                             )
-                            Spacer(Modifier.width(2.dp))
-                            DarkModeToggle(darkMode, onToggleDarkMode)
+                        } else if (tab == 0) {
+                            AppTopBar(darkMode = darkMode) {
+                                DynamicTopBarContent(
+                                    query = searchQuery,
+                                    onQueryChange = { searchQuery = it },
+                                    onSearch = { runSearch(1, searchOrder) },
+                                    darkMode = darkMode,
+                                )
+                                Spacer(Modifier.width(2.dp))
+                                DarkModeToggle(darkMode, onToggleDarkMode)
+                            }
+                        } else {
+                            AppTopBar(darkMode = darkMode, onToggleDarkMode = onToggleDarkMode)
                         }
-                    } else {
-                        AppTopBar(darkMode = darkMode, onToggleDarkMode = onToggleDarkMode)
                     }
                     // The scrollable page is captured once and shared by both glass surfaces.
                     Column(
                         Modifier.weight(1f).fillMaxWidth()
                             .verticalScroll(pageScroll)
-                            .padding(horizontal = 16.dp)
+                            .padding(horizontal = if (tab == 2) 0.dp else 16.dp)
                     ) {
                         when (tab) {
                             0 -> when (val state = searchState) {
@@ -308,7 +327,16 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
                                     )
                                 }
                             }
-                            else -> MyPage(0, session, darkMode) { session = it }
+                            else -> MyPage(
+                                session = session,
+                                darkMode = darkMode,
+                                onToggleDarkMode = onToggleDarkMode,
+                                onOpenLibrary = { filter ->
+                                    libraryFilter = filter
+                                    selected = 1
+                                },
+                                onSessionChange = { session = it },
+                            )
                         }
                         Spacer(Modifier.height(150.dp))
                         Spacer(Modifier.navigationBarsPadding())
@@ -317,7 +345,10 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
             }
         }
         if (selectedLocalVideo == null) {
-            LiquidNavigation(tab, { selected = it.coerceIn(0, 2) }, backdrop, darkMode,
+            LiquidNavigation(tab, { index ->
+                libraryFilter = null
+                selected = index.coerceIn(0, 2)
+            }, backdrop, darkMode,
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp))
         }
         // Keep the library composed underneath so its folder position, search and

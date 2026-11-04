@@ -130,6 +130,7 @@ private val LibraryCard = Color(0xFFFFFFFF)
 internal fun LibraryPage(
     refreshToken: Int = 0,
     darkMode: Boolean = false,
+    initialFilter: LocalVideoQuickFilter? = null,
     onToggleDarkMode: () -> Unit = {},
     onVideoSelected: (LocalVideo, List<LocalVideo>) -> Unit,
 ) {
@@ -151,7 +152,8 @@ internal fun LibraryPage(
     var nav by remember { mutableStateOf<List<String>>(emptyList()) }
     var query by remember { mutableStateOf("") }
     var searchOpen by remember { mutableStateOf(false) }
-    var quickFilter by remember { mutableStateOf<LocalVideoQuickFilter?>(null) }
+    // 从“我的”页的离线缓存 / 历史记录进入时，直接落到对应筛选。
+    var quickFilter by remember { mutableStateOf<LocalVideoQuickFilter?>(initialFilter) }
     var infoVideo by remember { mutableStateOf<LocalVideo?>(null) }
     var toastMessage by remember { mutableStateOf<String?>(null) }
     var lastToastMessage by remember { mutableStateOf("") }
