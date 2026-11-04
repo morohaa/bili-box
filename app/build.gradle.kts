@@ -5,13 +5,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.bilibox"
+    namespace = "io.github.bilibox"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.example.bilibox"
+        applicationId = "io.github.bilibox"
         minSdk = 28
         targetSdk = 37
         versionCode = 1

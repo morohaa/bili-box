@@ -2,7 +2,7 @@
 
 BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔哩客户端。项目直接调用 B 站 Web 端公开接口，提供视频搜索、在线播放、弹幕、本地视频管理、后台听视频与账号登录等常用能力，不依赖 WebView 承载主要界面。
 
-> 本项目仅用于 Android 开发和接口学习。使用前请阅读并遵守哔哩哔哩的用户协议与相关法律法规，不要用于商业用途或高频请求。
+> 本项目是非官方项目，仅用于 Android 开发和接口学习。使用前请阅读并遵守哔哩哔哩的用户协议与相关法律法规，不要用于商业用途或高频请求。BiliBox 与哔哩哔哩官方无关联。
 
 ## 功能
 
@@ -23,39 +23,53 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 | 播放 | AndroidX Media3 / ExoPlayer |
 | 网络 | OkHttp + kotlinx.serialization |
 | 登录 | B 站 Passport 接口、扫码、极验 WebView 桥 |
+| 包名 | `io.github.bilibox` |
 | 构建 | Gradle 9.6 + AGP 9.5，minSdk 28 / targetSdk 37 |
 
 ## 目录结构
 
+源码采用 feature-first 的单模块结构；`app` 下按职责分为 `core`、`data` 和 `feature`。
+
 ```text
 .
-├── app/
-│   ├── src/main/java/com/example/bilibox/
-│   │   ├── MainActivity.kt           # 应用入口、底部导航与页面切换
-│   │   ├── HomeScreen.kt             # 顶栏、底部玻璃导航等共享 UI
-│   │   ├── DynamicPage.kt            # 动态页：搜索首页、历史与结果
-│   │   ├── SearchScreen.kt           # 搜索结果列表与视频卡片
-│   │   ├── SearchControls.kt         # 排序 / 筛选 / 布局控制条
-│   │   ├── OnlineVideoScreen.kt      # 在线视频详情、选集与播放状态
-│   │   ├── PlayerScreen.kt           # 本地 / 在线共用的播放器界面
-│   │   ├── LibraryScreen.kt          # 本地视频库
-│   │   ├── LocalVideoDetails.kt      # 本地视频详情与播放顺序
-│   │   ├── ListenMode.kt             # 听视频界面与后台播放
-│   │   ├── MyPage.kt                 # 我的页、登录入口与会话存储
-│   │   ├── danmaku/                  # 弹幕解析、轨道排布、绘制与设置
-│   │   └── bili/                     # B 站接口客户端、模型、WBI 签名与播放源
-│   ├── src/test/                     # JVM 单元测试（解析、排布、搜索等）
-│   └── src/androidTest/              # Compose / 设备相关测试
+├── app/src/main/java/io/github/bilibox/
+│   ├── MainActivity.kt                 # 应用入口、页面切换与全局状态
+│   ├── core/
+│   │   ├── model/                     # 跨功能共享的搜索 / 播放状态模型
+│   │   ├── ui/component/              # 顶栏、玻璃导航等共享 UI
+│   │   ├── ui/theme/                  # 颜色、主题、字体与动态色板
+│   │   └── util/                      # 格式化、截帧等无业务工具
+│   ├── data/
+│   │   ├── auth/                      # B 站通行证请求、会话加密存储
+│   │   ├── bili/                      # B 站接口、模型、播放源与 WBI 签名
+│   │   ├── danmaku/                   # 弹幕解析、轨道排布与显示偏好
+│   │   ├── localvideo/                # 本地视频扫描、播放队列与进度
+│   │   └── search/                    # 搜索历史存储
+│   └── feature/
+│       ├── auth/                      # 登录、扫码与极验 UI
+│       ├── danmaku/                   # 弹幕层与播放器弹幕控制
+│       ├── dynamic/                   # 动态页 / 搜索首页
+│       ├── library/                   # 本地视频库与详情
+│       ├── listen/                    # 听视频页面与后台服务
+│       ├── online/                    # 在线视频详情、选集与缓存
+│       ├── player/                    # 播放器、倍速、定时关闭与手势
+│       ├── profile/                   # 我的页
+│       └── search/                    # 搜索结果与筛选控件
+├── app/src/test/                      # JVM 单元测试（与主代码包镜像）
+├── app/src/androidTest/               # Compose / 设备测试（与主代码包镜像）
 ├── design/
-│   ├── icon/                         # 应用图标矢量源与生成脚本
-│   └── prototypes/                   # 页面 HTML 设计稿（不参与构建）
-├── gradle/                           # 版本目录与 Gradle Wrapper
+│   ├── icon/                          # 应用图标矢量源与生成脚本
+│   └── prototypes/                    # 页面 HTML 设计稿（不参与构建）
+├── .github/workflows/android.yml      # CI：单元测试与 Debug 构建
+├── gradle/                            # 版本目录与 Gradle Wrapper
 ├── build.gradle.kts
 ├── settings.gradle.kts
+├── LICENSE
+├── CONTRIBUTING.md
 └── README.md
 ```
 
-`design/` 里的 HTML 仅作为视觉参考，不会被编译进 APK；应用实际界面全部由 Compose 实现。
+`design/` 里的 HTML 仅作为视觉参考，不会被编译进 APK；应用实际界面全部由 Compose 实现。单模块的包边界优先于多模块拆分，后续只有在出现独立复用需求时再拆 `:core` / `:feature` 模块。
 
 ## 环境要求
 
@@ -107,6 +121,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 - `app/src/test` 覆盖 WBI 签名、搜索历史、播放缓存、弹幕 XML / 压缩解码与轨道排布等纯逻辑。
 - `app/src/androidTest` 覆盖播放器控件、手势、本地视频详情、听视频和弹幕设置弹层等 Compose 交互。
 - 首次运行 Gradle 需要联网下载依赖；国内网络可自行配置 Maven 镜像，但不要把镜像的私有凭据提交到仓库。
+- GitHub Actions 会在 push / pull request 时执行单元测试与 Debug 构建，见 `.github/workflows/android.yml`。
 
 ## 已知限制
 
@@ -116,4 +131,4 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 ## License
 
-本仓库未附带开源许可证。代码仅用于学习交流，请勿直接用于商业分发。
+代码以 [MIT License](LICENSE) 开源。BiliBox 是非官方项目，仓库中的哔哩哔哩名称、图标参考素材及相关商标归其权利人所有；MIT License 不构成对这些素材的授权，发布或再分发前请自行确认素材使用权限。

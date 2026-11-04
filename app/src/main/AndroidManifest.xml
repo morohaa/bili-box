@@ -40,7 +40,7 @@
         </activity>
         <!-- Not exported: only this app's own components connect to the session. -->
         <service
-            android:name=".ListenPlaybackService"
+            android:name=".feature.listen.ListenPlaybackService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
