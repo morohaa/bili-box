@@ -1,0 +1,48 @@
+# Contributing to BiliBox
+
+感谢参与 BiliBox。提交改动前请先确认下面几项。
+
+## 分支与提交
+
+- 从 `main` / `master` 创建功能分支，例如 `feat/search-filter`、`fix/player-crash`。
+- 提交信息沿用仓库现有风格：
+
+  ```text
+  feat<scope>: 简短描述
+  - 变更点
+  - 验证方式
+  ```
+
+  常用 scope：`danmaku`、`player`、`online`、`library`、`profile`、`search`、`auth`、`repo`。
+
+## 代码组织
+
+- 新代码优先放入已有模块：
+  - 共享模型 → `core/model`
+  - 共享 UI / 主题 / 工具 → `core/ui`、`core/util`
+  - 接口与存储 → `data/*`
+  - 页面与页面组件 → `feature/*`
+- 不要把数据存储或网络请求直接写进 Composable；能独立测试的逻辑放到 `data/` 或 `core/`。
+- 新增页面请在 `feature/<feature>/` 下建文件，测试目录保持同样的包结构。
+- 避免新增超过 500 行的单文件；优先按页面、控制条、弹层拆成多个文件。
+
+## 验证
+
+提交前至少运行：
+
+```bash
+./gradlew testDebugUnitTest
+./gradlew assembleDebug
+```
+
+涉及 Compose 交互时再运行：
+
+```bash
+./gradlew connectedDebugAndroidTest
+```
+
+## 安全与隐私
+
+- 不要提交 `local.properties`、keystore、`.jks`、Cookie、账号密码或 `.env` 文件。
+- 新增日志时不要打印登录 Cookie、SESSDATA、bili_jct 等敏感信息。
+- 接口失败提示应可读，不要把服务端原始 HTML 或堆栈直接展示给用户。
