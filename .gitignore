@@ -1,12 +1,42 @@
+# --- Gradle / Android build output ---
+.gradle/
+.gradle-home/
+.kotlin/
+build/
+**/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# --- IDE / local tooling ---
+.idea/
 *.iml
-.gradle
-.gradle-home
-/local.properties
-/.idea/
-/.kotlin/
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+.fleet/
+.vscode/
+*.hprof
+
+# --- Local environment and secrets ---
 local.properties
+.env
+.env.*
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# --- Logs and temporary files ---
+*.log
+*.tmp
+*.bak
+.tmp-*/
