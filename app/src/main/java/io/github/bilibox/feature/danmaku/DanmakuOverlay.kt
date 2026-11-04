@@ -117,6 +117,7 @@ internal fun DanmakuOverlay(
                 val textHeight = layout.size.height.toFloat()
                 val x = when (track.item.mode) {
                     Danmaku.Mode.SCROLL -> track.leftEdgeAt(now, widthPx)
+
                     Danmaku.Mode.TOP,
                     Danmaku.Mode.BOTTOM,
                     -> (widthPx - textWidth) / 2f
@@ -128,6 +129,7 @@ internal fun DanmakuOverlay(
                     Danmaku.Mode.SCROLL,
                     Danmaku.Mode.TOP,
                     -> track.lane * laneHeightPx + (laneHeightPx - textHeight) / 2f
+
                     Danmaku.Mode.BOTTOM ->
                         areaHeightPx - (track.lane + 1) * laneHeightPx + (laneHeightPx - textHeight) / 2f
                 }

@@ -123,9 +123,8 @@ internal fun localVideoIsVisible(
     settings: LocalVideoSettings,
     nomediaFolders: Set<String>,
     allowHidden: Boolean = false,
-): Boolean =
-    (allowHidden || settings.showHidden || !video.isHiddenPath) &&
-        !(settings.recognizeNomedia && video.relativeDirectory in nomediaFolders)
+): Boolean = (allowHidden || settings.showHidden || !video.isHiddenPath) &&
+    !(settings.recognizeNomedia && video.relativeDirectory in nomediaFolders)
 
 internal fun localVideoMatchesQuickFilter(
     video: LocalVideo,
@@ -137,9 +136,13 @@ internal fun localVideoMatchesQuickFilter(
         val playedAt = playback[video.key]?.lastPlayedAtMs ?: 0L
         playedAt > 0L && nowMs - playedAt <= 7L * 24 * 60 * 60 * 1_000L
     }
+
     LocalVideoQuickFilter.BILI_CACHE -> video.isBiliCache
+
     LocalVideoQuickFilter.PRIVATE -> video.isHiddenPath
+
     LocalVideoQuickFilter.UNFINISHED -> playback[video.key]?.state is LocalVideoPlaybackState.Watching
+
     LocalVideoQuickFilter.FINISHED -> playback[video.key]?.state is LocalVideoPlaybackState.Watched
 }
 
@@ -154,17 +157,26 @@ private fun videoComparator(
 ): Comparator<LocalVideo> = Comparator { left, right ->
     val result = when (sort) {
         LocalVideoSort.TITLE -> videoCollator.compare(left.title, right.title)
+
         LocalVideoSort.DATE -> left.dateModifiedMs.compareTo(right.dateModifiedMs)
+
         LocalVideoSort.PLAYED -> lastPlayed(left, playback).compareTo(lastPlayed(right, playback))
+
         LocalVideoSort.STATUS -> statusRank(left, playback).compareTo(statusRank(right, playback))
+
         LocalVideoSort.DURATION -> left.durationMs.compareTo(right.durationMs)
+
         LocalVideoSort.SIZE -> left.sizeBytes.compareTo(right.sizeBytes)
+
         LocalVideoSort.RESOLUTION -> left.pixelCount.compareTo(right.pixelCount)
+
         LocalVideoSort.PATH -> videoCollator.compare(
             "${left.relativeDirectory}/${left.title}",
             "${right.relativeDirectory}/${right.title}",
         )
+
         LocalVideoSort.FPS -> left.frameRate.compareTo(right.frameRate)
+
         LocalVideoSort.TYPE -> videoCollator.compare(left.extension, right.extension)
     }
     val tied = if (result != 0) result else videoCollator.compare(left.title, right.title)
@@ -177,27 +189,34 @@ private fun folderComparator(
 ): Comparator<LocalVideoFolder> = Comparator { left, right ->
     val result = when (sort) {
         LocalVideoSort.TITLE -> videoCollator.compare(left.name, right.name)
+
         LocalVideoSort.DATE -> left.newestDateMs.compareTo(right.newestDateMs)
+
         LocalVideoSort.PLAYED -> left.newestPlayedAtMs.compareTo(right.newestPlayedAtMs)
+
         LocalVideoSort.STATUS -> right.unplayedCount.compareTo(left.unplayedCount)
+
         LocalVideoSort.DURATION -> left.totalDurationMs.compareTo(right.totalDurationMs)
+
         LocalVideoSort.SIZE -> left.totalSizeBytes.compareTo(right.totalSizeBytes)
+
         LocalVideoSort.RESOLUTION -> (left.maxWidth.toLong() * left.maxHeight)
             .compareTo(right.maxWidth.toLong() * right.maxHeight)
+
         LocalVideoSort.PATH -> videoCollator.compare(left.path, right.path)
+
         LocalVideoSort.FPS -> left.maxFrameRate.compareTo(right.maxFrameRate)
+
         LocalVideoSort.TYPE -> videoCollator.compare(left.name, right.name)
     }
     val tied = if (result != 0) result else videoCollator.compare(left.name, right.name)
     if (ascending) tied else -tied
 }
 
-private fun lastPlayed(video: LocalVideo, playback: Map<String, LocalVideoPlayback>): Long =
-    playback[video.key]?.lastPlayedAtMs ?: 0L
+private fun lastPlayed(video: LocalVideo, playback: Map<String, LocalVideoPlayback>): Long = playback[video.key]?.lastPlayedAtMs ?: 0L
 
-private fun statusRank(video: LocalVideo, playback: Map<String, LocalVideoPlayback>): Int =
-    when (playback[video.key]?.state) {
-        LocalVideoPlaybackState.Unplayed, null -> 0
-        is LocalVideoPlaybackState.Watching -> 1
-        LocalVideoPlaybackState.Watched -> 2
-    }
+private fun statusRank(video: LocalVideo, playback: Map<String, LocalVideoPlayback>): Int = when (playback[video.key]?.state) {
+    LocalVideoPlaybackState.Unplayed, null -> 0
+    is LocalVideoPlaybackState.Watching -> 1
+    LocalVideoPlaybackState.Watched -> 2
+}

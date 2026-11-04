@@ -58,8 +58,12 @@ internal class LocalPlaybackQueue(
         }
 
         override fun onEvents(player: Player, events: Player.Events) {
-            if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED,
-                    Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_POSITION_DISCONTINUITY)) {
+            if (events.containsAny(
+                    Player.EVENT_IS_PLAYING_CHANGED,
+                    Player.EVENT_PLAYBACK_STATE_CHANGED,
+                    Player.EVENT_POSITION_DISCONTINUITY
+                )
+            ) {
                 save()
             }
         }

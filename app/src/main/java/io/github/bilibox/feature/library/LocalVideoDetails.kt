@@ -27,5 +27,4 @@ internal fun localVideoFolderPath(video: LocalVideo): String {
     return "内部存储 / $folder"
 }
 
-internal fun localVideoFullPath(video: LocalVideo): String =
-    "${localVideoFolderPath(video)} / ${video.name}"
+internal fun localVideoFullPath(video: LocalVideo): String = "${localVideoFolderPath(video)} / ${video.name}"

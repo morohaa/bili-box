@@ -107,6 +107,15 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 # 安装到已连接的设备 / 模拟器
 ./gradlew installDebug
 
+# 代码风格检查（首次运行会下载固定版本的 ktlint CLI）
+./gradlew ktlintCheck
+
+# 自动格式化 Kotlin 代码
+./gradlew ktlintFormat
+
+# 检查单文件行数上限
+./gradlew checkKotlinFileSize
+
 # 运行 JVM 单元测试
 ./gradlew testDebugUnitTest
 
@@ -121,7 +130,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 - `app/src/test` 覆盖 WBI 签名、搜索历史、播放缓存、弹幕 XML / 压缩解码与轨道排布等纯逻辑。
 - `app/src/androidTest` 覆盖播放器控件、手势、本地视频详情、听视频和弹幕设置弹层等 Compose 交互。
 - 首次运行 Gradle 需要联网下载依赖；国内网络可自行配置 Maven 镜像，但不要把镜像的私有凭据提交到仓库。
-- GitHub Actions 会在 push / pull request 时执行单元测试与 Debug 构建，见 `.github/workflows/android.yml`。
+- GitHub Actions 会在 push / pull request 时执行 ktlint、文件行数检查、单元测试与 Debug 构建，见 `.github/workflows/android.yml`。
 
 ## 已知限制
 

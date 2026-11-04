@@ -178,10 +178,12 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     val backdrop = rememberGraphicsLayer()
     val appBackground = if (darkMode) Color(0xFF17191D) else Color(0xFFF4F6FA)
     Box(Modifier.fillMaxSize().background(appBackground)) {
-        Box(Modifier.fillMaxSize().drawWithContent {
-            backdrop.record { this@drawWithContent.drawContent() }
-            drawLayer(backdrop)
-        }) {
+        Box(
+            Modifier.fillMaxSize().drawWithContent {
+                backdrop.record { this@drawWithContent.drawContent() }
+                drawLayer(backdrop)
+            }
+        ) {
             when (tab) {
                 1 -> {
                     // The local-video browser owns its full-height layout so folders, the
@@ -197,6 +199,7 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
                         },
                     )
                 }
+
                 2 -> {
                     // “我的”页是通栏头图，独占整页滚动。
                     Column(Modifier.fillMaxSize().verticalScroll(pageScroll)) {
@@ -214,6 +217,7 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
                         Spacer(Modifier.navigationBarsPadding())
                     }
                 }
+
                 else -> {
                     DynamicPage(
                         query = searchQuery,
@@ -254,11 +258,16 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
                     animationSpec = tween(360, easing = BrandSpringEasing),
                 ) + fadeOut(tween(140)),
             ) {
-                LiquidNavigation(tab, { index ->
-                    libraryFilter = null
-                    selected = index.coerceIn(0, 2)
-                }, backdrop, darkMode,
-                    Modifier.navigationBarsPadding().padding(bottom = 16.dp))
+                LiquidNavigation(
+                    tab,
+                    { index ->
+                        libraryFilter = null
+                        selected = index.coerceIn(0, 2)
+                    },
+                    backdrop,
+                    darkMode,
+                    Modifier.navigationBarsPadding().padding(bottom = 16.dp)
+                )
             }
         }
         // Keep the library composed underneath so its folder position, search and
@@ -278,4 +287,6 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
 }
 
 @Composable
-private fun BiliBoxPreview() { BiliBoxTheme { BiliBoxApp() } }
+private fun BiliBoxPreview() {
+    BiliBoxTheme { BiliBoxApp() }
+}

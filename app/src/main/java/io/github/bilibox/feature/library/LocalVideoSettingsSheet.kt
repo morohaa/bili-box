@@ -369,8 +369,11 @@ private fun SortPicker(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(if (active) LibrarySoftPink else Color(0xFFF6F7F8))
                                 .then(
-                                    if (active) Modifier.border(1.5.dp, Pink, RoundedCornerShape(12.dp))
-                                    else Modifier
+                                    if (active) {
+                                        Modifier.border(1.5.dp, Pink, RoundedCornerShape(12.dp))
+                                    } else {
+                                        Modifier
+                                    }
                                 ),
                             contentAlignment = Alignment.Center,
                         ) {

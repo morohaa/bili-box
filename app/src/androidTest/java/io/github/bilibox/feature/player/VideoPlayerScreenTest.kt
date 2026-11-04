@@ -62,7 +62,11 @@ class VideoPlayerScreenTest {
                 sourceLabel = "哔哩哔哩",
                 commentMessage = "暂不支持查看在线评论",
                 onBack = {},
-                onRetry = { retries++; error = null; loading = "正在获取视频流…" },
+                onRetry = {
+                    retries++
+                    error = null
+                    loading = "正在获取视频流…"
+                },
                 details = { Text("搜索视频简介") }
             )
         }
@@ -75,7 +79,10 @@ class VideoPlayerScreenTest {
         compose.onNodeWithContentDescription("暂停").performClick()
         compose.onNodeWithContentDescription("播放").assertExists()
         val initialSurface = findPlayerView()
-        compose.runOnIdle { error = "测试取流失败"; loading = null }
+        compose.runOnIdle {
+            error = "测试取流失败"
+            loading = null
+        }
         compose.onNodeWithText("暂时无法播放").assertExists()
         compose.onAllNodesWithText("重试")[0].performClick()
         compose.runOnIdle { assertEquals(1, retries) }
@@ -413,8 +420,11 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("听视频 · 仅加载音频流").assertExists()
         compose.onNodeWithText("测试UP主").assertExists()
         compose.runOnIdle {
-            assertEquals(true, player.trackSelectionParameters.disabledTrackTypes
-                .contains(androidx.media3.common.C.TRACK_TYPE_VIDEO))
+            assertEquals(
+                true,
+                player.trackSelectionParameters.disabledTrackTypes
+                    .contains(androidx.media3.common.C.TRACK_TYPE_VIDEO)
+            )
         }
         compose.onNodeWithContentDescription("定时关闭").performClick()
         compose.onNodeWithText("30 分钟").performClick()
@@ -434,8 +444,11 @@ class VideoPlayerScreenTest {
         compose.waitForIdle()
         compose.onNodeWithContentDescription("听视频").assertExists()
         compose.runOnIdle {
-            assertEquals(false, player.trackSelectionParameters.disabledTrackTypes
-                .contains(androidx.media3.common.C.TRACK_TYPE_VIDEO))
+            assertEquals(
+                false,
+                player.trackSelectionParameters.disabledTrackTypes
+                    .contains(androidx.media3.common.C.TRACK_TYPE_VIDEO)
+            )
         }
     }
 

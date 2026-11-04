@@ -121,6 +121,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         danmakuSettings = updated
         danmakuPreferences.save(updated)
     }
+
     /** 登录后才允许发送；成功后立即插入本地时间轴。 */
     val sendDanmaku: (suspend (String, Long) -> Result<Unit>)? =
         if (session != null && hasLoginCookies(session.cookie)) {
@@ -132,13 +133,15 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                         message = message,
                         progressMs = progressMs,
                     )
-                    danmakuItems = (danmakuItems + Danmaku(
-                        timeMs = progressMs.coerceAtLeast(0L),
-                        mode = Danmaku.Mode.SCROLL,
-                        fontSize = 25,
-                        color = 0xFFFFFF,
-                        text = message,
-                    )).sortedBy { it.timeMs }
+                    danmakuItems = (
+                        danmakuItems + Danmaku(
+                            timeMs = progressMs.coerceAtLeast(0L),
+                            mode = Danmaku.Mode.SCROLL,
+                            fontSize = 25,
+                            color = 0xFFFFFF,
+                            text = message,
+                        )
+                        ).sortedBy { it.timeMs }
                     Result.success(Unit)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -149,6 +152,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         } else {
             null
         }
+
     /** Attaches fresh playurl data, resuming where the failed stream stopped. */
     fun attachPlayData(data: PlayData, qn: Int, resumeMs: Long = exoPlayer.currentPosition) {
         playbackData = data
@@ -157,6 +161,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         playbackCandidateCount = BiliPlayback.candidateCount(data, preferredQn = qn)
         BiliPlayback.attach(exoPlayer, data, preferredQn = qn, cookie = session?.cookie, bvid = video.bvid, startPositionMs = resumeMs)
     }
+
     /** Moves to the next CDN host pair of the current playurl response. */
     fun rotateCandidate(): Boolean {
         val data = playbackData ?: return false
@@ -166,8 +171,13 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         playbackCandidateIndex = nextIndex
         playbackState = PlaybackState.Loading
         BiliPlayback.attach(
-            exoPlayer, data, preferredQn = playbackCandidateQn, candidateIndex = nextIndex,
-            cookie = session?.cookie, bvid = video.bvid, startPositionMs = resumeMs,
+            exoPlayer,
+            data,
+            preferredQn = playbackCandidateQn,
+            candidateIndex = nextIndex,
+            cookie = session?.cookie,
+            bvid = video.bvid,
+            startPositionMs = resumeMs,
         )
         return true
     }
@@ -311,9 +321,11 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         val detail = error?.cause?.message?.takeIf { it.isNotBlank() }
         val message = when {
             error == null -> "视频源响应超时，请重试"
+
             httpStatus == 403 ||
                 (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && detail?.contains("403") == true) ->
                 "CDN 返回 HTTP 403，当前网络出口可能被 B 站拒绝"
+
             else -> "播放器无法读取视频流：${error.errorCodeName}${detail?.let { "（$it）" }.orEmpty()}"
         }
         playbackState = PlaybackState.Error(message)
@@ -435,6 +447,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         videoInfo?.pages?.takeIf { it.size > 1 }?.firstOrNull { it.page == page }
             ?.let { "P${it.page} ${it.part}".trim() },
     ).joinToString(" · ")
+
     /** Switches part without waiting for recomposition (background-safe). */
     fun advanceToPart(page: Int) {
         selectedPage = page
@@ -475,8 +488,11 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     val cachePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) beginCacheDownload()
-        else Toast.makeText(context, "需要存储权限才能缓存视频", Toast.LENGTH_SHORT).show()
+        if (granted) {
+            beginCacheDownload()
+        } else {
+            Toast.makeText(context, "需要存储权限才能缓存视频", Toast.LENGTH_SHORT).show()
+        }
     }
     val cacheLabel = when (cacheStatus) {
         OnlineVideoCacheStatus.DOWNLOADING -> "缓存中"
@@ -541,8 +557,12 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         }
     }
     val episodePicker: (@Composable (onDismiss: () -> Unit) -> Unit)? =
-        if (episodePages == null) null else { onDismiss ->
-            OnlineVideoEpisodes(episodePages, selectedPage, onDismiss) { selectedPage = it.page }
+        if (episodePages == null) {
+            null
+        } else {
+            { onDismiss ->
+                OnlineVideoEpisodes(episodePages, selectedPage, onDismiss) { selectedPage = it.page }
+            }
         }
     val episodeOverlayVisible = LocalConfiguration.current.orientation
         .let { it != Configuration.ORIENTATION_LANDSCAPE } &&
@@ -561,7 +581,9 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                 onPageSelected = { selectedPage = it }
             )
         }
-    } else null
+    } else {
+        null
+    }
     val qualityOptions = remember(playbackData, actualQn) { buildQualityOptions(playbackData, actualQn) }
     // Show what is actually playing; fall back to the requested value while loading.
     val effectiveQuality = actualQn.takeIf { qn -> qn > 0 && qualityOptions.any { it.qn == qn } }
@@ -578,7 +600,9 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                 if (index >= 0) parts.getOrNull(index + 1) else null
             }
             override val hasNext: Boolean get() = next() != null
-            override fun skipToNext() { next()?.let { latestAdvance(it.page) } }
+            override fun skipToNext() {
+                next()?.let { latestAdvance(it.page) }
+            }
         }
     }
     VideoPlayerScreen(
@@ -588,7 +612,9 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         loadingMessage = if (playbackState == PlaybackState.Loading) {
             // 区分“请求播放地址”和“连接视频源”，等待时能看出卡在哪一步。
             if (playbackData == null) "正在获取播放地址…" else "正在连接视频源…"
-        } else null,
+        } else {
+            null
+        },
         sourceLabel = "哔哩哔哩",
         commentMessage = "暂不支持查看在线评论",
         onBack = onBack,
@@ -621,7 +647,9 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         episodeOverlayVisible = episodeOverlayVisible,
         episodeOverlayDismiss = if (episodeOverlayVisible) {
             { episodesSheetVisible = false }
-        } else null,
+        } else {
+            null
+        },
         detailsBackground = OnlineSurface,
         showDetailTabs = false,
         listenInfo = ListenInfo(

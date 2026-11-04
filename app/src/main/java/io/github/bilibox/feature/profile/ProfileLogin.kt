@@ -57,7 +57,9 @@ internal fun LoginCard(
                     Text("扫码登录")
                 }
             }
+
             LoginUiState.CreatingQr -> CircularProgressIndicator(color = MyPink, strokeWidth = 2.dp)
+
             is LoginUiState.WaitingForScan -> {
                 Image(
                     state.bitmap,
@@ -69,6 +71,7 @@ internal fun LoginCard(
                 Spacer(Modifier.height(6.dp))
                 TextButton(onClick = onRetry) { Text("刷新二维码", color = MyPink) }
             }
+
             is LoginUiState.Failed -> {
                 Text(state.message, color = MyBadgeRed, fontSize = 12.sp, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(8.dp))
@@ -127,6 +130,7 @@ internal fun MyInfoDialog(
                             lineHeight = 20.sp,
                         )
                     }
+
                     MySheet.Session -> {
                         Text(
                             "会话凭证使用 AES-GCM 加密后保存在本机 Android Keystore，不会上传到任何服务器；卸载应用或清除应用数据会一并清除。",
@@ -135,6 +139,7 @@ internal fun MyInfoDialog(
                             lineHeight = 20.sp,
                         )
                     }
+
                     MySheet.About -> {
                         Text("BiliBox $version", color = ink, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         Spacer(Modifier.height(6.dp))
@@ -145,6 +150,7 @@ internal fun MyInfoDialog(
                             lineHeight = 20.sp,
                         )
                     }
+
                     MySheet.Help -> {
                         Text(
                             "· 视频无法播放：先确认账号已登录，部分视频需要大会员或登录后才能取流。\n" +
@@ -156,6 +162,7 @@ internal fun MyInfoDialog(
                             lineHeight = 20.sp,
                         )
                     }
+
                     MySheet.Update -> {
                         Text(
                             "当前版本 $version\n\n更新检查尚未接入服务端，新版本请通过安装包手动更新。",

@@ -103,8 +103,11 @@ internal fun MyPage(
             try {
                 when (val result = withContext(Dispatchers.IO) { pollLoginQr(waiting.key, waiting.cookie) }) {
                     QrPollResult.Pending -> Unit
+
                     QrPollResult.Scanned -> state = waiting.copy(status = "已扫码，请在哔哩哔哩 App 确认登录")
+
                     QrPollResult.Expired -> state = LoginUiState.Failed("二维码已过期，请重新获取")
+
                     is QrPollResult.Success -> {
                         BiliSessionStore.save(context, result.session)
                         onSessionChange(result.session)
@@ -222,14 +225,18 @@ internal fun MyPage(
 private fun rememberRemoteBitmap(url: String?): ImageBitmap? {
     var bitmap by remember(url) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(url) {
-        bitmap = if (url.isNullOrBlank()) null else withContext(Dispatchers.IO) {
-            runCatching {
-                val connection = URL(url).openConnection() as HttpURLConnection
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-                connection.inputStream.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
-            }.getOrNull()
+        bitmap = if (url.isNullOrBlank()) {
+            null
+        } else {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val connection = URL(url).openConnection() as HttpURLConnection
+                    connection.connectTimeout = 5000
+                    connection.readTimeout = 5000
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                    connection.inputStream.use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+                }.getOrNull()
+            }
         }
     }
     return bitmap
@@ -280,8 +287,11 @@ private fun pollLoginQr(key: String, initialCookie: String): QrPollResult {
     val code = root.optInt("code", -1)
     return when (code) {
         86101 -> QrPollResult.Pending
+
         86090 -> QrPollResult.Scanned
+
         86038 -> QrPollResult.Expired
+
         0 -> {
             val data = root.optJSONObject("data")
             val cookie = mergeCookies(initialCookie, response.cookies, cookieFromCallbackUrl(data?.optString("url").orEmpty()))
@@ -290,6 +300,7 @@ private fun pollLoginQr(key: String, initialCookie: String): QrPollResult {
             if (!hasLoginCookies(cookie)) return QrPollResult.Pending
             QrPollResult.Success(fetchBiliSession(cookie))
         }
+
         else -> throw IllegalStateException(root.optString("message").ifBlank { "二维码登录失败（$code）" })
     }
 }
@@ -297,8 +308,10 @@ private fun pollLoginQr(key: String, initialCookie: String): QrPollResult {
 private fun createQrImage(content: String): ImageBitmap {
     val matrix = MultiFormatWriter().encode(content, BarcodeFormat.QR_CODE, 720, 720)
     val bitmap = android.graphics.Bitmap.createBitmap(720, 720, android.graphics.Bitmap.Config.ARGB_8888)
-    for (y in 0 until 720) for (x in 0 until 720) {
-        bitmap.setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+    for (y in 0 until 720) {
+        for (x in 0 until 720) {
+            bitmap.setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+        }
     }
     return bitmap.asImageBitmap()
 }

@@ -261,9 +261,11 @@ internal fun videoMetaParts(
     if (fields.played) {
         when (state) {
             is LocalVideoPlaybackState.Watching -> parts += MetaPart("看到 ${formatVideoDuration(state.positionMs)}", highlight = true)
+
             LocalVideoPlaybackState.Watched -> parts += MetaPart(
                 if (playback.lastPlayedAtMs > 0L) "看过 ${formatRelativeDate(playback.lastPlayedAtMs)}" else "已看完"
             )
+
             LocalVideoPlaybackState.Unplayed -> Unit
         }
     }
@@ -322,7 +324,9 @@ internal fun resolutionLabel(width: Int, height: Int): String {
 
 internal fun frameRateLabel(frameRate: Float): String {
     val rounded = frameRate.roundToInt()
-    val text = if (kotlin.math.abs(frameRate - rounded) < .05f) "$rounded" else {
+    val text = if (kotlin.math.abs(frameRate - rounded) < .05f) {
+        "$rounded"
+    } else {
         "%.2f".format(frameRate).trimEnd('0').trimEnd('.')
     }
     return "$text fps"
@@ -343,9 +347,11 @@ internal fun formatRelativeDate(milliseconds: Long): String {
     }
 }
 
-internal fun formatFullDate(milliseconds: Long, formatter: DateTimeFormatter): String =
-    if (milliseconds <= 0L) "未知"
-    else Instant.ofEpochMilli(milliseconds).atZone(ZoneId.systemDefault()).format(formatter)
+internal fun formatFullDate(milliseconds: Long, formatter: DateTimeFormatter): String = if (milliseconds <= 0L) {
+    "未知"
+} else {
+    Instant.ofEpochMilli(milliseconds).atZone(ZoneId.systemDefault()).format(formatter)
+}
 
 internal fun coverBrush(seed: String): Brush {
     val hash = seed.hashCode()
@@ -412,6 +418,8 @@ internal fun localVideoPermissions(): Array<String> = when {
         Manifest.permission.READ_MEDIA_VIDEO,
         Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
     )
+
     Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_VIDEO)
+
     else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
 }

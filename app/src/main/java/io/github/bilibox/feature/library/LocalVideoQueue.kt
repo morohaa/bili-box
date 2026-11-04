@@ -144,7 +144,9 @@ internal fun LocalQueueRow(
     val fraction = if (isCurrent) {
         if (currentDurationMs > 0L) {
             (currentPositionMs.toFloat() / currentDurationMs).coerceIn(0f, 1f)
-        } else 0f
+        } else {
+            0f
+        }
     } else {
         watching?.fraction ?: 0f
     }
@@ -279,5 +281,3 @@ internal fun QueueMeta(
     }
     Text(text, fontSize = 10.5.sp, lineHeight = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
-
-/** The 媒体信息 tab: file, stream and playback facts in compact tables. */

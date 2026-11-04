@@ -67,8 +67,7 @@ internal fun quantizePlaybackSpeed(value: Float): Float {
     return stepped.coerceIn(PlaybackSpeedMin, PlaybackSpeedMax)
 }
 
-internal fun formatSpeedReadout(value: Float): String =
-    String.format(Locale.US, "%.2f", value)
+internal fun formatSpeedReadout(value: Float): String = String.format(Locale.US, "%.2f", value)
 
 /** Compact label for pills and the player bar: 1x / 1.5x / 0.75x. */
 internal fun formatSpeedBadge(value: Float): String {
@@ -179,13 +178,16 @@ internal fun SpeedPanel(
                 .semantics { contentDescription = "关闭倍速面板" }
         )
         val placement = when (mode) {
-            SpeedPanelMode.Drawer -> Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .width(panelWidth)
-            SpeedPanelMode.Sheet -> Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
+            SpeedPanelMode.Drawer ->
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .width(panelWidth)
+
+            SpeedPanelMode.Sheet ->
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
         }
         Column(
             placement
@@ -204,7 +206,9 @@ internal fun SpeedPanel(
                                 strokeWidth = 1.dp.toPx()
                             )
                         }
-                    } else Modifier
+                    } else {
+                        Modifier
+                    }
                 )
                 .pointerInput(Unit) { detectTapGestures { } },
             verticalArrangement = Arrangement.Center

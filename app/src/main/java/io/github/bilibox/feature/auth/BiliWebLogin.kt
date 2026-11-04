@@ -239,7 +239,10 @@ internal fun BiliWebLoginDialog(
                             fontSize = 12.sp,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { error = null; reloadTicket++ }) { Text("重试", color = Pink, fontSize = 13.sp) }
+                        TextButton(onClick = {
+                            error = null
+                            reloadTicket++
+                        }) { Text("重试", color = Pink, fontSize = 13.sp) }
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxWidth()) {

@@ -1,6 +1,5 @@
 package io.github.bilibox.feature.player
 
-import io.github.bilibox.R
 import android.graphics.BitmapFactory
 import android.graphics.Color as AndroidColor
 import android.view.LayoutInflater
@@ -35,6 +34,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.bilibox.MainActivity
+import io.github.bilibox.R
 import io.github.bilibox.core.util.captureVideoFrame
 import io.github.bilibox.core.util.saveVideoFrame
 import org.junit.Assert.assertEquals
@@ -169,7 +169,9 @@ class PlayerToolsTest {
                 val canvas = surface.lockCanvas(null)
                 canvas.drawColor(AndroidColor.GREEN)
                 surface.unlockCanvasAndPost(canvas)
-            } finally { surface.release() }
+            } finally {
+                surface.release()
+            }
         }
         compose.waitUntil(5_000) {
             compose.runOnIdle {
@@ -191,7 +193,11 @@ class PlayerToolsTest {
                 assertEquals(frame.height, saved.height)
                 assertEquals(AndroidColor.GREEN, saved.getPixel(saved.width / 2, saved.height / 2))
                 saved.recycle()
-            } finally { context.contentResolver.delete(uri, null, null) }
-        } finally { frame.recycle() }
+            } finally {
+                context.contentResolver.delete(uri, null, null)
+            }
+        } finally {
+            frame.recycle()
+        }
     }
 }

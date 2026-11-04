@@ -19,6 +19,7 @@ import java.net.URI
 object BiliPlayback {
     const val CDN_CONNECT_TIMEOUT_MS = 6_000
     const val CDN_READ_TIMEOUT_MS = 8_000
+
     // Bilibili's upos/edge CDN hosts reject the mobile Chrome UA on some
     // signed URLs with HTTP 403. PiliPlus uses a desktop UA for media requests;
     // the same UA keeps the official mirrors usable here.
@@ -30,12 +31,14 @@ object BiliPlayback {
             ?: "https://www.bilibili.com/"
         return DefaultHttpDataSource.Factory()
             .setUserAgent(UA)
-            .setDefaultRequestProperties(buildMap {
-                put("Referer", referer)
-                put("Origin", "https://www.bilibili.com")
-                put("Accept", "*/*")
-                cookie?.takeIf { it.isNotBlank() }?.let { put("Cookie", it) }
-            })
+            .setDefaultRequestProperties(
+                buildMap {
+                    put("Referer", referer)
+                    put("Origin", "https://www.bilibili.com")
+                    put("Accept", "*/*")
+                    cookie?.takeIf { it.isNotBlank() }?.let { put("Cookie", it) }
+                }
+            )
             .setAllowCrossProtocolRedirects(true)
             // A CDN node that cannot connect or send data within a few seconds is
             // almost always dead; failing fast lets the next backup URL take over.
@@ -126,10 +129,9 @@ object BiliPlayback {
         return dash.video.filter { it.id == bestId && it.url.isNotEmpty() }.minByOrNull { codecRank(it.codecs) }
     }
 
-    private fun pickAudio(dash: Dash): DashAudio? =
-        dash.audio.filter { it.url.isNotEmpty() }.maxByOrNull { it.id }
-            ?: dash.dolby?.audio?.maxByOrNull { it.bandwidth }
-            ?: dash.flac?.audio?.takeIf { it.url.isNotEmpty() }
+    private fun pickAudio(dash: Dash): DashAudio? = dash.audio.filter { it.url.isNotEmpty() }.maxByOrNull { it.id }
+        ?: dash.dolby?.audio?.maxByOrNull { it.bandwidth }
+        ?: dash.flac?.audio?.takeIf { it.url.isNotEmpty() }
 
     private fun codecRank(codecs: String): Int = when {
         codecs.startsWith("avc") -> 0
@@ -146,10 +148,9 @@ object BiliPlayback {
  * what kept playback on "正在获取视频流". Official upos mirrors go first.
  */
 object BiliCdn {
-    fun prioritize(urls: List<String>): List<String> =
-        urls.filter { it.isNotBlank() }.distinct().withIndex()
-            .sortedWith(compareBy({ rank(it.value) }, { it.index }))
-            .map { it.value }
+    fun prioritize(urls: List<String>): List<String> = urls.filter { it.isNotBlank() }.distinct().withIndex()
+        .sortedWith(compareBy({ rank(it.value) }, { it.index }))
+        .map { it.value }
 
     /** Lower is better: 0 official upos mirror, 1 other bilivideo CDN, 2 PCDN/P2P. */
     fun rank(url: String): Int {

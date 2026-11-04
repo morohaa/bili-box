@@ -1,7 +1,5 @@
 package io.github.bilibox.data.danmaku
 
-
-
 /**
  * 一条弹幕在时间轴上的排布结果。
  *
@@ -19,8 +17,7 @@ internal data class DanmakuTrack(
     fun isVisibleAt(positionMs: Long): Boolean = positionMs >= startMs && positionMs < endMs
 
     /** 滚动弹幕在 [positionMs] 时的左边缘；固定弹幕不使用这个值。 */
-    fun leftEdgeAt(positionMs: Long, viewportWidthPx: Float): Float =
-        viewportWidthPx - (positionMs - startMs) / 1_000f * speedPxPerSecond
+    fun leftEdgeAt(positionMs: Long, viewportWidthPx: Float): Float = viewportWidthPx - (positionMs - startMs) / 1_000f * speedPxPerSecond
 }
 
 /**

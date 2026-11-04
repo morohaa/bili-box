@@ -44,8 +44,10 @@ internal fun OnlineVideoEpisodes(
         initialFirstVisibleItemIndex = pages.indexOfFirst { it.page == selectedPage }.coerceAtLeast(0)
     )
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .35f))
-            .clickable(onClick = onDismiss).semantics { contentDescription = "关闭选集" })
+        Box(
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = .35f))
+                .clickable(onClick = onDismiss).semantics { contentDescription = "关闭选集" }
+        )
         Column(
             Modifier.align(Alignment.CenterEnd).width(360.dp).fillMaxHeight()
                 .background(Color(0xF2121318))
@@ -53,8 +55,10 @@ internal fun OnlineVideoEpisodes(
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                 .navigationBarsPadding()
         ) {
-            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp).height(56.dp),
-                verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp).height(56.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text("分集(${pages.size}P)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = "收起选集" }) {
@@ -62,11 +66,17 @@ internal fun OnlineVideoEpisodes(
                 }
             }
             HorizontalDivider(color = Color.White.copy(alpha = .08f))
-            LazyColumn(Modifier.weight(1f).selectableGroup(), state = listState,
+            LazyColumn(
+                Modifier.weight(1f).selectableGroup(),
+                state = listState,
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 itemsIndexed(pages, key = { _, page -> page.cid }) { _, page ->
-                    OnlineEpisodeRow(page, page.page == selectedPage) { onPageSelected(page); onDismiss() }
+                    OnlineEpisodeRow(page, page.page == selectedPage) {
+                        onPageSelected(page)
+                        onDismiss()
+                    }
                 }
             }
         }
@@ -105,8 +115,11 @@ internal fun OnlineEpisodeRow(page: Page, selected: Boolean, onClick: () -> Unit
 
 @Composable
 internal fun EqualizerBars() {
-    Row(Modifier.width(20.dp).height(16.dp), verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(
+        Modifier.width(20.dp).height(16.dp),
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
         val heights = listOf(8.dp, 13.dp, 10.dp)
         heights.forEach { height -> Box(Modifier.width(3.dp).height(height).clip(RoundedCornerShape(2.dp)).background(OnlinePink)) }
     }

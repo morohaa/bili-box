@@ -25,11 +25,9 @@ private const val loginUserAgent =
  * 访问哔哩哔哩通行证（passport）接口，统一带上 Referer 并收集 Set-Cookie。
  * 扫码登录与账号密码/短信登录共用这一份请求逻辑。
  */
-internal fun biliLoginRequest(endpoint: String, cookie: String? = null, includeCookies: Boolean = true): LoginResponse =
-    executeLoginRequest(endpoint, cookie, body = null, includeCookies = includeCookies)
+internal fun biliLoginRequest(endpoint: String, cookie: String? = null, includeCookies: Boolean = true): LoginResponse = executeLoginRequest(endpoint, cookie, body = null, includeCookies = includeCookies)
 
-internal fun biliLoginPost(endpoint: String, params: Map<String, String>, cookie: String? = null): LoginResponse =
-    executeLoginRequest(endpoint, cookie, body = encodeForm(params), includeCookies = true)
+internal fun biliLoginPost(endpoint: String, params: Map<String, String>, cookie: String? = null): LoginResponse = executeLoginRequest(endpoint, cookie, body = encodeForm(params), includeCookies = true)
 
 private fun encodeForm(params: Map<String, String>): String = params.entries.joinToString("&") { (key, value) ->
     "${URLEncoder.encode(key, Charsets.UTF_8.name())}=${URLEncoder.encode(value, Charsets.UTF_8.name())}"
@@ -53,13 +51,17 @@ private fun executeLoginRequest(endpoint: String, cookie: String?, body: String?
         val stream = if (status in 200..299) connection.inputStream else connection.errorStream
         val text = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         if (status !in 200..299) throw IllegalStateException("B 站登录服务暂不可用（HTTP $status）")
-        val cookies = if (includeCookies) connection.headerFields.entries
-            .filter { it.key?.equals("Set-Cookie", ignoreCase = true) == true }
-            .flatMap { it.value.orEmpty() }
-            .map { it.substringBefore(';').trim() }
-            .filter { it.contains('=') }
-            .distinctBy { it.substringBefore('=') }
-            .joinToString("; ") else ""
+        val cookies = if (includeCookies) {
+            connection.headerFields.entries
+                .filter { it.key?.equals("Set-Cookie", ignoreCase = true) == true }
+                .flatMap { it.value.orEmpty() }
+                .map { it.substringBefore(';').trim() }
+                .filter { it.contains('=') }
+                .distinctBy { it.substringBefore('=') }
+                .joinToString("; ")
+        } else {
+            ""
+        }
         LoginResponse(JSONObject(text), cookies)
     } finally {
         connection.disconnect()

@@ -1,0 +1,18 @@
+root = true
+
+[*.{kt,kts}]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+ktlint_code_style = android_studio
+# 现有代码仍有少量长行和通配符 import；先保留格式化规则，逐步收紧。
+max_line_length = off
+ktlint_standard_no-wildcard-imports = disabled
+# Compose 的 @Composable 函数按约定使用 PascalCase；主题色常量也保持现有命名。
+ktlint_standard_function-naming = disabled
+ktlint_standard_property-naming = disabled
+# 项目已有统一尾逗号风格，交给 IDE/ktlint 维护，不在此规则中强制删除。
+ktlint_standard_trailing-comma-on-call-site = disabled
+ktlint_standard_trailing-comma-on-declaration-site = disabled

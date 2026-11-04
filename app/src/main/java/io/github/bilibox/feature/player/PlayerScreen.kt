@@ -237,10 +237,12 @@ internal fun VideoPlayerScreen(
         val barsBehavior = controller?.systemBarsBehavior
         onDispose {
             if (originalOrientation != null) activity?.requestedOrientation = originalOrientation
-            if (originalWindowBrightness != null) activity?.window?.let { window ->
-                val attributes = window.attributes
-                attributes.screenBrightness = originalWindowBrightness
-                window.attributes = attributes
+            if (originalWindowBrightness != null) {
+                activity?.window?.let { window ->
+                    val attributes = window.attributes
+                    attributes.screenBrightness = originalWindowBrightness
+                    window.attributes = attributes
+                }
             }
             controller?.show(WindowInsetsCompat.Type.systemBars())
             if (lightStatusBars != null) controller?.isAppearanceLightStatusBars = lightStatusBars
@@ -261,8 +263,11 @@ internal fun VideoPlayerScreen(
                 isAppearanceLightStatusBars = false
                 isAppearanceLightNavigationBars = !fullScreen && detailsBackground == Color.White
                 systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                if (fullScreen) hide(WindowInsetsCompat.Type.systemBars())
-                else show(WindowInsetsCompat.Type.systemBars())
+                if (fullScreen) {
+                    hide(WindowInsetsCompat.Type.systemBars())
+                } else {
+                    show(WindowInsetsCompat.Type.systemBars())
+                }
             }
         }
     }
@@ -279,13 +284,19 @@ internal fun VideoPlayerScreen(
 
     fun toggleOrientation() {
         controlsVisible = true
-        activity?.requestedOrientation = if (fullScreen) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        activity?.requestedOrientation = if (fullScreen) {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
     }
 
     fun navigateBack() {
-        if (fullScreen) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        else onBack()
+        if (fullScreen) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            onBack()
+        }
     }
 
     fun togglePlayback() {
@@ -384,7 +395,9 @@ internal fun VideoPlayerScreen(
         if (savingFrame || screenLocked || !hasVideoFrame || playbackError != null) return
         val frame = try {
             playerView?.let(::captureVideoFrame)
-        } catch (_: Exception) { null }
+        } catch (_: Exception) {
+            null
+        }
         if (frame == null) {
             Toast.makeText(context, "暂时无法截取画面，请等待视频显示后重试", Toast.LENGTH_SHORT).show()
             return
@@ -419,18 +432,26 @@ internal fun VideoPlayerScreen(
     }
 
     val screenshotPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) takeVideoScreenshot()
-        else Toast.makeText(context, "需要存储权限才能保存视频画面", Toast.LENGTH_SHORT).show()
+        if (granted) {
+            takeVideoScreenshot()
+        } else {
+            Toast.makeText(context, "需要存储权限才能保存视频画面", Toast.LENGTH_SHORT).show()
+        }
     }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
-            override fun onRenderedFirstFrame() { hasVideoFrame = true }
+            override fun onRenderedFirstFrame() {
+                hasVideoFrame = true
+            }
+
             // A queue can switch files on the same player; wait for the new first frame.
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
                 hasVideoFrame = false
             }
-            override fun onPlayWhenReadyChanged(ready: Boolean, reason: Int) { playWhenReady = ready }
+            override fun onPlayWhenReadyChanged(ready: Boolean, reason: Int) {
+                playWhenReady = ready
+            }
             override fun onPlaybackStateChanged(state: Int) {
                 playbackState = state
                 if (state == Player.STATE_IDLE) hasVideoFrame = false
@@ -481,7 +502,8 @@ internal fun VideoPlayerScreen(
     }
     LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded) {
         if (controlsVisible && (isPlaying || screenLocked) && !scrubbing &&
-            !speedMenuExpanded && !playbackModeExpanded && !sleepTimerOpen && !episodesExpanded && !qualityMenuExpanded) {
+            !speedMenuExpanded && !playbackModeExpanded && !sleepTimerOpen && !episodesExpanded && !qualityMenuExpanded
+        ) {
             delay(4_000)
             controlsVisible = false
         }
@@ -522,407 +544,440 @@ internal fun VideoPlayerScreen(
     val showChrome = controlsVisible && !screenLocked && !(fullScreen && speedMenuExpanded)
     val sleepTimerRemainingMs = when (sleepTimer.mode) {
         SleepTimerMode.TIME -> (sleepTimer.endAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+
         SleepTimerMode.VIDEOS ->
             if (sleepTimer.videosLeft <= 1) (duration - position).coerceAtLeast(0L) else 0L
+
         SleepTimerMode.OFF -> 0L
     }
 
     Box(Modifier.fillMaxSize().onGloballyPositioned { screenRootOffset = it.positionInRoot() }) {
-        Column(Modifier.fillMaxSize().background(Color.Black)
-            .then(if (fullScreen) Modifier else Modifier.statusBarsPadding())) {
-        Box(
-            (if (fullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-                .background(Color.Black),
-            contentAlignment = Alignment.Center
+        Column(
+            Modifier.fillMaxSize().background(Color.Black)
+                .then(if (fullScreen) Modifier else Modifier.statusBarsPadding())
         ) {
-            AndroidView(
-                factory = { viewContext -> createTexturePlayerView(viewContext, player).also { playerView = it } },
-                update = {
-                    it.player = player
-                    // Let the screen sleep while only audio is playing.
-                    it.keepScreenOn = !listening
-                    playerView = it
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-            PlayerTouchSurface(
-                locked = screenLocked,
-                onToggleControls = { controlsVisible = !controlsVisible },
-                onTogglePlayback = { togglePlayback() },
-                verticalGesturesEnabled = !screenLocked,
-                onVerticalGestureStart = { startVerticalGesture(it) },
-                onVerticalSwipe = { side, delta -> adjustFromVerticalGesture(side, delta) },
-                onVerticalGestureEnd = { verticalGestureActive = false },
-                speedBoostEnabled = !screenLocked && !speedMenuExpanded &&
-                    !playbackModeExpanded && !sleepTimerOpen && playbackError == null,
-                onSpeedBoostStart = { startSpeedBoost() },
-                onSpeedBoostEnd = { endSpeedBoost() },
-                modifier = Modifier.fillMaxSize()
-            )
-            if (danmakuSupported && !listening && !listenPageOpen) {
-                DanmakuOverlay(
-                    player = player,
-                    items = danmakuItems,
-                    settings = danmakuSettings,
-                    modifier = Modifier.fillMaxSize(),
+            Box(
+                (if (fullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                AndroidView(
+                    factory = { viewContext -> createTexturePlayerView(viewContext, player).also { playerView = it } },
+                    update = {
+                        it.player = player
+                        // Let the screen sleep while only audio is playing.
+                        it.keepScreenOn = !listening
+                        playerView = it
+                    },
+                    modifier = Modifier.fillMaxSize()
                 )
-            }
-            if (listening && !listenPageOpen) {
-                CollapsedListenOverlay(
-                    cover = listenCover,
-                    playing = isPlaying,
-                    onExpand = { enterListen() },
-                    onRestoreVideo = { restoreVideo() },
+                PlayerTouchSurface(
+                    locked = screenLocked,
+                    onToggleControls = { controlsVisible = !controlsVisible },
+                    onTogglePlayback = { togglePlayback() },
+                    verticalGesturesEnabled = !screenLocked,
+                    onVerticalGestureStart = { startVerticalGesture(it) },
+                    onVerticalSwipe = { side, delta -> adjustFromVerticalGesture(side, delta) },
+                    onVerticalGestureEnd = { verticalGestureActive = false },
+                    speedBoostEnabled = !screenLocked && !speedMenuExpanded &&
+                        !playbackModeExpanded && !sleepTimerOpen && playbackError == null,
+                    onSpeedBoostStart = { startSpeedBoost() },
+                    onSpeedBoostEnd = { endSpeedBoost() },
+                    modifier = Modifier.fillMaxSize()
                 )
-            }
-            if (playbackError != null) {
-                Column(Modifier.padding(horizontal = 24.dp, vertical = 48.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("暂时无法播放", color = Color.White, fontSize = 14.sp)
-                    TextButton(onClick = onRetry) { Text("重试", color = Pink) }
+                if (danmakuSupported && !listening && !listenPageOpen) {
+                    DanmakuOverlay(
+                        player = player,
+                        items = danmakuItems,
+                        settings = danmakuSettings,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
-            } else if (loadingMessage != null || playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_IDLE) {
-                BiliLoadingIndicator(
-                    message = loadingMessage ?: if (playbackState == Player.STATE_BUFFERING) "正在缓冲…" else "等待视频加载"
-                )
-            }
-            if (sleepTimer.warning && sleepTimer.active) {
-                SleepTimerWarning(
-                    remainingMs = sleepTimerRemainingMs,
-                    onExtend = { sleepTimer.extend(10, sleepTimerRemainingMs) },
-                    onDismiss = { sleepTimer.dismissWarning() },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                        .padding(bottom = if (fullScreen) 150.dp else 72.dp),
-                )
-            }
-            if (showChrome) {
-                Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(56.dp)
-                    .background(Brush.verticalGradient(listOf(
-                        Color.Black.copy(alpha = .75f), Color.Black.copy(alpha = .3f), Color.Transparent
-                    ))))
-                Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(if (fullScreen) 150.dp else 64.dp)
-                    .background(Brush.verticalGradient(listOf(
-                        Color.Transparent, Color.Black.copy(alpha = .4f), Color.Black.copy(alpha = .88f)
-                    ))))
-                PlayerBottomBar(
-                    state = PlayerBottomBarState(
-                        fullScreen = fullScreen,
-                        position = position,
-                        duration = duration,
-                        bufferedPosition = bufferedPosition,
-                        scrubbing = scrubbing,
-                        scrubPosition = scrubPosition,
-                        playWhenReady = playWhenReady,
-                        playbackState = playbackState,
-                        danmakuSupported = danmakuSupported,
-                        danmakuSettings = danmakuSettings,
-                        danmakuLoading = danmakuLoading,
-                        danmakuError = danmakuError,
-                        canSendDanmaku = onSendDanmaku != null,
-                        episodesAvailable = episodes != null,
-                        speed = speed,
-                        qualityOptions = qualityOptions,
-                        selectedQuality = selectedQuality,
-                    ),
-                    actions = PlayerBottomBarActions(
-                        onSeekStart = { scrubbing = true; scrubPosition = it },
-                        onSeekFinished = {
-                            player.seekTo(scrubPosition.toLong())
-                            position = scrubPosition.toLong()
-                            scrubbing = false
-                        },
-                        onTogglePlayback = { togglePlayback() },
-                        onNextEpisode = {
-                            val next = onNextEpisode
-                            if (next != null) next()
-                            else Toast.makeText(context, "已经是最后一集", Toast.LENGTH_SHORT).show()
-                        },
-                        onDanmakuToggle = {
-                            onDanmakuSettingsChange(
-                                danmakuSettings.copy(enabled = !danmakuSettings.enabled)
+                if (listening && !listenPageOpen) {
+                    CollapsedListenOverlay(
+                        cover = listenCover,
+                        playing = isPlaying,
+                        onExpand = { enterListen() },
+                        onRestoreVideo = { restoreVideo() },
+                    )
+                }
+                if (playbackError != null) {
+                    Column(
+                        Modifier.padding(horizontal = 24.dp, vertical = 48.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("暂时无法播放", color = Color.White, fontSize = 14.sp)
+                        TextButton(onClick = onRetry) { Text("重试", color = Pink) }
+                    }
+                } else if (loadingMessage != null || playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_IDLE) {
+                    BiliLoadingIndicator(
+                        message = loadingMessage ?: if (playbackState == Player.STATE_BUFFERING) "正在缓冲…" else "等待视频加载"
+                    )
+                }
+                if (sleepTimer.warning && sleepTimer.active) {
+                    SleepTimerWarning(
+                        remainingMs = sleepTimerRemainingMs,
+                        onExtend = { sleepTimer.extend(10, sleepTimerRemainingMs) },
+                        onDismiss = { sleepTimer.dismissWarning() },
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                            .padding(bottom = if (fullScreen) 150.dp else 72.dp),
+                    )
+                }
+                if (showChrome) {
+                    Box(
+                        Modifier.align(Alignment.TopCenter).fillMaxWidth().height(56.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.Black.copy(alpha = .75f),
+                                        Color.Black.copy(alpha = .3f),
+                                        Color.Transparent
+                                    )
+                                )
                             )
-                        },
-                        onDanmakuSettings = { danmakuSettingsOpen = true },
-                        onDanmakuSend = {
-                            if (onSendDanmaku == null) {
-                                Toast.makeText(context, "登录后才能发送弹幕", Toast.LENGTH_SHORT).show()
+                    )
+                    Box(
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(if (fullScreen) 150.dp else 64.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = .4f),
+                                        Color.Black.copy(alpha = .88f)
+                                    )
+                                )
+                            )
+                    )
+                    PlayerBottomBar(
+                        state = PlayerBottomBarState(
+                            fullScreen = fullScreen,
+                            position = position,
+                            duration = duration,
+                            bufferedPosition = bufferedPosition,
+                            scrubbing = scrubbing,
+                            scrubPosition = scrubPosition,
+                            playWhenReady = playWhenReady,
+                            playbackState = playbackState,
+                            danmakuSupported = danmakuSupported,
+                            danmakuSettings = danmakuSettings,
+                            danmakuLoading = danmakuLoading,
+                            danmakuError = danmakuError,
+                            canSendDanmaku = onSendDanmaku != null,
+                            episodesAvailable = episodes != null,
+                            speed = speed,
+                            qualityOptions = qualityOptions,
+                            selectedQuality = selectedQuality,
+                        ),
+                        actions = PlayerBottomBarActions(
+                            onSeekStart = {
+                                scrubbing = true
+                                scrubPosition = it
+                            },
+                            onSeekFinished = {
+                                player.seekTo(scrubPosition.toLong())
+                                position = scrubPosition.toLong()
+                                scrubbing = false
+                            },
+                            onTogglePlayback = { togglePlayback() },
+                            onNextEpisode = {
+                                val next = onNextEpisode
+                                if (next != null) {
+                                    next()
+                                } else {
+                                    Toast.makeText(context, "已经是最后一集", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            onDanmakuToggle = {
+                                onDanmakuSettingsChange(
+                                    danmakuSettings.copy(enabled = !danmakuSettings.enabled)
+                                )
+                            },
+                            onDanmakuSettings = { danmakuSettingsOpen = true },
+                            onDanmakuSend = {
+                                if (onSendDanmaku == null) {
+                                    Toast.makeText(context, "登录后才能发送弹幕", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    danmakuSendError = null
+                                    danmakuComposerOpen = true
+                                }
+                            },
+                            onEpisodes = {
+                                speedMenuExpanded = false
+                                qualityMenuExpanded = false
+                                episodesExpanded = true
+                            },
+                            onSpeed = {
+                                episodesExpanded = false
+                                qualityMenuExpanded = false
+                                speedMenuExpanded = true
+                            },
+                            onQuality = {
+                                episodesExpanded = false
+                                speedMenuExpanded = false
+                                qualityMenuExpanded = true
+                            },
+                            onToggleOrientation = { toggleOrientation() },
+                        ),
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                            .then(
+                                if (fullScreen) {
+                                    Modifier
+                                        .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 6.dp)
+                                } else {
+                                    Modifier.padding(horizontal = 6.dp)
+                                }
+                            ),
+                    )
+                }
+                if (showChrome) {
+                    PlayerTopBar(
+                        fullScreen = fullScreen,
+                        title = title,
+                        listening = listening,
+                        showListenButton = listenInfo != null,
+                        speed = speed,
+                        onBack = { navigateBack() },
+                        onListenClick = { enterListen() },
+                        onListenPositioned = { listenOrigin = it },
+                        onSpeedClick = { speedMenuExpanded = true },
+                        modifier = Modifier.align(Alignment.TopStart),
+                    )
+                }
+                // Locking the screen must keep the unlock affordance reachable, so
+                // this follows the raw chrome state rather than showChrome.
+                if (fullScreen && controlsVisible && !speedMenuExpanded) {
+                    PlayerSideTools(
+                        locked = screenLocked,
+                        screenshotEnabled = hasVideoFrame && playbackError == null && !savingFrame,
+                        onScreenshot = {
+                            if (Build.VERSION.SDK_INT == 28 && context.checkSelfPermission(
+                                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                                ) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                screenshotPermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                             } else {
-                                danmakuSendError = null
-                                danmakuComposerOpen = true
+                                takeVideoScreenshot()
                             }
                         },
-                        onEpisodes = {
-                            speedMenuExpanded = false
-                            qualityMenuExpanded = false
-                            episodesExpanded = true
-                        },
-                        onSpeed = {
+                        onToggleLock = { toggleScreenLock() },
+                        modifier = Modifier.align(Alignment.CenterEnd).displayCutoutPadding()
+                            .navigationBarsPadding().padding(end = 10.dp).offset(y = (-36).dp)
+                    )
+                }
+                gestureFeedback?.let { feedback ->
+                    PlayerGestureFeedback(
+                        side = feedback.side,
+                        level = feedback.level,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                PlayerSpeedBoostIndicator(
+                    active = speedBoostActive,
+                    speed = speedBoostSpeed,
+                    // Keep the feedback near the top edge: centering it covered the
+                    // part of the frame the user was watching while holding.
+                    modifier = Modifier.align(Alignment.TopCenter)
+                        .padding(top = if (fullScreen) 56.dp else 52.dp)
+                )
+                val episodeContent = episodes
+                if (fullScreen && !screenLocked && episodeContent != null) {
+                    PlayerDrawerVisibility(visible = episodesExpanded) {
+                        episodeContent.invoke {
                             episodesExpanded = false
-                            qualityMenuExpanded = false
-                            speedMenuExpanded = true
-                        },
-                        onQuality = {
-                            episodesExpanded = false
-                            speedMenuExpanded = false
-                            qualityMenuExpanded = true
-                        },
-                        onToggleOrientation = { toggleOrientation() },
-                    ),
-                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .then(
-                            if (fullScreen) Modifier
-                                .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 6.dp)
-                            else Modifier.padding(horizontal = 6.dp)
-                        ),
-                )
-            }
-            if (showChrome) {
-                PlayerTopBar(
-                    fullScreen = fullScreen,
-                    title = title,
-                    listening = listening,
-                    showListenButton = listenInfo != null,
-                    speed = speed,
-                    onBack = { navigateBack() },
-                    onListenClick = { enterListen() },
-                    onListenPositioned = { listenOrigin = it },
-                    onSpeedClick = { speedMenuExpanded = true },
-                    modifier = Modifier.align(Alignment.TopStart),
-                )
-            }
-            // Locking the screen must keep the unlock affordance reachable, so
-            // this follows the raw chrome state rather than showChrome.
-            if (fullScreen && controlsVisible && !speedMenuExpanded) {
-                PlayerSideTools(
-                    locked = screenLocked,
-                    screenshotEnabled = hasVideoFrame && playbackError == null && !savingFrame,
-                    onScreenshot = {
-                        if (Build.VERSION.SDK_INT == 28 && context.checkSelfPermission(
-                                Manifest.permission.WRITE_EXTERNAL_STORAGE
-                            ) != PackageManager.PERMISSION_GRANTED) {
-                            screenshotPermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                        } else takeVideoScreenshot()
-                    },
-                    onToggleLock = { toggleScreenLock() },
-                    modifier = Modifier.align(Alignment.CenterEnd).displayCutoutPadding()
-                        .navigationBarsPadding().padding(end = 10.dp).offset(y = (-36).dp)
-                )
-            }
-            gestureFeedback?.let { feedback ->
-                PlayerGestureFeedback(
-                    side = feedback.side,
-                    level = feedback.level,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            }
-            PlayerSpeedBoostIndicator(
-                active = speedBoostActive,
-                speed = speedBoostSpeed,
-                // Keep the feedback near the top edge: centering it covered the
-                // part of the frame the user was watching while holding.
-                modifier = Modifier.align(Alignment.TopCenter)
-                    .padding(top = if (fullScreen) 56.dp else 52.dp)
-            )
-            val episodeContent = episodes
-            if (fullScreen && !screenLocked && episodeContent != null) {
-                PlayerDrawerVisibility(visible = episodesExpanded) {
-                    episodeContent.invoke {
-                        episodesExpanded = false
-                        controlsVisible = true
+                            controlsVisible = true
+                        }
                     }
                 }
-            }
-            if (fullScreen && !screenLocked) {
-                PlayerDrawerVisibility(visible = speedMenuExpanded) {
-                    SpeedPanel(
-                        speed = speed,
-                        mode = SpeedPanelMode.Drawer,
-                        onDismiss = { speedMenuExpanded = false },
-                        onSpeedChange = {
-                            player.setPlaybackSpeed(it)
-                            speed = it
-                        }
+                if (fullScreen && !screenLocked) {
+                    PlayerDrawerVisibility(visible = speedMenuExpanded) {
+                        SpeedPanel(
+                            speed = speed,
+                            mode = SpeedPanelMode.Drawer,
+                            onDismiss = { speedMenuExpanded = false },
+                            onSpeedChange = {
+                                player.setPlaybackSpeed(it)
+                                speed = it
+                            }
+                        )
+                    }
+                    PlayerDrawerVisibility(visible = qualityMenuExpanded) {
+                        PlaybackQualityDrawer(
+                            options = qualityOptions,
+                            selectedQuality = selectedQuality,
+                            onDismiss = { qualityMenuExpanded = false },
+                            onQualitySelected = { qn ->
+                                onQualitySelected?.invoke(qn)
+                                qualityMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+
+                // Save confirmation: a scaled thumbnail of the captured frame sits
+                // above the control bar, mirroring the reference player.
+                val previewFrame = screenshotPreview
+                if (previewFrame != null) {
+                    ScreenshotPreviewCard(
+                        frame = previewFrame,
+                        visible = screenshotPreviewVisible,
+                        modifier = Modifier.align(Alignment.BottomStart)
+                            .padding(start = 10.dp, bottom = if (fullScreen) 156.dp else 48.dp),
                     )
                 }
-                PlayerDrawerVisibility(visible = qualityMenuExpanded) {
-                    PlaybackQualityDrawer(
-                        options = qualityOptions,
-                        selectedQuality = selectedQuality,
-                        onDismiss = { qualityMenuExpanded = false },
-                        onQualitySelected = { qn ->
-                            onQualitySelected?.invoke(qn)
-                            qualityMenuExpanded = false
-                        },
-                    )
+                if (screenshotFlash.value > .001f) {
+                    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = screenshotFlash.value)))
                 }
             }
 
-            // Save confirmation: a scaled thumbnail of the captured frame sits
-            // above the control bar, mirroring the reference player.
-            val previewFrame = screenshotPreview
-            if (previewFrame != null) {
-                ScreenshotPreviewCard(
-                    frame = previewFrame,
-                    visible = screenshotPreviewVisible,
-                    modifier = Modifier.align(Alignment.BottomStart)
-                        .padding(start = 10.dp, bottom = if (fullScreen) 156.dp else 48.dp),
+            if (!fullScreen) {
+                PlayerDetailsPane(
+                    modifier = Modifier.weight(1f),
+                    detailsBackground = detailsBackground,
+                    showDetailTabs = showDetailTabs,
+                    detailTabs = detailTabs,
+                    detailsTab = detailsTab,
+                    onDetailsTabChange = { detailsTab = it },
+                    sourcePill = sourcePill,
+                    sourceLabel = sourceLabel,
+                    playbackError = playbackError,
+                    onRetry = onRetry,
+                    commentMessage = commentMessage,
+                    duration = duration,
+                    positionMs = if (scrubbing) scrubPosition.toLong() else position,
+                    speed = speed,
+                    screenshotEnabled = hasVideoFrame && playbackError == null && !savingFrame,
+                    sleepTimerActive = sleepTimer.active,
+                    onOpenSpeedPanel = {
+                        playbackModeExpanded = false
+                        speedMenuExpanded = true
+                    },
+                    onOpenPlaybackModeSheet = {
+                        speedMenuExpanded = false
+                        playbackModeExpanded = true
+                    },
+                    onOpenSleepTimerSheet = {
+                        speedMenuExpanded = false
+                        playbackModeExpanded = false
+                        sleepTimerOpen = true
+                    },
+                    onTakeScreenshot = { takeVideoScreenshot() },
+                    onSeekTo = { target ->
+                        player.seekTo(target.coerceAtLeast(0L))
+                        player.playWhenReady = true
+                        controlsVisible = true
+                    },
+                    details = details,
+                    extraDetailPane = extraDetailPane,
+                    episodeOverlay = episodeOverlay,
+                    episodeOverlayVisible = episodeOverlayVisible,
+                    speedMenuExpanded = speedMenuExpanded,
+                    onDismissSpeedSheet = { speedMenuExpanded = false },
+                    onSpeedChange = {
+                        player.setPlaybackSpeed(it)
+                        speed = it
+                    },
+                    playbackModeExpanded = playbackModeExpanded,
+                    playbackModeSheet = playbackModeSheet,
+                    onDismissPlaybackMode = { playbackModeExpanded = false },
                 )
             }
-            if (screenshotFlash.value > .001f) {
-                Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = screenshotFlash.value)))
+        }
+        // The timer lives on the player, so it keeps counting while the sheet is
+        // closed and the queue switches files. It is a sibling of the player
+        // column so the panel covers the video too, like the reference design.
+        if (!fullScreen) {
+            PlayerDrawerVisibility(visible = sleepTimerOpen, fromBottom = true) {
+                SleepTimerSheet(
+                    timer = sleepTimer,
+                    remainingVideos = remainingVideos,
+                    currentRemainingMs = (duration - position).coerceAtLeast(0L),
+                    durationMs = duration,
+                    onDismiss = { sleepTimerOpen = false },
+                )
             }
         }
-
-        if (!fullScreen) {
-            PlayerDetailsPane(
-                modifier = Modifier.weight(1f),
-                detailsBackground = detailsBackground,
-                showDetailTabs = showDetailTabs,
-                detailTabs = detailTabs,
-                detailsTab = detailsTab,
-                onDetailsTabChange = { detailsTab = it },
-                sourcePill = sourcePill,
-                sourceLabel = sourceLabel,
-                playbackError = playbackError,
-                onRetry = onRetry,
-                commentMessage = commentMessage,
-                duration = duration,
-                positionMs = if (scrubbing) scrubPosition.toLong() else position,
+        // 弹幕输入与设置放在播放器外层：弹层要盖住视频和详情，而不是被视频 Box 裁掉。
+        if (danmakuSupported && danmakuComposerOpen) {
+            val send = onSendDanmaku
+            if (send != null) {
+                DanmakuComposerDialog(
+                    sending = danmakuSending,
+                    error = danmakuSendError,
+                    onDismiss = { if (!danmakuSending) danmakuComposerOpen = false },
+                    onSend = { text ->
+                        if (!danmakuSending) {
+                            danmakuSending = true
+                            danmakuSendError = null
+                            captureScope.launch {
+                                try {
+                                    send(text, player.currentPosition.coerceAtLeast(0L))
+                                    danmakuComposerOpen = false
+                                    Toast.makeText(context, "弹幕已发送", Toast.LENGTH_SHORT).show()
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (error: Exception) {
+                                    danmakuSendError = error.message ?: "弹幕发送失败"
+                                } finally {
+                                    danmakuSending = false
+                                }
+                            }
+                        }
+                    },
+                )
+            }
+        }
+        if (danmakuSupported && danmakuSettingsOpen) {
+            DanmakuSettingsSheet(
+                settings = danmakuSettings,
+                onDismiss = { danmakuSettingsOpen = false },
+                onSettingsChange = onDanmakuSettingsChange,
+            )
+        }
+        // 听视频 page: stays composed while its reveal animation is running.
+        val info = listenInfo
+        if (info != null && listenVisible) {
+            ListenScreen(
+                reveal = { listenReveal.value },
+                origin = listenOrigin - screenRootOffset,
+                open = listenPageOpen,
+                title = title,
+                info = info,
+                cover = listenCover,
+                playing = playWhenReady && playbackState != Player.STATE_ENDED,
+                visualizing = isPlaying,
+                buffering = playbackState == Player.STATE_BUFFERING,
+                positionMs = position,
+                durationMs = duration,
                 speed = speed,
-                screenshotEnabled = hasVideoFrame && playbackError == null && !savingFrame,
-                sleepTimerActive = sleepTimer.active,
-                onOpenSpeedPanel = {
-                    playbackModeExpanded = false
-                    speedMenuExpanded = true
+                timer = sleepTimer,
+                mode = listenControls?.mode ?: 0,
+                remainingVideos = remainingVideos,
+                hasPrevious = listenControls?.hasPrevious ?: false,
+                // Online videos pass no controls; their 下一个 is the next P as before.
+                hasNext = listenControls?.hasNext ?: (onNextEpisode != null),
+                onTogglePlay = {
+                    if (player.playbackState == Player.STATE_ENDED) {
+                        player.seekTo(0L)
+                        player.playWhenReady = true
+                    } else {
+                        player.playWhenReady = !player.playWhenReady
+                    }
                 },
-                onOpenPlaybackModeSheet = {
-                    speedMenuExpanded = false
-                    playbackModeExpanded = true
-                },
-                onOpenSleepTimerSheet = {
-                    speedMenuExpanded = false
-                    playbackModeExpanded = false
-                    sleepTimerOpen = true
-                },
-                onTakeScreenshot = { takeVideoScreenshot() },
-                onSeekTo = { target ->
+                onSeek = { target ->
                     player.seekTo(target.coerceAtLeast(0L))
-                    player.playWhenReady = true
-                    controlsVisible = true
+                    position = target.coerceAtLeast(0L)
                 },
-                details = details,
-                extraDetailPane = extraDetailPane,
-                episodeOverlay = episodeOverlay,
-                episodeOverlayVisible = episodeOverlayVisible,
-                speedMenuExpanded = speedMenuExpanded,
-                onDismissSpeedSheet = { speedMenuExpanded = false },
+                onPrevious = listenControls?.onPrevious ?: {},
+                onNext = { (listenControls?.onNext ?: onNextEpisode)?.invoke() },
                 onSpeedChange = {
                     player.setPlaybackSpeed(it)
                     speed = it
                 },
-                playbackModeExpanded = playbackModeExpanded,
-                playbackModeSheet = playbackModeSheet,
-                onDismissPlaybackMode = { playbackModeExpanded = false },
-            )
-        }
-
-    }
-    // The timer lives on the player, so it keeps counting while the sheet is
-    // closed and the queue switches files. It is a sibling of the player
-    // column so the panel covers the video too, like the reference design.
-    if (!fullScreen) {
-        PlayerDrawerVisibility(visible = sleepTimerOpen, fromBottom = true) {
-            SleepTimerSheet(
-                timer = sleepTimer,
-                remainingVideos = remainingVideos,
-                currentRemainingMs = (duration - position).coerceAtLeast(0L),
-                durationMs = duration,
-                onDismiss = { sleepTimerOpen = false },
+                onCycleMode = listenControls?.onCycleMode ?: {},
+                onOpenQueue = listenControls?.onOpenQueue ?: {},
+                onCollapse = { listenPageOpen = false },
+                onRestoreVideo = { restoreVideo() },
             )
         }
     }
-    // 弹幕输入与设置放在播放器外层：弹层要盖住视频和详情，而不是被视频 Box 裁掉。
-    if (danmakuSupported && danmakuComposerOpen) {
-        val send = onSendDanmaku
-        if (send != null) {
-            DanmakuComposerDialog(
-                sending = danmakuSending,
-                error = danmakuSendError,
-                onDismiss = { if (!danmakuSending) danmakuComposerOpen = false },
-                onSend = { text ->
-                    if (!danmakuSending) {
-                        danmakuSending = true
-                        danmakuSendError = null
-                        captureScope.launch {
-                            try {
-                                send(text, player.currentPosition.coerceAtLeast(0L))
-                                danmakuComposerOpen = false
-                                Toast.makeText(context, "弹幕已发送", Toast.LENGTH_SHORT).show()
-                            } catch (cancelled: CancellationException) {
-                                throw cancelled
-                            } catch (error: Exception) {
-                                danmakuSendError = error.message ?: "弹幕发送失败"
-                            } finally {
-                                danmakuSending = false
-                            }
-                        }
-                    }
-                },
-            )
-        }
-    }
-    if (danmakuSupported && danmakuSettingsOpen) {
-        DanmakuSettingsSheet(
-            settings = danmakuSettings,
-            onDismiss = { danmakuSettingsOpen = false },
-            onSettingsChange = onDanmakuSettingsChange,
-        )
-    }
-    // 听视频 page: stays composed while its reveal animation is running.
-    val info = listenInfo
-    if (info != null && listenVisible) {
-        ListenScreen(
-            reveal = { listenReveal.value },
-            origin = listenOrigin - screenRootOffset,
-            open = listenPageOpen,
-            title = title,
-            info = info,
-            cover = listenCover,
-            playing = playWhenReady && playbackState != Player.STATE_ENDED,
-            visualizing = isPlaying,
-            buffering = playbackState == Player.STATE_BUFFERING,
-            positionMs = position,
-            durationMs = duration,
-            speed = speed,
-            timer = sleepTimer,
-            mode = listenControls?.mode ?: 0,
-            remainingVideos = remainingVideos,
-            hasPrevious = listenControls?.hasPrevious ?: false,
-            // Online videos pass no controls; their 下一个 is the next P as before.
-            hasNext = listenControls?.hasNext ?: (onNextEpisode != null),
-            onTogglePlay = {
-                if (player.playbackState == Player.STATE_ENDED) {
-                    player.seekTo(0L)
-                    player.playWhenReady = true
-                } else {
-                    player.playWhenReady = !player.playWhenReady
-                }
-            },
-            onSeek = { target ->
-                player.seekTo(target.coerceAtLeast(0L))
-                position = target.coerceAtLeast(0L)
-            },
-            onPrevious = listenControls?.onPrevious ?: {},
-            onNext = { (listenControls?.onNext ?: onNextEpisode)?.invoke() },
-            onSpeedChange = {
-                player.setPlaybackSpeed(it)
-                speed = it
-            },
-            onCycleMode = listenControls?.onCycleMode ?: {},
-            onOpenQueue = listenControls?.onOpenQueue ?: {},
-            onCollapse = { listenPageOpen = false },
-            onRestoreVideo = { restoreVideo() },
-        )
-    }
-}
 }

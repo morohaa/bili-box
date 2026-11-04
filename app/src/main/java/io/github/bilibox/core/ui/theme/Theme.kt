@@ -46,6 +46,7 @@ fun BiliBoxTheme(
         }
 
         darkTheme -> DarkColorScheme
+
         else -> LightColorScheme
     }
 

@@ -105,16 +105,25 @@ internal fun OnlineVideoDetails(
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    ownerName, color = OnlinePink, fontSize = 14.sp, lineHeight = 18.sp,
-                    fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis
+                    ownerName,
+                    color = OnlinePink,
+                    fontSize = 14.sp,
+                    lineHeight = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(2.dp))
                 val creatorStats = creatorCard?.let {
                     "${formatCompactCount(it.card.fans)} 粉丝    ${it.archiveCount} 视频"
                 } ?: "哔哩哔哩 UP 主"
                 Text(
-                    creatorStats, color = OnlineMuted, fontSize = 11.5.sp, lineHeight = 16.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                    creatorStats,
+                    color = OnlineMuted,
+                    fontSize = 11.5.sp,
+                    lineHeight = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             Spacer(Modifier.width(12.dp))
@@ -135,16 +144,28 @@ internal fun OnlineVideoDetails(
                     if (!following) {
                         Canvas(Modifier.size(14.dp)) {
                             val inset = size.width * 5f / 24f
-                            drawLine(Color.White, Offset(center.x, inset), Offset(center.x, size.height - inset),
-                                1.4.dp.toPx(), StrokeCap.Round)
-                            drawLine(Color.White, Offset(inset, center.y), Offset(size.width - inset, center.y),
-                                1.4.dp.toPx(), StrokeCap.Round)
+                            drawLine(
+                                Color.White,
+                                Offset(center.x, inset),
+                                Offset(center.x, size.height - inset),
+                                1.4.dp.toPx(),
+                                StrokeCap.Round
+                            )
+                            drawLine(
+                                Color.White,
+                                Offset(inset, center.y),
+                                Offset(size.width - inset, center.y),
+                                1.4.dp.toPx(),
+                                StrokeCap.Round
+                            )
                         }
                     }
                     Text(
                         if (following) "已关注" else "关注",
                         color = if (following) OnlineSecondary else Color.White,
-                        fontSize = 12.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium
+                        fontSize = 12.5.sp,
+                        lineHeight = 16.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
@@ -179,9 +200,13 @@ internal fun OnlineVideoDetails(
                 OnlineMetric("play", stat?.let { formatCompactCount(it.view) } ?: video.playCount)
                 OnlineMetric("comment", (stat?.danmaku ?: video.commentCount).toString())
                 Text(
-                    formatPublishDateTime(publishedAt), color = OnlineMuted,
-                    fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+                    formatPublishDateTime(publishedAt),
+                    color = OnlineMuted,
+                    fontSize = 11.5.sp,
+                    lineHeight = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
                 Text(duration, color = OnlineMuted, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 1)
             }
@@ -189,12 +214,17 @@ internal fun OnlineVideoDetails(
                 HorizontalDivider(Modifier.padding(top = 10.dp), color = OnlineDivider)
                 Text(
                     info?.bvid?.ifBlank { video.bvid } ?: video.bvid,
-                    color = OnlineMuted, fontSize = 11.5.sp, lineHeight = 16.sp,
+                    color = OnlineMuted,
+                    fontSize = 11.5.sp,
+                    lineHeight = 16.sp,
                     modifier = Modifier.padding(top = 8.dp)
                 )
                 info?.desc?.takeIf { it.isNotBlank() }?.let { description ->
                     Text(
-                        description, color = OnlineSecondary, fontSize = 12.sp, lineHeight = 19.sp,
+                        description,
+                        color = OnlineSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 19.sp,
                         modifier = Modifier.padding(top = 6.dp)
                     )
                 }
@@ -389,8 +419,12 @@ internal fun RowScope.OnlineAction(
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            value.ifBlank { label }, color = tint, fontSize = 11.5.sp, lineHeight = 14.sp,
-            maxLines = 1, overflow = TextOverflow.Ellipsis
+            value.ifBlank { label },
+            color = tint,
+            fontSize = 11.5.sp,
+            lineHeight = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -421,12 +455,20 @@ internal fun OnlineActionIcon(kind: String, tint: Color, modifier: Modifier = Mo
         scale(size.width / 24f, size.height / 24f, pivot = Offset.Zero) {
             if (kind == "coin") {
                 drawCircle(tint, 9.2f, Offset(12f, 12f), style = Stroke(2f))
-                drawPath(Path().apply {
-                    moveTo(8.5f, 9.2f); lineTo(15.5f, 9.2f)
-                    moveTo(10f, 9.2f); lineTo(10f, 15.5f)
-                    moveTo(14f, 9.2f); lineTo(14f, 15.5f)
-                    moveTo(7.8f, 12.2f); lineTo(16.2f, 12.2f)
-                }, tint, style = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                drawPath(
+                    Path().apply {
+                        moveTo(8.5f, 9.2f)
+                        lineTo(15.5f, 9.2f)
+                        moveTo(10f, 9.2f)
+                        lineTo(10f, 15.5f)
+                        moveTo(14f, 9.2f)
+                        lineTo(14f, 15.5f)
+                        moveTo(7.8f, 12.2f)
+                        lineTo(16.2f, 12.2f)
+                    },
+                    tint,
+                    style = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
             } else if (kind == "cache") {
                 drawPath(path, tint, style = Stroke(1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
             } else {
@@ -439,11 +481,15 @@ internal fun OnlineActionIcon(kind: String, tint: Color, modifier: Modifier = Mo
 @Composable
 internal fun ChevronDownIcon(modifier: Modifier = Modifier, tint: Color) {
     Canvas(modifier) {
-        drawPath(Path().apply {
-            moveTo(size.width * .25f, size.height * .375f)
-            lineTo(size.width * .5f, size.height * .625f)
-            lineTo(size.width * .75f, size.height * .375f)
-        }, tint, style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawPath(
+            Path().apply {
+                moveTo(size.width * .25f, size.height * .375f)
+                lineTo(size.width * .5f, size.height * .625f)
+                lineTo(size.width * .75f, size.height * .375f)
+            },
+            tint,
+            style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
     }
 }
 
@@ -478,35 +524,56 @@ internal fun RowScope.VideoAction(index: Int, label: String, selected: Boolean, 
             val stroke = Stroke(width = 1.8f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
             when (index) {
                 0 -> {
-                    drawRoundRect(tint, topLeft = Offset(2*u, 10*u), size = androidx.compose.ui.geometry.Size(4*u, 11*u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(u))
-                    drawPath(Path().apply {
-                        moveTo(8*u, 10*u); lineTo(12*u, 3*u)
-                        cubicTo(16*u, 2*u, 15*u, 7*u, 14*u, 9*u)
-                        lineTo(20*u, 9*u); quadraticTo(23*u, 9*u, 22*u, 12*u)
-                        lineTo(20*u, 20*u); lineTo(8*u, 20*u); close()
-                    }, tint)
+                    drawRoundRect(tint, topLeft = Offset(2 * u, 10 * u), size = androidx.compose.ui.geometry.Size(4 * u, 11 * u), cornerRadius = androidx.compose.ui.geometry.CornerRadius(u))
+                    drawPath(
+                        Path().apply {
+                            moveTo(8 * u, 10 * u)
+                            lineTo(12 * u, 3 * u)
+                            cubicTo(16 * u, 2 * u, 15 * u, 7 * u, 14 * u, 9 * u)
+                            lineTo(20 * u, 9 * u)
+                            quadraticTo(23 * u, 9 * u, 22 * u, 12 * u)
+                            lineTo(20 * u, 20 * u)
+                            lineTo(8 * u, 20 * u)
+                            close()
+                        },
+                        tint
+                    )
                 }
+
                 1 -> {
-                    drawCircle(tint, radius = 10*u, style = stroke)
-                    drawLine(tint, Offset(7*u, 8*u), Offset(17*u, 8*u), strokeWidth = 1.8f*u)
-                    drawLine(tint, Offset(12*u, 6*u), Offset(12*u, 19*u), strokeWidth = 1.8f*u)
-                    drawLine(tint, Offset(8*u, 12*u), Offset(16*u, 12*u), strokeWidth = 1.8f*u)
+                    drawCircle(tint, radius = 10 * u, style = stroke)
+                    drawLine(tint, Offset(7 * u, 8 * u), Offset(17 * u, 8 * u), strokeWidth = 1.8f * u)
+                    drawLine(tint, Offset(12 * u, 6 * u), Offset(12 * u, 19 * u), strokeWidth = 1.8f * u)
+                    drawLine(tint, Offset(8 * u, 12 * u), Offset(16 * u, 12 * u), strokeWidth = 1.8f * u)
                 }
-                2 -> drawPath(Path().apply {
-                    for (point in 0..9) {
-                        val angle = Math.PI * point / 5 - Math.PI / 2
-                        val radius = if (point % 2 == 0) 11*u else 5*u
-                        val x = 12*u + kotlin.math.cos(angle).toFloat()*radius
-                        val y = 12*u + kotlin.math.sin(angle).toFloat()*radius
-                        if (point == 0) moveTo(x, y) else lineTo(x, y)
-                    }
-                    close()
-                }, tint)
-                3 -> drawPath(Path().apply {
-                    moveTo(3*u, 21*u); cubicTo(3*u, 11*u, 7*u, 7*u, 15*u, 7*u)
-                    lineTo(15*u, 2*u); lineTo(23*u, 11*u); lineTo(15*u, 18*u)
-                    lineTo(15*u, 13*u); quadraticTo(7*u, 13*u, 3*u, 21*u); close()
-                }, tint)
+
+                2 -> drawPath(
+                    Path().apply {
+                        for (point in 0..9) {
+                            val angle = Math.PI * point / 5 - Math.PI / 2
+                            val radius = if (point % 2 == 0) 11 * u else 5 * u
+                            val x = 12 * u + kotlin.math.cos(angle).toFloat() * radius
+                            val y = 12 * u + kotlin.math.sin(angle).toFloat() * radius
+                            if (point == 0) moveTo(x, y) else lineTo(x, y)
+                        }
+                        close()
+                    },
+                    tint
+                )
+
+                3 -> drawPath(
+                    Path().apply {
+                        moveTo(3 * u, 21 * u)
+                        cubicTo(3 * u, 11 * u, 7 * u, 7 * u, 15 * u, 7 * u)
+                        lineTo(15 * u, 2 * u)
+                        lineTo(23 * u, 11 * u)
+                        lineTo(15 * u, 18 * u)
+                        lineTo(15 * u, 13 * u)
+                        quadraticTo(7 * u, 13 * u, 3 * u, 21 * u)
+                        close()
+                    },
+                    tint
+                )
             }
         }
         Spacer(Modifier.height(7.dp))
@@ -514,10 +581,11 @@ internal fun RowScope.VideoAction(index: Int, label: String, selected: Boolean, 
     }
 }
 
-
 /** Startup gets this long before a non-progressing CDN host is abandoned. */
 internal const val STARTUP_STALL_TIMEOUT_MS = 6_000L
+
 /** Buffered position must not have grown for this long to count as stalled. */
 internal const val STARTUP_NO_PROGRESS_MS = 3_000L
+
 /** Hard cap for one URL set: a trickling CDN can keep "progressing" forever. */
 internal const val STARTUP_DEADLINE_MS = 12_000L

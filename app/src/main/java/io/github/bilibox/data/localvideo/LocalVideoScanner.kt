@@ -86,6 +86,7 @@ private fun readLocalVideos(
         val bucketIndex = cursor.getColumnIndex(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
         val relativeIndex = cursor.getColumnIndex(MediaStore.Video.Media.RELATIVE_PATH)
         val frameRateIndex = cursor.getColumnIndex(MediaStore.Video.Media.CAPTURE_FRAMERATE)
+
         @Suppress("DEPRECATION")
         val dataIndex = cursor.getColumnIndex(MediaStore.Video.Media.DATA)
         val externalRoot = Environment.getExternalStorageDirectory().absolutePath.trimEnd('/')
@@ -96,12 +97,14 @@ private fun readLocalVideos(
             val bucketName = cursor.stringOrNull(bucketIndex).orEmpty()
             val relativePath = when {
                 relativeIndex >= 0 -> cursor.stringOrNull(relativeIndex).orEmpty()
+
                 dataIndex >= 0 -> cursor.stringOrNull(dataIndex)
                     ?.takeIf { it.startsWith(externalRoot) }
                     ?.removePrefix(externalRoot)
                     ?.trimStart('/')
                     ?.substringBeforeLast('/', "")
                     .orEmpty()
+
                 else -> bucketName
             }.trim().trim('/')
             videos += LocalVideo(
@@ -123,14 +126,11 @@ private fun readLocalVideos(
     return videos
 }
 
-private fun Cursor.longOrNull(index: Int): Long? =
-    if (index < 0 || isNull(index)) null else getLong(index)
+private fun Cursor.longOrNull(index: Int): Long? = if (index < 0 || isNull(index)) null else getLong(index)
 
-private fun Cursor.floatOrNull(index: Int): Float? =
-    if (index < 0 || isNull(index)) null else getFloat(index)
+private fun Cursor.floatOrNull(index: Int): Float? = if (index < 0 || isNull(index)) null else getFloat(index)
 
-private fun Cursor.stringOrNull(index: Int): String? =
-    if (index < 0 || isNull(index)) null else getString(index)
+private fun Cursor.stringOrNull(index: Int): String? = if (index < 0 || isNull(index)) null else getString(index)
 
 private fun detectNomediaFolders(videos: List<LocalVideo>): Set<String> {
     val root = Environment.getExternalStorageDirectory()

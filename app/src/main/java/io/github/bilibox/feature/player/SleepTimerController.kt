@@ -21,7 +21,6 @@ import kotlinx.coroutines.isActive
 private const val SleepFadeMs = 30_000L
 private const val SleepWarnMs = 60_000L
 
-
 internal enum class SleepTimerMode { OFF, TIME, VIDEOS }
 
 /** Sleep timer shared by the player details pane and the listen page. */
@@ -89,10 +88,12 @@ internal class PlaybackSleepTimer {
                 minutes += extraMinutes
                 clearWarning()
             }
+
             SleepTimerMode.VIDEOS -> {
                 val extra = extraMinutes + ceil(currentRemainingMs / 60_000.0).toInt()
                 startMinutes(extra.coerceAtLeast(extraMinutes))
             }
+
             SleepTimerMode.OFF -> startMinutes(extraMinutes)
         }
     }

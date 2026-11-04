@@ -211,7 +211,9 @@ internal fun PlayerDetailsPane(
                                 }
                             }
                         }
+
                         extraDetailPane != null -> extraDetailPane(duration)
+
                         else -> {
                             Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
                                 Text(detailTabs.getOrNull(1) ?: "评论", color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)

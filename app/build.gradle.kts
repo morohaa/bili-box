@@ -59,3 +59,24 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+
+// Retrofit guard: allow the existing architecture but prevent new 1000+ line files.
+val kotlinFileLineLimit = 1000
+val checkKotlinFileSize = tasks.register("checkKotlinFileSize") {
+    group = "verification"
+    description = "Fails when a main Kotlin source file exceeds $kotlinFileLineLimit lines."
+    doLast {
+        val offenders = fileTree("src/main/java") { include("**/*.kt") }.files
+            .map { it to it.readLines().size }
+            .filter { (_, lines) -> lines > kotlinFileLineLimit }
+        if (offenders.isNotEmpty()) {
+            throw GradleException(
+                "Kotlin files exceed $kotlinFileLineLimit lines:\n" +
+                    offenders.joinToString("\n") { (file, lines) ->
+                        " - ${file.relativeTo(projectDir)}: $lines"
+                    }
+            )
+        }
+    }
+}
+tasks.named("check") { dependsOn(checkKotlinFileSize) }

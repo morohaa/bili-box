@@ -44,7 +44,6 @@ private val HomeInk = Color(0xFF24313D)
 private val HomePink = Color(0xFFEF7196)
 private val HomeMuted = Color(0xFF82909D)
 
-
 /**
  * 固定顶栏容器：宽满屏、内容高 64dp，并带一条可见的下边界。
  *
@@ -78,7 +77,7 @@ internal fun AppTopBar(
 
 @Composable
 private fun RowScope.BrandTopBarContent(darkMode: Boolean, onToggleDarkMode: () -> Unit) {
-    Text("bili", color =   HomePink, fontWeight = FontWeight.Black, fontSize = 28.sp, letterSpacing = (-1).sp)
+    Text("bili", color = HomePink, fontWeight = FontWeight.Black, fontSize = 28.sp, letterSpacing = (-1).sp)
     Text("box", color = if (darkMode) Color(0xFFE9E9EC) else HomeInk, fontWeight = FontWeight.Light, fontSize = 28.sp, letterSpacing = (-1).sp)
     Spacer(Modifier.weight(1f))
     DarkModeToggle(darkMode, onToggleDarkMode)
@@ -103,10 +102,13 @@ internal fun DarkModeToggle(darkMode: Boolean, onToggle: () -> Unit) {
                     val angle = Math.PI * index / 4.0
                     val inner = 9f * unit
                     val outer = 11f * unit
-                    drawLine(tint,
+                    drawLine(
+                        tint,
                         Offset(12f * unit + kotlin.math.cos(angle).toFloat() * inner, 12f * unit + kotlin.math.sin(angle).toFloat() * inner),
                         Offset(12f * unit + kotlin.math.cos(angle).toFloat() * outer, 12f * unit + kotlin.math.sin(angle).toFloat() * outer),
-                        stroke.width, StrokeCap.Round)
+                        stroke.width,
+                        StrokeCap.Round
+                    )
                 }
             } else {
                 drawCircle(tint, 8f * unit, Offset(10f * unit, 10f * unit))
@@ -264,8 +266,7 @@ private fun NavIcon(index: Int, tint: Color) {
     Canvas(Modifier.size(24.dp)) {
         val unit = size.width / 24f
         val stroke = Stroke(width = 2f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        fun line(x1: Float, y1: Float, x2: Float, y2: Float) =
-            drawLine(tint, Offset(x1 * unit, y1 * unit), Offset(x2 * unit, y2 * unit), stroke.width, StrokeCap.Round)
+        fun line(x1: Float, y1: Float, x2: Float, y2: Float) = drawLine(tint, Offset(x1 * unit, y1 * unit), Offset(x2 * unit, y2 * unit), stroke.width, StrokeCap.Round)
         when (index) {
             0 -> {
                 drawRoundRect(
@@ -280,6 +281,7 @@ private fun NavIcon(index: Int, tint: Color) {
                 line(9f, 12f, 9f, 14f)
                 line(15f, 12f, 15f, 14f)
             }
+
             1 -> {
                 drawRoundRect(
                     tint,
@@ -297,6 +299,7 @@ private fun NavIcon(index: Int, tint: Color) {
                 }
                 drawPath(path, tint, style = stroke)
             }
+
             else -> {
                 drawCircle(tint, 4 * unit, Offset(12 * unit, 8 * unit), style = stroke)
                 val path = Path().apply {

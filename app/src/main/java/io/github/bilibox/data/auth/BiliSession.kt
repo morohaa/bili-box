@@ -48,11 +48,13 @@ internal object BiliSessionStore {
     fun save(context: Context, session: BiliSession) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, getKey())
-        val encrypted = cipher.doFinal(JSONObject().put("username", session.username)
-            .put("avatar", session.avatarUrl).put("cookie", session.cookie)
-            .put("level", session.level).put("coins", session.coins)
-            .put("current_exp", session.currentExp).put("next_exp", session.nextExp)
-            .toString().toByteArray(Charsets.UTF_8))
+        val encrypted = cipher.doFinal(
+            JSONObject().put("username", session.username)
+                .put("avatar", session.avatarUrl).put("cookie", session.cookie)
+                .put("level", session.level).put("coins", session.coins)
+                .put("current_exp", session.currentExp).put("next_exp", session.nextExp)
+                .toString().toByteArray(Charsets.UTF_8)
+        )
         val stored = cipher.iv + encrypted
         context.getSharedPreferences(prefsName, Context.MODE_PRIVATE).edit()
             .putString(dataKey, Base64.encodeToString(stored, Base64.NO_WRAP)).apply()
@@ -66,11 +68,13 @@ internal object BiliSessionStore {
         val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (keyStore.getKey(alias, null) as? SecretKey)?.let { return it }
         return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").run {
-            init(KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setRandomizedEncryptionRequired(true)
-                .build())
+            init(
+                KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setRandomizedEncryptionRequired(true)
+                    .build()
+            )
             generateKey()
         }
     }

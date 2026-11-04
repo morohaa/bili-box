@@ -19,16 +19,18 @@ internal class PlaybackProgressStore(private val preferences: SharedPreferences)
         context.applicationContext.getSharedPreferences("local_playback_progress", Context.MODE_PRIVATE)
     )
 
-    fun load(videoKey: String, durationMs: Long): Long =
-        validPosition(preferences.getLong(videoKey, 0L), durationMs)
+    fun load(videoKey: String, durationMs: Long): Long = validPosition(preferences.getLong(videoKey, 0L), durationMs)
 
     fun save(videoKey: String, positionMs: Long, durationMs: Long, completed: Boolean) {
         val position = if (completed) 0L else validPosition(positionMs, durationMs)
         val played = completed || position > 0L
         preferences.edit().apply {
             if (position == 0L) remove(videoKey) else putLong(videoKey, position)
-            if (completed) putBoolean(completedKey(videoKey), true)
-            else if (position > 0L) remove(completedKey(videoKey))
+            if (completed) {
+                putBoolean(completedKey(videoKey), true)
+            } else if (position > 0L) {
+                remove(completedKey(videoKey))
+            }
             if (played) putLong(lastPlayedKey(videoKey), System.currentTimeMillis())
         }.apply()
     }
@@ -43,7 +45,9 @@ internal class PlaybackProgressStore(private val preferences: SharedPreferences)
                 positionMs = position,
                 fraction = if (durationMs > 0L) (position.toFloat() / durationMs).coerceIn(0f, 1f) else 0f,
             )
+
             completed -> LocalVideoPlaybackState.Watched
+
             else -> LocalVideoPlaybackState.Unplayed
         }
         return LocalVideoPlayback(state, lastPlayedAt)

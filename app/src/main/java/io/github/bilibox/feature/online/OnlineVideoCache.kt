@@ -107,9 +107,14 @@ private suspend fun cacheOnlineVideo(
             }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val published = resolver.update(uri, ContentValues().apply {
-                put(MediaStore.Video.Media.IS_PENDING, 0)
-            }, null, null)
+            val published = resolver.update(
+                uri,
+                ContentValues().apply {
+                    put(MediaStore.Video.Media.IS_PENDING, 0)
+                },
+                null,
+                null
+            )
             if (published != 1) throw java.io.IOException("无法发布缓存视频")
         }
     } catch (error: Exception) {

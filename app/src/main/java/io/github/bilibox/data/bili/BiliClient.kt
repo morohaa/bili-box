@@ -36,12 +36,16 @@ class BiliClient(
     var sessData: String? = null
 
     @Volatile private var buvid3: String? = null
+
     @Volatile private var mixinKey: String? = null
+
     @Volatile private var mixinKeyAt = 0L
     private val keyLock = Mutex()
     private val buvidLock = Mutex()
 
-    suspend fun warmUp() { runCatching { buvid() } }
+    suspend fun warmUp() {
+        runCatching { buvid() }
+    }
 
     suspend fun videoInfo(bvid: String): VideoInfo {
         val response = getJson<VideoInfo>("$VIEW_URL?bvid=${encodeQuery(bvid)}")
@@ -272,19 +276,18 @@ class BiliClient(
         return response.data ?: throw BiliException(response.code, "playurl 返回空 data")
     }
 
-    private suspend fun signedPlayUrl(params: Map<String, String>, forceRefreshKey: Boolean): String =
-        "$PLAY_URL?${WbiSigner.sign(params, obtainMixinKey(forceRefreshKey))}"
+    private suspend fun signedPlayUrl(params: Map<String, String>, forceRefreshKey: Boolean): String = "$PLAY_URL?${WbiSigner.sign(params, obtainMixinKey(forceRefreshKey))}"
 
-    private suspend fun signedSearchUrl(params: Map<String, String>, forceRefreshKey: Boolean): String =
-        "$SEARCH_URL?${WbiSigner.sign(params, obtainMixinKey(forceRefreshKey))}"
+    private suspend fun signedSearchUrl(params: Map<String, String>, forceRefreshKey: Boolean): String = "$SEARCH_URL?${WbiSigner.sign(params, obtainMixinKey(forceRefreshKey))}"
 
     private suspend fun obtainMixinKey(force: Boolean): String {
         val cached = mixinKey
         if (!force && cached != null && System.currentTimeMillis() - mixinKeyAt < KEY_TTL_MS) return cached
         return keyLock.withLock {
             val current = mixinKey
-            if (!force && current != null && System.currentTimeMillis() - mixinKeyAt < KEY_TTL_MS) current
-            else {
+            if (!force && current != null && System.currentTimeMillis() - mixinKeyAt < KEY_TTL_MS) {
+                current
+            } else {
                 val nav = getJson<NavData>(NAV_URL, withCookie = false)
                 val image = nav.data?.wbiImg?.imgUrl.orEmpty()
                 val sub = nav.data?.wbiImg?.subUrl.orEmpty()
@@ -301,20 +304,19 @@ class BiliClient(
         url: String,
         withCookie: Boolean = true,
         includeFingerprint: Boolean = true,
-    ): ApiResponse<T> =
-        withContext(Dispatchers.IO) {
-            val builder = Request.Builder()
-                .url(url)
-                .header("User-Agent", UA)
-                .header("Referer", "https://www.bilibili.com/")
-                .header("Accept", "application/json, text/plain, */*")
-            if (withCookie) buildCookieHeader(includeFingerprint)?.let { builder.header("Cookie", it) }
-            http.newCall(builder.build()).execute().use { response ->
-                val body = response.body?.string().orEmpty()
-                if (!response.isSuccessful || body.isEmpty()) throw BiliException(response.code, "HTTP ${response.code} $url")
-                json.decodeFromString<ApiResponse<T>>(body)
-            }
+    ): ApiResponse<T> = withContext(Dispatchers.IO) {
+        val builder = Request.Builder()
+            .url(url)
+            .header("User-Agent", UA)
+            .header("Referer", "https://www.bilibili.com/")
+            .header("Accept", "application/json, text/plain, */*")
+        if (withCookie) buildCookieHeader(includeFingerprint)?.let { builder.header("Cookie", it) }
+        http.newCall(builder.build()).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful || body.isEmpty()) throw BiliException(response.code, "HTTP ${response.code} $url")
+            json.decodeFromString<ApiResponse<T>>(body)
         }
+    }
 
     private fun buildCookieHeader(includeFingerprint: Boolean = true): String? {
         val existing = cookieHeader?.takeIf { it.isNotBlank() }
@@ -380,7 +382,6 @@ class BiliClient(
     }
 }
 
-private fun JsonObject.stringValue(key: String): String =
-    this[key]?.jsonPrimitive?.contentOrNull.orEmpty()
+private fun JsonObject.stringValue(key: String): String = this[key]?.jsonPrimitive?.contentOrNull.orEmpty()
 
 private fun encodeQuery(value: String): String = java.net.URLEncoder.encode(value, Charsets.UTF_8.name())

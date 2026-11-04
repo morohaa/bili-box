@@ -1,7 +1,5 @@
 package io.github.bilibox.data.danmaku
 
-
-
 /**
  * 一条可显示的弹幕。
  *

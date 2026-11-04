@@ -219,10 +219,13 @@ internal fun DynamicPage(
                         ) {
                             when (val state = searchState) {
                                 SearchState.Idle -> Unit
+
                                 SearchState.Loading -> SearchLoading(darkMode)
+
                                 is SearchState.Error -> SearchError(state.message, darkMode) {
                                     onRetry(state.page, state.order)
                                 }
+
                                 is SearchState.Success -> SearchResults(
                                     state = state,
                                     darkMode = darkMode,

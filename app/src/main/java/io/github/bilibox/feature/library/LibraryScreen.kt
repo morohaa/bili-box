@@ -77,8 +77,11 @@ internal fun LibraryPage(
     var settingsOpen by remember { mutableStateOf(false) }
     var scanState by remember {
         mutableStateOf<LocalVideoScanState>(
-            if (hasLocalVideoPermission(context)) LocalVideoScanState.Loading
-            else LocalVideoScanState.NeedsPermission
+            if (hasLocalVideoPermission(context)) {
+                LocalVideoScanState.Loading
+            } else {
+                LocalVideoScanState.NeedsPermission
+            }
         )
     }
     var scanRequest by remember { mutableIntStateOf(0) }
@@ -162,7 +165,9 @@ internal fun LibraryPage(
                 searchOpen = false
                 query = ""
             }
+
             quickFilter != null -> quickFilter = null
+
             nav.isNotEmpty() -> nav = nav.dropLast(1)
         }
     }
@@ -273,11 +278,14 @@ internal fun LibraryPage(
                         onRequest = { permissionLauncher.launch(localVideoPermissions()) },
                         onRecheck = { scanRequest++ },
                     )
+
                     LocalVideoScanState.Loading -> LoadingState()
+
                     is LocalVideoScanState.Error -> ErrorState(
                         message = state.message,
                         onRetry = { scanRequest++ },
                     )
+
                     is LocalVideoScanState.Ready -> {
                         if (view.folders.isEmpty() && view.videos.isEmpty()) {
                             EmptyState(

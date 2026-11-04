@@ -111,28 +111,34 @@ internal fun GeetestCaptchaDialog(
     LaunchedEffect(reloadTicket) {
         error = null
         loading = true
-        webView.addJavascriptInterface(object {
-            @JavascriptInterface
-            fun postMessage(payload: String) {
-                Handler(Looper.getMainLooper()).post {
-                    val json = runCatching { JSONObject(payload) }.getOrNull() ?: return@post
-                    when (json.optString("type")) {
-                        "ready" -> loading = false
-                        "loaded" -> loading = false
-                        "success" -> {
-                            val validate = json.optString("geetest_validate")
-                            val seccode = json.optString("geetest_seccode")
-                            if (validate.isNotBlank() && seccode.isNotBlank()) {
-                                solvedEvent.value(GeetestProof(validate, seccode))
-                            } else {
-                                error = "验证结果无效，请重试"
+        webView.addJavascriptInterface(
+            object {
+                @JavascriptInterface
+                fun postMessage(payload: String) {
+                    Handler(Looper.getMainLooper()).post {
+                        val json = runCatching { JSONObject(payload) }.getOrNull() ?: return@post
+                        when (json.optString("type")) {
+                            "ready" -> loading = false
+
+                            "loaded" -> loading = false
+
+                            "success" -> {
+                                val validate = json.optString("geetest_validate")
+                                val seccode = json.optString("geetest_seccode")
+                                if (validate.isNotBlank() && seccode.isNotBlank()) {
+                                    solvedEvent.value(GeetestProof(validate, seccode))
+                                } else {
+                                    error = "验证结果无效，请重试"
+                                }
                             }
+
+                            "error" -> error = json.optString("message").ifBlank { "人机验证加载失败，请重试" }
                         }
-                        "error" -> error = json.optString("message").ifBlank { "人机验证加载失败，请重试" }
                     }
                 }
-            }
-        }, CAPTCHA_BRIDGE)
+            },
+            CAPTCHA_BRIDGE
+        )
         webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 loading = true
@@ -185,7 +191,10 @@ internal fun GeetestCaptchaDialog(
                             fontSize = 12.sp,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { error = null; reloadTicket++ }) { Text("重试", color = Pink, fontSize = 13.sp) }
+                        TextButton(onClick = {
+                            error = null
+                            reloadTicket++
+                        }) { Text("重试", color = Pink, fontSize = 13.sp) }
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxWidth()) {

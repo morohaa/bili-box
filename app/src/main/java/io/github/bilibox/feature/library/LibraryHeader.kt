@@ -221,7 +221,9 @@ internal fun SortBar(
     ) {
         when {
             query.isNotBlank() -> CrumbCount("搜索到 ${view.videos.size} 个视频")
+
             quickFilter != null -> CrumbCount("${quickFilter.label} · ${view.videos.size} 个视频")
+
             nav.isEmpty() -> CrumbCount(
                 if (settings.mode == LocalVideoViewMode.FILES) {
                     "全部视频 · ${view.videos.size}"
@@ -229,6 +231,7 @@ internal fun SortBar(
                     "${view.folders.size} 个文件夹 · ${view.videos.size} 个视频"
                 }
             )
+
             else -> {
                 CrumbLink("根目录", onRoot)
                 nav.forEachIndexed { index, path ->

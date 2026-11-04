@@ -153,6 +153,7 @@ internal fun BiliNativeLoginDialog(
                         countdown = 60
                         hint = "验证码已发送至 +86 $phoneNumber"
                     }
+
                     CredentialAction.PasswordLogin -> {
                         val cookie = withContext(Dispatchers.IO) {
                             loginWithPassword(account.trim(), password, ticket, proof)
@@ -189,6 +190,7 @@ internal fun BiliNativeLoginDialog(
                 }
                 beginCaptcha(CredentialAction.PasswordLogin)
             }
+
             CredentialTab.Sms -> {
                 if (!phoneValid) {
                     error = "请输入正确的手机号"
@@ -282,7 +284,10 @@ internal fun BiliNativeLoginDialog(
                     CredentialTab.Password -> {
                         CredentialField(
                             value = account,
-                            onValueChange = { account = it; error = null },
+                            onValueChange = {
+                                account = it
+                                error = null
+                            },
                             label = "手机号 / 邮箱",
                             darkMode = darkMode,
                             keyboardType = KeyboardType.Email,
@@ -291,7 +296,10 @@ internal fun BiliNativeLoginDialog(
                         Spacer(Modifier.height(10.dp))
                         CredentialField(
                             value = password,
-                            onValueChange = { password = it; error = null },
+                            onValueChange = {
+                                password = it
+                                error = null
+                            },
                             label = "密码",
                             darkMode = darkMode,
                             keyboardType = KeyboardType.Password,
@@ -305,6 +313,7 @@ internal fun BiliNativeLoginDialog(
                             enabled = accountValid && passwordValid,
                         ) { loginWithPasswordOrSms() }
                     }
+
                     CredentialTab.Sms -> {
                         CredentialField(
                             value = phone,
@@ -323,7 +332,10 @@ internal fun BiliNativeLoginDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             CredentialField(
                                 value = smsCode,
-                                onValueChange = { smsCode = it; error = null },
+                                onValueChange = {
+                                    smsCode = it
+                                    error = null
+                                },
                                 label = "短信验证码",
                                 darkMode = darkMode,
                                 keyboardType = KeyboardType.Number,

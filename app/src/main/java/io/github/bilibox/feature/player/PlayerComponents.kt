@@ -155,30 +155,54 @@ internal fun BiliLoadingIndicator(message: String) {
             Canvas(Modifier.size(44.dp).rotate(rotation)) {
                 val u = size.width / 50f
                 val diameter = androidx.compose.ui.geometry.Size(40f * u, 40f * u)
-                drawCircle(Color.White.copy(alpha = .12f), radius = 20f * u,
-                    style = Stroke(3.2f * u))
-                drawArc(OnlinePink, startAngle = -90f, sweepAngle = 244f, useCenter = false,
-                    topLeft = Offset(5f * u, 5f * u), size = diameter,
-                    style = Stroke(3.2f * u, cap = StrokeCap.Round))
+                drawCircle(
+                    Color.White.copy(alpha = .12f),
+                    radius = 20f * u,
+                    style = Stroke(3.2f * u)
+                )
+                drawArc(
+                    OnlinePink,
+                    startAngle = -90f,
+                    sweepAngle = 244f,
+                    useCenter = false,
+                    topLeft = Offset(5f * u, 5f * u),
+                    size = diameter,
+                    style = Stroke(3.2f * u, cap = StrokeCap.Round)
+                )
             }
             Canvas(Modifier.offset(y = televisionOffset.dp).size(20.dp)) {
                 val u = size.width / 24f
                 val tint = Color.White.copy(alpha = .9f)
                 val stroke = Stroke(1.8f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                drawPath(Path().apply {
-                    moveTo(8f * u, 3f * u); lineTo(11f * u, 6f * u); lineTo(14f * u, 3f * u)
-                }, tint, style = stroke)
-                drawRoundRect(tint, Offset(4f * u, 6f * u),
+                drawPath(
+                    Path().apply {
+                        moveTo(8f * u, 3f * u)
+                        lineTo(11f * u, 6f * u)
+                        lineTo(14f * u, 3f * u)
+                    },
+                    tint,
+                    style = stroke
+                )
+                drawRoundRect(
+                    tint,
+                    Offset(4f * u, 6f * u),
                     androidx.compose.ui.geometry.Size(16f * u, 13f * u),
-                    androidx.compose.ui.geometry.CornerRadius(3.5f * u), style = stroke)
+                    androidx.compose.ui.geometry.CornerRadius(3.5f * u),
+                    style = stroke
+                )
                 listOf(9f, 15f).forEach { x ->
                     drawLine(tint, Offset(x * u, 11f * u), Offset(x * u, 13f * u), 1.8f * u, StrokeCap.Round)
                 }
             }
         }
         Spacer(Modifier.height(6.dp))
-        Text(message, color = Color.White.copy(alpha = .9f), fontSize = 12.sp,
-            lineHeight = 17.sp, letterSpacing = .3.sp)
+        Text(
+            message,
+            color = Color.White.copy(alpha = .9f),
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            letterSpacing = .3.sp
+        )
     }
 }
 
@@ -265,12 +289,15 @@ internal fun PlayerQualityChip(label: String, onClick: () -> Unit) {
 internal fun NextEpisodeIcon(modifier: Modifier = Modifier.size(18.dp)) {
     Canvas(modifier) {
         val u = size.width / 24f
-        drawPath(Path().apply {
-            moveTo(5f * u, 5.5f * u)
-            lineTo(15f * u, 12f * u)
-            lineTo(5f * u, 18.5f * u)
-            close()
-        }, Color.White)
+        drawPath(
+            Path().apply {
+                moveTo(5f * u, 5.5f * u)
+                lineTo(15f * u, 12f * u)
+                lineTo(5f * u, 18.5f * u)
+                close()
+            },
+            Color.White
+        )
         drawRoundRect(
             Color.White,
             Offset(17.5f * u, 5f * u),
@@ -308,10 +335,18 @@ internal fun PlaybackQualityDrawer(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text("清晰度与音质", color = Color.White, fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold)
-                    Text("切换后保持当前播放进度", color = Color.White.copy(alpha = .45f),
-                        fontSize = 10.5.sp, modifier = Modifier.padding(top = 2.dp))
+                    Text(
+                        "清晰度与音质",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "切换后保持当前播放进度",
+                        color = Color.White.copy(alpha = .45f),
+                        fontSize = 10.5.sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                 }
                 IconButton(
                     onClick = onDismiss,
@@ -334,8 +369,11 @@ internal fun PlaybackQualityDrawer(
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                             .background(
-                                if (selected) OnlinePink.copy(alpha = .16f)
-                                else Color.White.copy(alpha = .05f)
+                                if (selected) {
+                                    OnlinePink.copy(alpha = .16f)
+                                } else {
+                                    Color.White.copy(alpha = .05f)
+                                }
                             )
                             .border(
                                 1.dp,
@@ -366,8 +404,12 @@ internal fun PlaybackQualityDrawer(
                                             .background(OnlinePink.copy(alpha = .22f))
                                             .padding(horizontal = 5.dp, vertical = 1.dp)
                                     ) {
-                                        Text(badge, color = OnlinePink, fontSize = 9.sp,
-                                            fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            badge,
+                                            color = OnlinePink,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
                                     }
                                 }
                             }
@@ -386,8 +428,12 @@ internal fun PlaybackQualityDrawer(
                                     .background(OnlinePink)
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
-                                Text("播放中", color = Color.White, fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold)
+                                Text(
+                                    "播放中",
+                                    color = Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
@@ -422,12 +468,31 @@ internal fun VideoSeekBar(
                     val played = (sliderState.value / duration.coerceAtLeast(1L)).coerceIn(0f, 1f)
                     val buffered = (bufferedPosition.toFloat() / duration.coerceAtLeast(1L)).coerceIn(0f, 1f)
                     val start = Offset(0f, center.y)
-                    drawLine(Color.White.copy(alpha = .3f), start, Offset(size.width, center.y),
-                        size.height, StrokeCap.Round)
-                    if (buffered > 0f) drawLine(Color.White.copy(alpha = .45f), start,
-                        Offset(size.width * buffered, center.y), size.height, StrokeCap.Round)
-                    if (played > 0f) drawLine(OnlinePink, start,
-                        Offset(size.width * played, center.y), size.height, StrokeCap.Round)
+                    drawLine(
+                        Color.White.copy(alpha = .3f),
+                        start,
+                        Offset(size.width, center.y),
+                        size.height,
+                        StrokeCap.Round
+                    )
+                    if (buffered > 0f) {
+                        drawLine(
+                            Color.White.copy(alpha = .45f),
+                            start,
+                            Offset(size.width * buffered, center.y),
+                            size.height,
+                            StrokeCap.Round
+                        )
+                    }
+                    if (played > 0f) {
+                        drawLine(
+                            OnlinePink,
+                            start,
+                            Offset(size.width * played, center.y),
+                            size.height,
+                            StrokeCap.Round
+                        )
+                    }
                 }
             }
         )
@@ -445,20 +510,24 @@ internal fun PlayerDrawerVisibility(
         modifier = Modifier.fillMaxSize(),
         enter = if (fromBottom) {
             fadeIn(tween(180)) + slideInVertically(
-                initialOffsetY = { it }, animationSpec = tween(260, easing = FastOutSlowInEasing)
+                initialOffsetY = { it },
+                animationSpec = tween(260, easing = FastOutSlowInEasing)
             )
         } else {
             fadeIn(tween(180)) + slideInHorizontally(
-                initialOffsetX = { it }, animationSpec = tween(260, easing = FastOutSlowInEasing)
+                initialOffsetX = { it },
+                animationSpec = tween(260, easing = FastOutSlowInEasing)
             )
         },
         exit = if (fromBottom) {
             fadeOut(tween(140)) + slideOutVertically(
-                targetOffsetY = { it }, animationSpec = tween(220, easing = FastOutSlowInEasing)
+                targetOffsetY = { it },
+                animationSpec = tween(220, easing = FastOutSlowInEasing)
             )
         } else {
             fadeOut(tween(140)) + slideOutHorizontally(
-                targetOffsetX = { it }, animationSpec = tween(220, easing = FastOutSlowInEasing)
+                targetOffsetX = { it },
+                animationSpec = tween(220, easing = FastOutSlowInEasing)
             )
         }
     ) {
@@ -477,8 +546,10 @@ internal fun LocalVideoEpisodes(
         initialFirstVisibleItemIndex = playlist.indexOfFirst { it.uri == currentVideo.uri }.coerceAtLeast(0)
     )
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .35f))
-            .clickable(onClick = onDismiss).semantics { contentDescription = "关闭选集" })
+        Box(
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = .35f))
+                .clickable(onClick = onDismiss).semantics { contentDescription = "关闭选集" }
+        )
         Column(
             Modifier.align(Alignment.CenterEnd).width(360.dp).fillMaxHeight()
                 .background(Color(0xF2121318))
@@ -486,8 +557,10 @@ internal fun LocalVideoEpisodes(
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) }
                 .navigationBarsPadding()
         ) {
-            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp).height(56.dp),
-                verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp).height(56.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text("分集(${playlist.size}P)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = "收起选集" }) {
@@ -495,9 +568,12 @@ internal fun LocalVideoEpisodes(
                 }
             }
             HorizontalDivider(color = Color.White.copy(alpha = .08f))
-            LazyColumn(Modifier.weight(1f).selectableGroup(), state = listState,
+            LazyColumn(
+                Modifier.weight(1f).selectableGroup(),
+                state = listState,
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 itemsIndexed(playlist, key = { _, item -> item.uri.toString() }) { index, item ->
                     LocalEpisodeRow(index, item, item.uri == currentVideo.uri) { onVideoSelected(item) }
                 }
@@ -542,20 +618,26 @@ internal fun PlaybackIcon(playing: Boolean, modifier: Modifier = Modifier.size(2
         val u = size.width / 24f
         if (playing) {
             listOf(6f, 14.2f).forEach { x ->
-                drawRoundRect(Color.White, Offset(x * u, 5f * u),
+                drawRoundRect(
+                    Color.White,
+                    Offset(x * u, 5f * u),
                     androidx.compose.ui.geometry.Size(3.8f * u, 14f * u),
-                    androidx.compose.ui.geometry.CornerRadius(1.2f * u))
+                    androidx.compose.ui.geometry.CornerRadius(1.2f * u)
+                )
             }
         } else {
-            drawPath(Path().apply {
-                moveTo(6.5f * u, 4.8f * u)
-                cubicTo(5.7f * u, 4.3f * u, 4.7f * u, 4.9f * u, 4.7f * u, 5.8f * u)
-                lineTo(4.7f * u, 18.2f * u)
-                cubicTo(4.7f * u, 19.1f * u, 5.7f * u, 19.7f * u, 6.5f * u, 19.2f * u)
-                lineTo(17.1f * u, 13f * u)
-                cubicTo(17.9f * u, 12.6f * u, 17.9f * u, 11.4f * u, 17.1f * u, 11f * u)
-                close()
-            }, Color.White)
+            drawPath(
+                Path().apply {
+                    moveTo(6.5f * u, 4.8f * u)
+                    cubicTo(5.7f * u, 4.3f * u, 4.7f * u, 4.9f * u, 4.7f * u, 5.8f * u)
+                    lineTo(4.7f * u, 18.2f * u)
+                    cubicTo(4.7f * u, 19.1f * u, 5.7f * u, 19.7f * u, 6.5f * u, 19.2f * u)
+                    lineTo(17.1f * u, 13f * u)
+                    cubicTo(17.9f * u, 12.6f * u, 17.9f * u, 11.4f * u, 17.1f * u, 11f * u)
+                    close()
+                },
+                Color.White
+            )
         }
     }
 }
@@ -565,14 +647,23 @@ internal fun TelevisionSeekThumb() {
     Canvas(Modifier.size(width = 18.dp, height = 16.dp)) {
         val u = size.width / 24f
         val stroke = Stroke(1.8f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        drawLine(OnlinePink, Offset(7.5f*u, 1.5f*u), Offset(10.5f*u, 4.5f*u), 2f*u, StrokeCap.Round)
-        drawLine(OnlinePink, Offset(16.5f*u, 1.5f*u), Offset(13.5f*u, 4.5f*u), 2f*u, StrokeCap.Round)
-        drawRoundRect(Color.White, Offset(2.5f*u, 4f*u), androidx.compose.ui.geometry.Size(19f*u, 14f*u),
-            androidx.compose.ui.geometry.CornerRadius(4.5f*u))
-        drawRoundRect(OnlinePink, Offset(2.5f*u, 4f*u), androidx.compose.ui.geometry.Size(19f*u, 14f*u),
-            androidx.compose.ui.geometry.CornerRadius(4.5f*u), style = stroke)
+        drawLine(OnlinePink, Offset(7.5f * u, 1.5f * u), Offset(10.5f * u, 4.5f * u), 2f * u, StrokeCap.Round)
+        drawLine(OnlinePink, Offset(16.5f * u, 1.5f * u), Offset(13.5f * u, 4.5f * u), 2f * u, StrokeCap.Round)
+        drawRoundRect(
+            Color.White,
+            Offset(2.5f * u, 4f * u),
+            androidx.compose.ui.geometry.Size(19f * u, 14f * u),
+            androidx.compose.ui.geometry.CornerRadius(4.5f * u)
+        )
+        drawRoundRect(
+            OnlinePink,
+            Offset(2.5f * u, 4f * u),
+            androidx.compose.ui.geometry.Size(19f * u, 14f * u),
+            androidx.compose.ui.geometry.CornerRadius(4.5f * u),
+            style = stroke
+        )
         listOf(8.5f, 15.5f).forEach { x ->
-            drawLine(OnlineText, Offset(x*u, 10f*u), Offset(x*u, 11.8f*u), 2f*u, StrokeCap.Round)
+            drawLine(OnlineText, Offset(x * u, 10f * u), Offset(x * u, 11.8f * u), 2f * u, StrokeCap.Round)
         }
     }
 }
@@ -583,22 +674,38 @@ internal fun FullscreenIcon(fullScreen: Boolean, modifier: Modifier = Modifier.s
         val u = size.width / 24f
         val corners = Path().apply {
             if (fullScreen) {
-                moveTo(2f*u, 8f*u); lineTo(8f*u, 8f*u); lineTo(8f*u, 2f*u)
-                moveTo(16f*u, 2f*u); lineTo(16f*u, 8f*u); lineTo(22f*u, 8f*u)
-                moveTo(22f*u, 16f*u); lineTo(16f*u, 16f*u); lineTo(16f*u, 22f*u)
-                moveTo(8f*u, 22f*u); lineTo(8f*u, 16f*u); lineTo(2f*u, 16f*u)
+                moveTo(2f * u, 8f * u)
+                lineTo(8f * u, 8f * u)
+                lineTo(8f * u, 2f * u)
+                moveTo(16f * u, 2f * u)
+                lineTo(16f * u, 8f * u)
+                lineTo(22f * u, 8f * u)
+                moveTo(22f * u, 16f * u)
+                lineTo(16f * u, 16f * u)
+                lineTo(16f * u, 22f * u)
+                moveTo(8f * u, 22f * u)
+                lineTo(8f * u, 16f * u)
+                lineTo(2f * u, 16f * u)
             } else {
-                moveTo(4f*u, 9f*u); lineTo(4f*u, 5f*u)
-                quadraticTo(4f*u, 4f*u, 5f*u, 4f*u); lineTo(9f*u, 4f*u)
-                moveTo(20f*u, 9f*u); lineTo(20f*u, 5f*u)
-                quadraticTo(20f*u, 4f*u, 19f*u, 4f*u); lineTo(15f*u, 4f*u)
-                moveTo(4f*u, 15f*u); lineTo(4f*u, 19f*u)
-                quadraticTo(4f*u, 20f*u, 5f*u, 20f*u); lineTo(9f*u, 20f*u)
-                moveTo(20f*u, 15f*u); lineTo(20f*u, 19f*u)
-                quadraticTo(20f*u, 20f*u, 19f*u, 20f*u); lineTo(15f*u, 20f*u)
+                moveTo(4f * u, 9f * u)
+                lineTo(4f * u, 5f * u)
+                quadraticTo(4f * u, 4f * u, 5f * u, 4f * u)
+                lineTo(9f * u, 4f * u)
+                moveTo(20f * u, 9f * u)
+                lineTo(20f * u, 5f * u)
+                quadraticTo(20f * u, 4f * u, 19f * u, 4f * u)
+                lineTo(15f * u, 4f * u)
+                moveTo(4f * u, 15f * u)
+                lineTo(4f * u, 19f * u)
+                quadraticTo(4f * u, 20f * u, 5f * u, 20f * u)
+                lineTo(9f * u, 20f * u)
+                moveTo(20f * u, 15f * u)
+                lineTo(20f * u, 19f * u)
+                quadraticTo(20f * u, 20f * u, 19f * u, 20f * u)
+                lineTo(15f * u, 20f * u)
             }
         }
-        drawPath(corners, Color.White.copy(alpha = .9f), style = Stroke(2.1f*u, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawPath(corners, Color.White.copy(alpha = .9f), style = Stroke(2.1f * u, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
 
@@ -608,14 +715,11 @@ internal tailrec fun Context.findActivity(): ComponentActivity? = when (this) {
     else -> null
 }
 
-
-internal fun createTexturePlayerView(context: Context, player: ExoPlayer): PlayerView =
-    (LayoutInflater.from(context).inflate(R.layout.video_player_view, null) as PlayerView).apply {
-        this.player = player
-        setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-        keepScreenOn = true
-    }
-
+internal fun createTexturePlayerView(context: Context, player: ExoPlayer): PlayerView = (LayoutInflater.from(context).inflate(R.layout.video_player_view, null) as PlayerView).apply {
+    this.player = player
+    setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+    keepScreenOn = true
+}
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal fun createCompatiblePlayer(context: Context): ExoPlayer {
@@ -629,6 +733,9 @@ internal fun formatPlaybackTime(positionMs: Long, unknownWhenZero: Boolean = fal
     val hours = totalSeconds / 3600
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
-    return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds)
-    else "%02d:%02d".format(minutes, seconds)
+    return if (hours > 0) {
+        "%d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        "%02d:%02d".format(minutes, seconds)
+    }
 }

@@ -134,7 +134,8 @@ internal fun ListenPlaybackEffect(
                     .setUsage(C.USAGE_MEDIA)
                     .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
                     .build(),
-                /* handleAudioFocus = */ true
+                /* handleAudioFocus = */
+                true
             )
             player.setHandleAudioBecomingNoisy(true)
             player.setWakeMode(C.WAKE_MODE_NETWORK)
@@ -209,15 +210,24 @@ internal fun HeadphoneIcon(tint: Color, modifier: Modifier = Modifier.size(20.dp
     Canvas(modifier) {
         val u = size.width / 24f
         val stroke = Stroke(1.9f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        drawPath(Path().apply {
-            moveTo(4f * u, 15f * u)
-            lineTo(4f * u, 12f * u)
-            arcTo(Rect(4f * u, 4f * u, 20f * u, 20f * u), 180f, 180f, false)
-            lineTo(20f * u, 15f * u)
-        }, tint, style = stroke)
+        drawPath(
+            Path().apply {
+                moveTo(4f * u, 15f * u)
+                lineTo(4f * u, 12f * u)
+                arcTo(Rect(4f * u, 4f * u, 20f * u, 20f * u), 180f, 180f, false)
+                lineTo(20f * u, 15f * u)
+            },
+            tint,
+            style = stroke
+        )
         listOf(3f, 16.5f).forEach { x ->
-            drawRoundRect(tint, Offset(x * u, 14f * u), Size(4.5f * u, 7f * u),
-                CornerRadius(1.6f * u), style = stroke)
+            drawRoundRect(
+                tint,
+                Offset(x * u, 14f * u),
+                Size(4.5f * u, 7f * u),
+                CornerRadius(1.6f * u),
+                style = stroke
+            )
         }
     }
 }
@@ -252,8 +262,12 @@ internal fun CollapsedListenOverlay(
 ) {
     Box(modifier.fillMaxSize().background(Color(0xFF15161B))) {
         if (cover != null) {
-            Image(cover.asImageBitmap(), contentDescription = null,
-                modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            Image(
+                cover.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
         }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .55f)))
         Column(
@@ -262,8 +276,12 @@ internal fun CollapsedListenOverlay(
         ) {
             ListenVisualizer(playing, Modifier.width(72.dp).height(22.dp), bars = 9)
             Spacer(Modifier.height(8.dp))
-            Text(if (playing) "正在听视频 · 画面已关闭" else "听视频已暂停", color = Color.White,
-                fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text(
+                if (playing) "正在听视频 · 画面已关闭" else "听视频已暂停",
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ListenChip("展开", onExpand, filled = false)
@@ -282,8 +300,12 @@ private fun ListenChip(text: String, onClick: () -> Unit, filled: Boolean) {
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(text, color = if (filled) OnlineText else Color.White, fontSize = 12.sp,
-            fontWeight = FontWeight.Medium)
+        Text(
+            text,
+            color = if (filled) OnlineText else Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -308,7 +330,9 @@ internal fun ListenVisualizer(playing: Boolean, modifier: Modifier = Modifier, b
                         val noise = ((now / 90 + k * 7919) % 97) / 97f * .25f
                         val edge = 1f - abs(k - bars / 2f) / bars * .9f
                         ((.25f + .45f * wave + noise) * edge).coerceIn(0f, 1f)
-                    } else 0f
+                    } else {
+                        0f
+                    }
                     levels[k] += (target - levels[k]) * .18f
                     if (abs(levels[k] - target) > .004f) moving = true
                 }
@@ -325,8 +349,12 @@ internal fun ListenVisualizer(playing: Boolean, modifier: Modifier = Modifier, b
         for (k in 0 until bars) {
             val h = max(size.height * .08f, levels[k] * size.height)
             val bw = w * .56f
-            drawRoundRect(brush, Offset(k * w + w * .22f, (size.height - h) / 2f), Size(bw, h),
-                CornerRadius(bw / 2f))
+            drawRoundRect(
+                brush,
+                Offset(k * w + w * .22f, (size.height - h) / 2f),
+                Size(bw, h),
+                CornerRadius(bw / 2f)
+            )
         }
     }
 }
@@ -396,11 +424,15 @@ internal fun ListenScreen(
         Modifier.fillMaxSize()
             .drawWithContent {
                 val progress = reveal()
-                if (progress >= .999f) drawContent() else {
+                if (progress >= .999f) {
+                    drawContent()
+                } else {
                     val radius = hypot(max(origin.x, size.width - origin.x), max(origin.y, size.height - origin.y)) * progress
-                    clipPath(Path().apply {
-                        addOval(Rect(origin, radius))
-                    }) { this@drawWithContent.drawContent() }
+                    clipPath(
+                        Path().apply {
+                            addOval(Rect(origin, radius))
+                        }
+                    ) { this@drawWithContent.drawContent() }
                 }
             }
             // Swallow touches so nothing reaches the player underneath.
@@ -420,12 +452,15 @@ internal fun ListenScreen(
                             .padding(horizontal = 12.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(Modifier.size(6.dp).clip(CircleShape)
-                            .background(if (playing) Color(0xFF7CF29A) else Color.White.copy(alpha = .4f)))
+                        Box(
+                            Modifier.size(6.dp).clip(CircleShape)
+                                .background(if (playing) Color(0xFF7CF29A) else Color.White.copy(alpha = .4f))
+                        )
                         Spacer(Modifier.width(6.dp))
                         Text(
                             if (info.online) "听视频 · 仅加载音频流" else "听视频 · 画面已停止解码",
-                            color = Color.White.copy(alpha = .9f), fontSize = 12.sp
+                            color = Color.White.copy(alpha = .9f),
+                            fontSize = 12.sp
                         )
                     }
                 }
@@ -438,12 +473,24 @@ internal fun ListenScreen(
             ListenVisualizer(visualizing, Modifier.fillMaxWidth().height(40.dp))
             Spacer(Modifier.weight(1f))
 
-            Text(title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 24.sp)
+            Text(
+                title,
+                color = Color.White,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 24.sp
+            )
             if (info.subtitle.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
-                Text(info.subtitle, color = Color.White.copy(alpha = .65f), fontSize = 12.5.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    info.subtitle,
+                    color = Color.White.copy(alpha = .65f),
+                    fontSize = 12.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             if (timer.active) {
                 Spacer(Modifier.height(6.dp))
@@ -455,7 +502,10 @@ internal fun ListenScreen(
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
                 Slider(
                     value = (if (scrubbing) scrubValue else positionMs.toFloat()).coerceIn(0f, sliderMax),
-                    onValueChange = { scrubbing = true; scrubValue = it },
+                    onValueChange = {
+                        scrubbing = true
+                        scrubValue = it
+                    },
                     onValueChangeFinished = {
                         onSeek(scrubValue.toLong())
                         scrubbing = false
@@ -470,20 +520,38 @@ internal fun ListenScreen(
                         Canvas(Modifier.fillMaxWidth().height(4.dp)) {
                             val played = (state.value / sliderMax).coerceIn(0f, 1f)
                             val y = center.y
-                            drawLine(Color.White.copy(alpha = .25f), Offset(0f, y), Offset(size.width, y),
-                                size.height, StrokeCap.Round)
-                            if (played > 0f) drawLine(OnlinePink, Offset(0f, y), Offset(size.width * played, y),
-                                size.height, StrokeCap.Round)
+                            drawLine(
+                                Color.White.copy(alpha = .25f),
+                                Offset(0f, y),
+                                Offset(size.width, y),
+                                size.height,
+                                StrokeCap.Round
+                            )
+                            if (played > 0f) {
+                                drawLine(
+                                    OnlinePink,
+                                    Offset(0f, y),
+                                    Offset(size.width * played, y),
+                                    size.height,
+                                    StrokeCap.Round
+                                )
+                            }
                         }
                     }
                 )
             }
             Row(Modifier.fillMaxWidth()) {
-                Text(formatPlaybackTime(if (scrubbing) scrubValue.toLong() else positionMs),
-                    color = Color.White.copy(alpha = .65f), fontSize = 11.sp)
+                Text(
+                    formatPlaybackTime(if (scrubbing) scrubValue.toLong() else positionMs),
+                    color = Color.White.copy(alpha = .65f),
+                    fontSize = 11.sp
+                )
                 Spacer(Modifier.weight(1f))
-                Text(formatPlaybackTime(durationMs, unknownWhenZero = true),
-                    color = Color.White.copy(alpha = .65f), fontSize = 11.sp)
+                Text(
+                    formatPlaybackTime(durationMs, unknownWhenZero = true),
+                    color = Color.White.copy(alpha = .65f),
+                    fontSize = 11.sp
+                )
             }
 
             Spacer(Modifier.height(6.dp))
@@ -493,8 +561,11 @@ internal fun ListenScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 ListenRoundButton("上一个", {
-                    if (hasPrevious) onPrevious()
-                    else Toast.makeText(context, "已经是第一个了", Toast.LENGTH_SHORT).show()
+                    if (hasPrevious) {
+                        onPrevious()
+                    } else {
+                        Toast.makeText(context, "已经是第一个了", Toast.LENGTH_SHORT).show()
+                    }
                 }, size = 48.dp) {
                     PrevGlyph(Color.White.copy(alpha = if (hasPrevious) 1f else .35f))
                 }
@@ -508,8 +579,11 @@ internal fun ListenScreen(
                     SkipGlyph(forward = true, seconds = 10)
                 }
                 ListenRoundButton("下一个", {
-                    if (hasNext) onNext()
-                    else Toast.makeText(context, "已经是最后一个了", Toast.LENGTH_SHORT).show()
+                    if (hasNext) {
+                        onNext()
+                    } else {
+                        Toast.makeText(context, "已经是最后一个了", Toast.LENGTH_SHORT).show()
+                    }
                 }, size = 48.dp) {
                     NextGlyph(Color.White.copy(alpha = if (hasNext) 1f else .35f))
                 }
@@ -536,7 +610,9 @@ internal fun ListenScreen(
                             val remainingMs = (timer.endAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
                             formatTimerBadge(remainingMs)
                         }
+
                         timer.mode == SleepTimerMode.VIDEOS -> "${timer.videosLeft}个后"
+
                         else -> "定时关闭"
                     },
                     active = timer.active,

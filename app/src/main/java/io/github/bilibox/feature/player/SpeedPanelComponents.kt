@@ -244,8 +244,11 @@ internal fun SpeedPresetRow(
                     .height(32.dp)
                     .clip(RoundedCornerShape(10.dp))
                     .background(
-                        if (selected) OnlinePink.copy(alpha = .20f)
-                        else Color.White.copy(alpha = .06f)
+                        if (selected) {
+                            OnlinePink.copy(alpha = .20f)
+                        } else {
+                            Color.White.copy(alpha = .06f)
+                        }
                     )
                     .border(
                         1.dp,
@@ -493,8 +496,10 @@ internal fun DrawScope.drawSpeedRunner(
             Triple(55f, 21f, 1.3f),
             Triple(71f, 9f, 2.4f)
         ).forEach { (yUnit, length, phaseOffset) ->
-            val lengthPx = (length + 16f * streak +
-                sin(phase * 3f + phaseOffset) * 3f * streak) * unit * (0.55f + streak)
+            val lengthPx = (
+                length + 16f * streak +
+                    sin(phase * 3f + phaseOffset) * 3f * streak
+                ) * unit * (0.55f + streak)
             if (lengthPx > 1f) {
                 val yPx = y(yUnit) - bob * unit * .5f
                 drawLine(
@@ -635,6 +640,7 @@ internal fun DrawScope.drawSpeedRunner(
                     )
                 }
             }
+
             1 -> {
                 val stroke = Stroke(3f * unit, cap = StrokeCap.Round)
                 drawPath(
@@ -654,6 +660,7 @@ internal fun DrawScope.drawSpeedRunner(
                     style = stroke
                 )
             }
+
             else -> {
                 val stroke = Stroke(3.2f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round)
                 drawPath(

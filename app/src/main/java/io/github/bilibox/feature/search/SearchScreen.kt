@@ -262,8 +262,13 @@ internal fun VideoMetaIcon(kind: String, modifier: Modifier = Modifier, tint: Co
         val bottom = size.height * .86f
         when (kind) {
             "play" -> {
-                drawRoundRect(tint, Offset(left, top), androidx.compose.ui.geometry.Size(right - left, bottom - top),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .18f), style = stroke)
+                drawRoundRect(
+                    tint,
+                    Offset(left, top),
+                    androidx.compose.ui.geometry.Size(right - left, bottom - top),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .18f),
+                    style = stroke
+                )
                 val path = Path().apply {
                     moveTo(size.width * .43f, size.height * .31f)
                     lineTo(size.width * .67f, size.height * .5f)
@@ -272,18 +277,29 @@ internal fun VideoMetaIcon(kind: String, modifier: Modifier = Modifier, tint: Co
                 }
                 drawPath(path, tint)
             }
+
             "comment" -> {
-                drawRoundRect(tint, Offset(left, top), androidx.compose.ui.geometry.Size(right - left, bottom - top),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .16f), style = stroke)
+                drawRoundRect(
+                    tint,
+                    Offset(left, top),
+                    androidx.compose.ui.geometry.Size(right - left, bottom - top),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .16f),
+                    style = stroke
+                )
                 drawCircle(tint, size.minDimension * .055f, Offset(size.width * .31f, size.height * .4f))
                 drawLine(tint, Offset(size.width * .43f, size.height * .4f), Offset(size.width * .7f, size.height * .4f), strokeWidth)
                 drawCircle(tint, size.minDimension * .055f, Offset(size.width * .31f, size.height * .62f))
                 drawLine(tint, Offset(size.width * .43f, size.height * .62f), Offset(size.width * .62f, size.height * .62f), strokeWidth)
             }
+
             "date" -> {
-                drawRoundRect(tint, Offset(left, top + size.height * .08f),
+                drawRoundRect(
+                    tint,
+                    Offset(left, top + size.height * .08f),
                     androidx.compose.ui.geometry.Size(right - left, bottom - top - size.height * .08f),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .12f), style = stroke)
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.minDimension * .12f),
+                    style = stroke
+                )
                 drawLine(tint, Offset(left, size.height * .38f), Offset(right, size.height * .38f), strokeWidth)
                 drawLine(tint, Offset(size.width * .34f, size.height * .08f), Offset(size.width * .34f, size.height * .3f), strokeWidth)
                 drawLine(tint, Offset(size.width * .66f, size.height * .08f), Offset(size.width * .66f, size.height * .3f), strokeWidth)
@@ -306,7 +322,11 @@ internal fun RemoteCover(
                 connection.connectTimeout = 8000
                 connection.readTimeout = 8000
                 connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-                try { connection.inputStream.use(BitmapFactory::decodeStream) } finally { connection.disconnect() }
+                try {
+                    connection.inputStream.use(BitmapFactory::decodeStream)
+                } finally {
+                    connection.disconnect()
+                }
             }.getOrNull()
         }
     }

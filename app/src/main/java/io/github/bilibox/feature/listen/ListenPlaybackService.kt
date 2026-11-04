@@ -38,7 +38,9 @@ class ListenPlaybackService : MediaSessionService() {
         if (launch != null) {
             builder.setSessionActivity(
                 PendingIntent.getActivity(
-                    this, 0, launch,
+                    this,
+                    0,
+                    launch,
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )
             )
@@ -198,21 +200,28 @@ private class MetadataPlayer(
 
     override fun seekToNext() {
         val q = queue
-        if (q != null) { if (q.hasNext) q.skipToNext() } else super.seekToNext()
+        if (q != null) {
+            if (q.hasNext) q.skipToNext()
+        } else {
+            super.seekToNext()
+        }
     }
 
     override fun seekToNextMediaItem() {
         val q = queue
-        if (q != null) { if (q.hasNext) q.skipToNext() } else super.seekToNextMediaItem()
+        if (q != null) {
+            if (q.hasNext) q.skipToNext()
+        } else {
+            super.seekToNextMediaItem()
+        }
     }
 }
 
-internal fun buildListenMetadata(title: String, subtitle: String, artwork: ByteArray?): MediaMetadata =
-    MediaMetadata.Builder()
-        .setTitle(title)
-        .setDisplayTitle(title)
-        .setArtist(subtitle)
-        .apply {
-            if (artwork != null) setArtworkData(artwork, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-        }
-        .build()
+internal fun buildListenMetadata(title: String, subtitle: String, artwork: ByteArray?): MediaMetadata = MediaMetadata.Builder()
+    .setTitle(title)
+    .setDisplayTitle(title)
+    .setArtist(subtitle)
+    .apply {
+        if (artwork != null) setArtworkData(artwork, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+    }
+    .build()

@@ -1,7 +1,5 @@
 package io.github.bilibox.data.danmaku
 
-
-
 /**
  * 解析 B 站 `x/v1/dm/list.so` 返回的 XML。
  *
@@ -72,6 +70,7 @@ internal object DanmakuParser {
         val codePoint = when {
             entity.startsWith("#x", ignoreCase = true) ->
                 entity.substring(2).toIntOrNull(16)
+
             else -> entity.substring(1).toIntOrNull()
         } ?: return null
         if (!Character.isValidCodePoint(codePoint)) return null

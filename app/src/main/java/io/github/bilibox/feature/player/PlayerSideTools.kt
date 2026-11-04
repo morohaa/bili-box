@@ -257,21 +257,29 @@ internal fun PlayerGestureFeedback(
                     )
                 }
             } else {
-                drawPath(Path().apply {
-                    moveTo(3f * scale, 12f * scale)
-                    lineTo(9f * scale, 12f * scale)
-                    lineTo(18f * scale, 5f * scale)
-                    lineTo(18f * scale, 27f * scale)
-                    lineTo(9f * scale, 20f * scale)
-                    lineTo(3f * scale, 20f * scale)
-                    close()
-                }, white, style = stroke)
-                drawPath(Path().apply {
-                    moveTo(21f * scale, 11f * scale)
-                    quadraticTo(27f * scale, 16f * scale, 21f * scale, 21f * scale)
-                    moveTo(23f * scale, 7f * scale)
-                    cubicTo(32f * scale, 12f * scale, 32f * scale, 20f * scale, 23f * scale, 25f * scale)
-                }, white, style = stroke)
+                drawPath(
+                    Path().apply {
+                        moveTo(3f * scale, 12f * scale)
+                        lineTo(9f * scale, 12f * scale)
+                        lineTo(18f * scale, 5f * scale)
+                        lineTo(18f * scale, 27f * scale)
+                        lineTo(9f * scale, 20f * scale)
+                        lineTo(3f * scale, 20f * scale)
+                        close()
+                    },
+                    white,
+                    style = stroke
+                )
+                drawPath(
+                    Path().apply {
+                        moveTo(21f * scale, 11f * scale)
+                        quadraticTo(27f * scale, 16f * scale, 21f * scale, 21f * scale)
+                        moveTo(23f * scale, 7f * scale)
+                        cubicTo(32f * scale, 12f * scale, 32f * scale, 20f * scale, 23f * scale, 25f * scale)
+                    },
+                    white,
+                    style = stroke
+                )
             }
         }
         Spacer(Modifier.width(20.dp))
@@ -314,15 +322,27 @@ private fun CameraIcon(alpha: Float) {
         val u = size.width / 24f
         val color = Color.White.copy(alpha = alpha)
         val stroke = Stroke(1.7f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        drawPath(Path().apply {
-            moveTo(5*u, 7*u)
-            lineTo(8*u, 7*u); lineTo(10*u, 4*u); lineTo(14*u, 4*u); lineTo(16*u, 7*u)
-            lineTo(19*u, 7*u); quadraticTo(21*u, 7*u, 21*u, 9*u)
-            lineTo(21*u, 18*u); quadraticTo(21*u, 20*u, 19*u, 20*u)
-            lineTo(5*u, 20*u); quadraticTo(3*u, 20*u, 3*u, 18*u)
-            lineTo(3*u, 9*u); quadraticTo(3*u, 7*u, 5*u, 7*u); close()
-        }, color, style = stroke)
-        drawCircle(color, 3.2f*u, Offset(12*u, 13*u), style = stroke)
+        drawPath(
+            Path().apply {
+                moveTo(5 * u, 7 * u)
+                lineTo(8 * u, 7 * u)
+                lineTo(10 * u, 4 * u)
+                lineTo(14 * u, 4 * u)
+                lineTo(16 * u, 7 * u)
+                lineTo(19 * u, 7 * u)
+                quadraticTo(21 * u, 7 * u, 21 * u, 9 * u)
+                lineTo(21 * u, 18 * u)
+                quadraticTo(21 * u, 20 * u, 19 * u, 20 * u)
+                lineTo(5 * u, 20 * u)
+                quadraticTo(3 * u, 20 * u, 3 * u, 18 * u)
+                lineTo(3 * u, 9 * u)
+                quadraticTo(3 * u, 7 * u, 5 * u, 7 * u)
+                close()
+            },
+            color,
+            style = stroke
+        )
+        drawCircle(color, 3.2f * u, Offset(12 * u, 13 * u), style = stroke)
     }
 }
 
@@ -331,17 +351,25 @@ private fun ScreenLockIcon(locked: Boolean) {
     Canvas(Modifier.size(24.dp)) {
         val u = size.width / 24f
         val stroke = Stroke(1.7f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        drawRoundRect(Color.White, Offset(4*u, 10*u), Size(16*u, 11*u), CornerRadius(2.5f*u), style = stroke)
-        drawPath(Path().apply {
-            if (locked) {
-                moveTo(8*u, 10*u); lineTo(8*u, 6*u)
-                cubicTo(8*u, 2*u, 16*u, 2*u, 16*u, 6*u); lineTo(16*u, 10*u)
-            } else {
-                moveTo(12*u, 10*u); lineTo(12*u, 6*u)
-                cubicTo(12*u, 2*u, 20*u, 2*u, 20*u, 6*u); lineTo(20*u, 8*u)
-            }
-        }, Color.White, style = stroke)
-        drawCircle(Color.White, 1.5f*u, Offset(12*u, 15*u))
-        drawLine(Color.White, Offset(12*u, 15*u), Offset(12*u, 18*u), 1.7f*u, StrokeCap.Round)
+        drawRoundRect(Color.White, Offset(4 * u, 10 * u), Size(16 * u, 11 * u), CornerRadius(2.5f * u), style = stroke)
+        drawPath(
+            Path().apply {
+                if (locked) {
+                    moveTo(8 * u, 10 * u)
+                    lineTo(8 * u, 6 * u)
+                    cubicTo(8 * u, 2 * u, 16 * u, 2 * u, 16 * u, 6 * u)
+                    lineTo(16 * u, 10 * u)
+                } else {
+                    moveTo(12 * u, 10 * u)
+                    lineTo(12 * u, 6 * u)
+                    cubicTo(12 * u, 2 * u, 20 * u, 2 * u, 20 * u, 6 * u)
+                    lineTo(20 * u, 8 * u)
+                }
+            },
+            Color.White,
+            style = stroke
+        )
+        drawCircle(Color.White, 1.5f * u, Offset(12 * u, 15 * u))
+        drawLine(Color.White, Offset(12 * u, 15 * u), Offset(12 * u, 18 * u), 1.7f * u, StrokeCap.Round)
     }
 }

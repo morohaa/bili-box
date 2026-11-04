@@ -12,8 +12,7 @@ internal object WbiSigner {
         22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 34, 44, 52,
     )
 
-    fun extractKey(imageUrl: String): String =
-        imageUrl.substringAfterLast('/').substringBefore('.')
+    fun extractKey(imageUrl: String): String = imageUrl.substringAfterLast('/').substringBefore('.')
 
     fun mixinKey(imgKey: String, subKey: String): String {
         val raw = imgKey + subKey

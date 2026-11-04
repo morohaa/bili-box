@@ -84,7 +84,9 @@ internal fun LocalVideoIntro(
         ) {
             val quality = if (video.width > 0 && video.height > 0) {
                 resolutionLabel(video.width, video.height)
-            } else ""
+            } else {
+                ""
+            }
             if (quality.isNotBlank()) {
                 Box(
                     Modifier.padding(top = 1.dp).clip(RoundedCornerShape(4.dp))

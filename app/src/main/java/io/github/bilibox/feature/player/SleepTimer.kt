@@ -93,9 +93,14 @@ internal fun SleepTimerLabel(timer: PlaybackSleepTimer, modifier: Modifier = Mod
     val text = when (timer.mode) {
         SleepTimerMode.TIME ->
             "定时关闭：剩余 ${formatPlaybackTime((timer.endAt - now).coerceAtLeast(0L))}"
+
         SleepTimerMode.VIDEOS ->
-            if (timer.videoCount <= 1) "定时关闭：播完当前视频后暂停"
-            else "定时关闭：再播 ${timer.videosLeft} 个视频后暂停"
+            if (timer.videoCount <= 1) {
+                "定时关闭：播完当前视频后暂停"
+            } else {
+                "定时关闭：再播 ${timer.videosLeft} 个视频后暂停"
+            }
+
         SleepTimerMode.OFF -> ""
     }
     if (text.isNotBlank()) {
@@ -175,11 +180,13 @@ internal fun SleepTimerSheet(
     }
     val progress = when (timer.mode) {
         SleepTimerMode.TIME -> if (timer.totalMs > 0L) leftMs.toFloat() / timer.totalMs else 0f
+
         SleepTimerMode.VIDEOS -> when {
             timer.videosLeft > 1 -> timer.videosLeft.toFloat() / timer.videoCount.coerceAtLeast(1)
             durationMs > 0L -> 1f - currentRemainingMs.toFloat() / durationMs
             else -> 0f
         }
+
         SleepTimerMode.OFF -> 0f
     }
     val ringTitle = when (timer.mode) {
@@ -194,9 +201,14 @@ internal fun SleepTimerSheet(
     }
     val stateTitle = when (timer.mode) {
         SleepTimerMode.TIME -> "将于 ${clockAfter(leftMs)} 暂停播放"
+
         SleepTimerMode.VIDEOS ->
-            if (timer.videoCount <= 1) "播完当前视频后暂停"
-            else "再播 ${timer.videosLeft} 个视频后暂停"
+            if (timer.videoCount <= 1) {
+                "播完当前视频后暂停"
+            } else {
+                "再播 ${timer.videosLeft} 个视频后暂停"
+            }
+
         SleepTimerMode.OFF -> "未开启"
     }
     val stateSubtitle = when (timer.mode) {
@@ -204,7 +216,9 @@ internal fun SleepTimerSheet(
             append("共 ${timer.minutes} 分钟")
             if (timer.fade) append(" · 最后 30 秒音量渐弱")
         }
+
         SleepTimerMode.VIDEOS -> "含当前视频，按同文件夹顺序"
+
         SleepTimerMode.OFF -> "选择一个时长，或播完视频后暂停"
     }
     val multiSelected = timer.mode == SleepTimerMode.VIDEOS && timer.videoCount > 1
@@ -253,8 +267,11 @@ internal fun SleepTimerSheet(
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
                     .background(
-                        if (active) Brush.linearGradient(listOf(SleepCardPink, SleepCardLilac))
-                        else Brush.linearGradient(listOf(SleepCardIdle, SleepCardIdle))
+                        if (active) {
+                            Brush.linearGradient(listOf(SleepCardPink, SleepCardLilac))
+                        } else {
+                            Brush.linearGradient(listOf(SleepCardIdle, SleepCardIdle))
+                        }
                     )
                     .padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -262,8 +279,12 @@ internal fun SleepTimerSheet(
                 SleepTimerRing(progress = progress, active = active, title = ringTitle, subtitle = ringSub)
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(stateTitle, color = if (active) SleepInk else SleepSecondary, fontSize = 14.sp,
-                        fontWeight = if (active) FontWeight.Medium else FontWeight.Normal)
+                    Text(
+                        stateTitle,
+                        color = if (active) SleepInk else SleepSecondary,
+                        fontSize = 14.sp,
+                        fontWeight = if (active) FontWeight.Medium else FontWeight.Normal
+                    )
                     Spacer(Modifier.height(3.dp))
                     Text(stateSubtitle, color = SleepMuted, fontSize = 12.sp, lineHeight = 17.sp)
                     if (active) {
@@ -321,14 +342,29 @@ internal fun SleepTimerSheet(
                     Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(12.dp))
                         .background(SleepField).padding(horizontal = 14.dp, vertical = 12.dp),
                 ) {
-                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()) {
-                        Text("$customMinutes", color = OnlinePink, fontSize = 24.sp,
-                            fontWeight = FontWeight.SemiBold)
-                        Text(" 分钟", color = SleepMuted, fontSize = 12.sp,
-                            modifier = Modifier.padding(bottom = 3.dp))
-                        Text("  ${clockAfter(customMinutes * 60_000L)} 暂停", color = SleepMuted,
-                            fontSize = 12.sp, modifier = Modifier.padding(bottom = 3.dp, start = 6.dp))
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            "$customMinutes",
+                            color = OnlinePink,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            " 分钟",
+                            color = SleepMuted,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 3.dp)
+                        )
+                        Text(
+                            "  ${clockAfter(customMinutes * 60_000L)} 暂停",
+                            color = SleepMuted,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 3.dp, start = 6.dp)
+                        )
                     }
                     Slider(
                         value = customMinutes.toFloat(),
@@ -373,7 +409,8 @@ internal fun SleepTimerSheet(
                     Spacer(Modifier.height(2.dp))
                     Text(
                         "剩余 ${formatPlaybackTime(currentRemainingMs, unknownWhenZero = durationMs <= 0L)}",
-                        color = SleepMuted, fontSize = 11.sp,
+                        color = SleepMuted,
+                        fontSize = 11.sp,
                     )
                 }
                 LocalGlyphIcon(LocalIcon.FILM, SleepSecondary, Modifier.size(18.dp), 1.7f)
@@ -486,8 +523,12 @@ private fun SleepQuickChip(
 
 @Composable
 private fun SleepSectionLabel(text: String, top: androidx.compose.ui.unit.Dp) {
-    Text(text, color = SleepMuted, fontSize = 12.sp,
-        modifier = Modifier.padding(top = top, bottom = 8.dp))
+    Text(
+        text,
+        color = SleepMuted,
+        fontSize = 12.sp,
+        modifier = Modifier.padding(top = top, bottom = 8.dp)
+    )
 }
 
 @Composable
@@ -575,6 +616,5 @@ private fun SleepToggleRow(
     }
 }
 
-private fun clockAfter(millis: Long): String =
-    SimpleDateFormat("HH:mm", Locale.getDefault())
-        .format(Date(System.currentTimeMillis() + millis.coerceAtLeast(0L)))
+private fun clockAfter(millis: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault())
+    .format(Date(System.currentTimeMillis() + millis.coerceAtLeast(0L)))

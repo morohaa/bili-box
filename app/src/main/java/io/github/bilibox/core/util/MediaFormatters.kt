@@ -1,7 +1,5 @@
 package io.github.bilibox.core.util
 
-
-
 internal fun formatVideoDuration(durationMs: Long): String {
     val totalSeconds = (durationMs / 1000L).coerceAtLeast(0L)
     val hours = totalSeconds / 3600L

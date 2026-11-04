@@ -52,9 +52,14 @@ internal fun saveVideoFrame(context: Context, bitmap: Bitmap): android.net.Uri {
             if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) throw IOException("截帧编码失败")
         }
         if (Build.VERSION.SDK_INT >= 29) {
-            val published = resolver.update(uri, ContentValues().apply {
-                put(MediaStore.Images.Media.IS_PENDING, 0)
-            }, null, null)
+            val published = resolver.update(
+                uri,
+                ContentValues().apply {
+                    put(MediaStore.Images.Media.IS_PENDING, 0)
+                },
+                null,
+                null
+            )
             if (published != 1) throw IOException("无法保存截帧")
         }
         return uri

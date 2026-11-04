@@ -41,6 +41,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
+/** The 媒体信息 tab: file, stream and playback facts in compact tables. */
 @Composable
 internal fun LocalVideoMediaInfo(
     video: LocalVideo,
@@ -53,7 +54,9 @@ internal fun LocalVideoMediaInfo(
     val path = localVideoFullPath(video)
     val sizeText = if (video.sizeBytes > 0L) {
         "${Formatter.formatFileSize(context, video.sizeBytes)}（${String.format(Locale.US, "%,d", video.sizeBytes)} 字节）"
-    } else "未知"
+    } else {
+        "未知"
+    }
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 22.dp)) {
         MediaInfoSection(
@@ -74,7 +77,9 @@ internal fun LocalVideoMediaInfo(
             rows = listOf(
                 "分辨率" to if (video.width > 0 && video.height > 0) {
                     "${video.width} × ${video.height}（${resolutionLabel(video.width, video.height)}）"
-                } else "未知",
+                } else {
+                    "未知"
+                },
                 "帧率" to if (video.frameRate > 0f) frameRateLabel(video.frameRate) else "未知",
                 "类型" to video.mimeType.ifBlank { "未知" },
             ),
@@ -86,7 +91,9 @@ internal fun LocalVideoMediaInfo(
                 "进度" to if (durationMs > 0L) {
                     "${formatVideoDuration(positionMs)} / ${formatVideoDuration(durationMs)}" +
                         "（${(fraction * 100).roundToInt()}%）"
-                } else "未知",
+                } else {
+                    "未知"
+                },
                 "状态" to when {
                     fraction >= .995f -> "已看完"
                     positionMs > 0L -> "观看中"
