@@ -19,7 +19,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
@@ -31,15 +30,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -55,7 +50,6 @@ import io.github.bilibox.core.util.saveVideoFrame
 import io.github.bilibox.data.danmaku.Danmaku
 import io.github.bilibox.data.danmaku.DanmakuSettings
 import io.github.bilibox.feature.danmaku.DanmakuComposerDialog
-import io.github.bilibox.feature.danmaku.DanmakuControlBar
 import io.github.bilibox.feature.danmaku.DanmakuOverlay
 import io.github.bilibox.feature.danmaku.DanmakuSettingsSheet
 import io.github.bilibox.feature.listen.CollapsedListenOverlay
@@ -64,7 +58,6 @@ import io.github.bilibox.feature.listen.ListenInfo
 import io.github.bilibox.feature.listen.ListenPlaybackEffect
 import io.github.bilibox.feature.listen.ListenQueue
 import io.github.bilibox.feature.listen.ListenScreen
-import io.github.bilibox.feature.listen.ListenTopBarButton
 import io.github.bilibox.feature.listen.rememberListenCover
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -611,185 +604,91 @@ internal fun VideoPlayerScreen(
                     .background(Brush.verticalGradient(listOf(
                         Color.Transparent, Color.Black.copy(alpha = .4f), Color.Black.copy(alpha = .88f)
                     ))))
-                Column(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .then(if (fullScreen) Modifier
-                            .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 6.dp)
-                            else Modifier.padding(horizontal = 6.dp))
-                ) {
-                    val seekBar: @Composable (Modifier) -> Unit = { modifier ->
-                        VideoSeekBar(
-                            position = if (scrubbing) scrubPosition else position.toFloat(),
-                            duration = duration,
-                            bufferedPosition = bufferedPosition,
-                            onSeek = { scrubbing = true; scrubPosition = it },
-                            onSeekFinished = {
-                                player.seekTo(scrubPosition.toLong())
-                                position = scrubPosition.toLong()
-                                scrubbing = false
-                            },
-                            modifier = modifier
-                        )
-                    }
-                    val showPause = playWhenReady && playbackState != Player.STATE_ENDED
-                    if (fullScreen) {
-                        val currentQualityLabel = qualityOptions
-                            .firstOrNull { it.qn == selectedQuality }?.label
-                            ?: qualityOptions.maxByOrNull { it.qn }?.label.orEmpty()
-                        Row(
-                            Modifier.fillMaxWidth().height(26.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            seekBar(Modifier.fillMaxWidth())
-                        }
-                        Row(
-                            Modifier.fillMaxWidth().height(46.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Left: play/pause, next part and the tabular timestamp.
-                            PlayerBarIconButton(
-                                contentDescription = if (showPause) "暂停" else "播放",
-                                onClick = { togglePlayback() }
-                            ) {
-                                PlaybackIcon(showPause, Modifier.size(22.dp))
-                            }
-                            // Keep the next-episode icon in the bar even for
-                            // single-part videos, where tapping explains why it
-                            // has nowhere to go.
-                            PlayerBarIconButton(
-                                contentDescription = "下一集",
-                                onClick = {
-                                    val next = onNextEpisode
-                                    if (next != null) next()
-                                    else Toast.makeText(context, "已经是最后一集", Toast.LENGTH_SHORT).show()
-                                }
-                            ) {
-                                NextEpisodeIcon(Modifier.size(18.dp))
-                            }
-                            PlaybackTimeLabel(
-                                position = if (scrubbing) scrubPosition.toLong() else position,
-                                duration = duration,
-                                modifier = Modifier.padding(start = 6.dp, end = 4.dp)
+                PlayerBottomBar(
+                    state = PlayerBottomBarState(
+                        fullScreen = fullScreen,
+                        position = position,
+                        duration = duration,
+                        bufferedPosition = bufferedPosition,
+                        scrubbing = scrubbing,
+                        scrubPosition = scrubPosition,
+                        playWhenReady = playWhenReady,
+                        playbackState = playbackState,
+                        danmakuSupported = danmakuSupported,
+                        danmakuSettings = danmakuSettings,
+                        danmakuLoading = danmakuLoading,
+                        danmakuError = danmakuError,
+                        canSendDanmaku = onSendDanmaku != null,
+                        episodesAvailable = episodes != null,
+                        speed = speed,
+                        qualityOptions = qualityOptions,
+                        selectedQuality = selectedQuality,
+                    ),
+                    actions = PlayerBottomBarActions(
+                        onSeekStart = { scrubbing = true; scrubPosition = it },
+                        onSeekFinished = {
+                            player.seekTo(scrubPosition.toLong())
+                            position = scrubPosition.toLong()
+                            scrubbing = false
+                        },
+                        onTogglePlayback = { togglePlayback() },
+                        onNextEpisode = {
+                            val next = onNextEpisode
+                            if (next != null) next()
+                            else Toast.makeText(context, "已经是最后一集", Toast.LENGTH_SHORT).show()
+                        },
+                        onDanmakuToggle = {
+                            onDanmakuSettingsChange(
+                                danmakuSettings.copy(enabled = !danmakuSettings.enabled)
                             )
-                            Spacer(Modifier.width(12.dp))
-                            // Center: danmaku controls, capped so the send field
-                            // does not stretch across the whole control bar.
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                if (danmakuSupported) {
-                                    DanmakuControlBar(
-                                        settings = danmakuSettings,
-                                        loading = danmakuLoading,
-                                        error = danmakuError,
-                                        canSend = onSendDanmaku != null,
-                                        onToggle = {
-                                            onDanmakuSettingsChange(
-                                                danmakuSettings.copy(enabled = !danmakuSettings.enabled)
-                                            )
-                                        },
-                                        onOpenSettings = { danmakuSettingsOpen = true },
-                                        onSend = {
-                                            if (onSendDanmaku == null) {
-                                                Toast.makeText(
-                                                    context,
-                                                    "登录后才能发送弹幕",
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                            } else {
-                                                danmakuSendError = null
-                                                danmakuComposerOpen = true
-                                            }
-                                        },
-                                        modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth()
-                                    )
-                                }
+                        },
+                        onDanmakuSettings = { danmakuSettingsOpen = true },
+                        onDanmakuSend = {
+                            if (onSendDanmaku == null) {
+                                Toast.makeText(context, "登录后才能发送弹幕", Toast.LENGTH_SHORT).show()
+                            } else {
+                                danmakuSendError = null
+                                danmakuComposerOpen = true
                             }
-                            Spacer(Modifier.width(12.dp))
-                            // Right: episodes, speed and quality. The fullscreen
-                            // exit is intentionally left to the top-left back arrow.
-                            if (episodes != null) {
-                                PlayerBarAction("选集", contentDescription = "选集") {
-                                    speedMenuExpanded = false
-                                    qualityMenuExpanded = false
-                                    episodesExpanded = true
-                                }
-                            }
-                            SpeedBarChip(speed = speed) {
-                                episodesExpanded = false
-                                qualityMenuExpanded = false
-                                speedMenuExpanded = true
-                            }
-                            if (qualityOptions.isNotEmpty()) {
-                                PlayerQualityChip(
-                                    label = currentQualityLabel,
-                                    onClick = {
-                                        episodesExpanded = false
-                                        speedMenuExpanded = false
-                                        qualityMenuExpanded = true
-                                    }
-                                )
-                            }
-                        }
-                    } else {
-                        Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { togglePlayback() },
-                                modifier = Modifier.size(40.dp).semantics {
-                                    contentDescription = if (showPause) "暂停" else "播放"
-                                }
-                            ) {
-                                PlaybackIcon(showPause, Modifier.size(18.dp))
-                            }
-                            seekBar(Modifier.weight(1f))
-                            PlaybackTimeLabel(
-                                position = if (scrubbing) scrubPosition.toLong() else position,
-                                duration = duration,
-                                modifier = Modifier.padding(start = 10.dp)
-                            )
-                            IconButton(
-                                onClick = { toggleOrientation() },
-                                modifier = Modifier.size(40.dp).semantics { contentDescription = "切换横屏" }
-                            ) {
-                                FullscreenIcon(fullScreen = false, modifier = Modifier.size(16.dp))
-                            }
-                        }
-                    }
-                }
+                        },
+                        onEpisodes = {
+                            speedMenuExpanded = false
+                            qualityMenuExpanded = false
+                            episodesExpanded = true
+                        },
+                        onSpeed = {
+                            episodesExpanded = false
+                            qualityMenuExpanded = false
+                            speedMenuExpanded = true
+                        },
+                        onQuality = {
+                            episodesExpanded = false
+                            speedMenuExpanded = false
+                            qualityMenuExpanded = true
+                        },
+                        onToggleOrientation = { toggleOrientation() },
+                    ),
+                    modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                        .then(
+                            if (fullScreen) Modifier
+                                .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 6.dp)
+                            else Modifier.padding(horizontal = 6.dp)
+                        ),
+                )
             }
-            if (showChrome) Row(
-                Modifier.align(Alignment.TopStart).fillMaxWidth()
-                    .then(if (fullScreen) Modifier.displayCutoutPadding() else Modifier)
-                    .height(if (fullScreen) 48.dp else 44.dp)
-                    .padding(horizontal = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { navigateBack() }, modifier = Modifier.size(if (fullScreen) 48.dp else 40.dp)
-                    .semantics { contentDescription = "返回" }) {
-                    Canvas(Modifier.size(if (fullScreen) 24.dp else 20.dp)) {
-                        drawPath(Path().apply {
-                            moveTo(size.width * .63f, size.height * .15f)
-                            lineTo(size.width * .28f, size.height * .5f)
-                            lineTo(size.width * .63f, size.height * .85f)
-                        }, Color.White, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-                    }
-                }
-                Text(if (fullScreen) title else "", color = Color.White, fontSize = 14.sp,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                if (!fullScreen && listenInfo != null) {
-                    ListenTopBarButton(
-                        listening = listening,
-                        modifier = Modifier.onGloballyPositioned { coordinates ->
-                            val p = coordinates.positionInRoot()
-                            listenOrigin = Offset(
-                                p.x + coordinates.size.width / 2f,
-                                p.y + coordinates.size.height / 2f
-                            )
-                        }
-                    ) { enterListen() }
-                    Spacer(Modifier.width(4.dp))
-                }
-                if (!fullScreen) {
-                    SpeedBarChip(speed = speed) { speedMenuExpanded = true }
-                }
+            if (showChrome) {
+                PlayerTopBar(
+                    fullScreen = fullScreen,
+                    title = title,
+                    listening = listening,
+                    showListenButton = listenInfo != null,
+                    speed = speed,
+                    onBack = { navigateBack() },
+                    onListenClick = { enterListen() },
+                    onListenPositioned = { listenOrigin = it },
+                    onSpeedClick = { speedMenuExpanded = true },
+                    modifier = Modifier.align(Alignment.TopStart),
+                )
             }
             // Locking the screen must keep the unlock affordance reachable, so
             // this follows the raw chrome state rather than showChrome.
