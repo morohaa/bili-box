@@ -812,6 +812,7 @@ private fun ToolButton(
     Column(
         modifier = Modifier
             .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label }
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
