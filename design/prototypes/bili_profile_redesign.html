@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BiliBox · 我的 · 个人资料卡重设计</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC","HarmonyOS Sans SC","Segoe UI",Roboto,sans-serif;
+    background:
+      radial-gradient(900px 620px at 16% 4%, rgba(251,114,153,.13), transparent 62%),
+      radial-gradient(760px 620px at 88% 96%, rgba(255,160,80,.08), transparent 62%),
+      #090A0D;
+    color:#fff;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:44px 32px;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  img{display:block}
+  svg{display:block}
+  .stage{display:flex;align-items:center;justify-content:center;gap:76px;width:100%;max-width:1060px}
+
+  /* ───────── presentation note ───────── */
+  .notes{width:322px;flex-shrink:0}
+  .eyebrow{display:flex;align-items:center;gap:9px;font-size:10.5px;letter-spacing:2px;font-weight:650;color:#757E8C;text-transform:uppercase}
+  .eyebrow::before{content:"";width:20px;height:1px;background:linear-gradient(90deg,#FB7299,transparent)}
+  .notes h1{margin:20px 0 16px;font-size:30px;line-height:1.4;font-weight:700;letter-spacing:-.3px;color:#F4F5F7}
+  .notes h1 em{font-style:normal;background:linear-gradient(96deg,#FB7299 10%,#FFB35C 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .lede{font-size:12.5px;line-height:1.95;color:#8D96A3}
+  .notes ul{list-style:none;margin-top:26px;display:flex;flex-direction:column;gap:17px}
+  .notes li{display:flex;gap:12px;font-size:12px;line-height:1.75;color:#98A1AD}
+  .notes li .no{width:22px;height:22px;flex-shrink:0;margin-top:2px;border-radius:7px;border:1px solid rgba(251,114,153,.3);display:grid;place-items:center;font-size:9.5px;font-weight:700;color:#FB7299;background:rgba(251,114,153,.05)}
+  .notes li b{display:block;color:#E7EAEE;font-weight:600;font-size:12.5px;margin-bottom:2px;letter-spacing:.1px}
+  .hint{display:flex;align-items:center;gap:8px;margin-top:30px;font-size:11px;color:#6E7784}
+  .hint .k{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);font-size:10px;color:#AAB2BD}
+
+  /* ───────── phone shell ───────── */
+  .phone{
+    position:relative;
+    width:390px;height:844px;flex-shrink:0;
+    padding:11px;border-radius:56px;
+    background:linear-gradient(155deg,#5A5E67 0%,#1A1B20 11%,#0B0C0F 44%,#111216 68%,#3D3F47 100%);
+    box-shadow:0 64px 120px -42px rgba(0,0,0,.95),0 0 0 1px rgba(255,255,255,.07),inset 0 0 0 1px rgba(255,255,255,.05);
+  }
+  .phone::before{content:"";position:absolute;inset:4px;border-radius:52px;border:1px solid rgba(255,255,255,.055);pointer-events:none;z-index:3}
+  .screen{
+    position:relative;isolation:isolate;display:flex;flex-direction:column;
+    width:100%;height:100%;border-radius:46px;overflow:hidden;
+    color:var(--text);
+    --bg:#15171B;
+    --surface:#202329;
+    --text:#F2F4F7;
+    --text-2:#A7AFB9;
+    --text-3:#88919D;
+    --line:rgba(255,255,255,.06);
+    --line-strong:rgba(255,255,255,.1);
+    --pink:#FB7299;
+    --pink-deep:#FF5F8B;
+    --accent-text:#FB7299;
+    --amber:#FFB35C;
+    --green:#5EE0A0;
+    --tile:rgba(255,255,255,.045);
+    --tile-line:rgba(255,255,255,.075);
+    --nav:rgba(25,28,33,.84);
+    --card:#1D2026;
+    --card-border:rgba(255,255,255,.085);
+    --avatar-gap:#1E2127;
+    --row-hover:rgba(255,255,255,.025);
+    background:var(--bg);
+    transition:background .45s ease,color .45s ease;
+  }
+  .screen[data-theme="light"]{
+    --bg:#F3F4F6;
+    --surface:#FFFFFF;
+    --text:#1B1D22;
+    --text-2:#565E69;
+    --text-3:#717986;
+    --line:rgba(20,24,32,.065);
+    --line-strong:rgba(20,24,32,.09);
+    --pink:#F25C8A;
+    --pink-deep:#E64A7A;
+    --accent-text:#D24270;
+    --amber:#F09A36;
+    --green:#0E9F6E;
+    --tile:rgba(255,255,255,.72);
+    --tile-line:rgba(251,114,153,.13);
+    --nav:rgba(255,255,255,.84);
+    --card:#FFFFFF;
+    --card-border:rgba(251,114,153,.14);
+    --avatar-gap:#FFFFFF;
+    --row-hover:rgba(20,24,32,.018);
+  }
+
+  .app-bg{
+    position:absolute;inset:0;z-index:-1;
+    background:
+      radial-gradient(440px 320px at 92% -8%, rgba(251,114,153,.17), transparent 64%),
+      radial-gradient(400px 300px at -12% 26%, rgba(255,170,90,.09), transparent 62%),
+      radial-gradient(420px 380px at 50% 112%, rgba(130,96,255,.07), transparent 68%),
+      var(--bg);
+    transition:background .45s ease;
+  }
+  .screen[data-theme="light"] .app-bg{
+    background:
+      radial-gradient(440px 320px at 92% -8%, rgba(251,114,153,.19), transparent 64%),
+      radial-gradient(400px 300px at -12% 26%, rgba(255,170,90,.15), transparent 62%),
+      radial-gradient(420px 380px at 50% 112%, rgba(130,96,255,.06), transparent 68%),
+      var(--bg);
+  }
+
+  /* status + app bar */
+  .status{height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 27px;font-size:14px;font-weight:600;letter-spacing:.2px;color:var(--text);z-index:5}
+  .status-icons{display:flex;align-items:center;gap:6.5px;color:currentColor}
+  .status-icons svg{opacity:.92}
+  .appbar{height:56px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;z-index:5}
+  .logo{font-size:22px;line-height:1;font-weight:800;letter-spacing:-.9px;padding-bottom:2px;
+    background:linear-gradient(100deg,#FFB3C7 0%,#FB7299 55%,#F25C8A 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 2px 10px rgba(251,114,153,.22));
+  }
+  .theme-btn{
+    width:38px;height:38px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;
+    color:#FFC46B;background:var(--tile);border:1px solid var(--tile-line);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 18px -12px rgba(0,0,0,.7);
+    transition:background .25s,border-color .25s,color .25s,transform .2s;
+  }
+  .theme-btn:hover{transform:scale(1.06)}
+  .theme-btn:active{transform:scale(.94)}
+  .theme-btn .ico{width:18px;height:18px}
+  .theme-btn .moon{display:none}
+  .screen[data-theme="light"] .theme-btn{color:#566070;background:#fff;border-color:rgba(20,24,32,.08);box-shadow:0 8px 18px -14px rgba(20,24,32,.35)}
+  .screen[data-theme="light"] .theme-btn .sun{display:none}
+  .screen[data-theme="light"] .theme-btn .moon{display:block}
+
+  /* scroll body */
+  .body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px 16px 116px;z-index:2;scrollbar-width:none;display:flex;flex-direction:column}
+  .body::-webkit-scrollbar{display:none}
+  .body > *{flex-shrink:0}
+  .page-foot{margin-top:auto;padding-top:28px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:9px;letter-spacing:1.6px;color:var(--text-3);opacity:.48}
+  .page-foot .mark{font-size:10px;font-weight:800;letter-spacing:.1px;color:var(--text-2);opacity:.9}
+  .page-foot .dot{width:2.5px;height:2.5px;border-radius:50%;background:var(--text-3);opacity:.6}
+
+  /* ───────── profile card ───────── */
+  .profile-card{
+    position:relative;isolation:isolate;overflow:hidden;
+    margin-top:2px;padding:18px;border-radius:26px;
+    border:1px solid var(--card-border);
+    background:
+      radial-gradient(210px 170px at 100% -8%, rgba(251,114,153,.17), transparent 72%),
+      radial-gradient(220px 180px at 0% 102%, rgba(255,170,88,.11), transparent 74%),
+      radial-gradient(280px 220px at 50% 120%, rgba(140,108,255,.08), transparent 74%),
+      linear-gradient(155deg,#23262C 0%,#191C21 48%,#1E1B20 100%);
+    box-shadow:0 28px 54px -32px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.055);
+    animation:cardIn .7s cubic-bezier(.2,.8,.2,1) both;
+    transition:background .45s ease,border-color .45s ease,box-shadow .45s ease;
+  }
+  .profile-card::after{
+    content:"";position:absolute;inset:0;z-index:1;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .screen[data-theme="light"] .profile-card{
+    background:
+      radial-gradient(225px 175px at 97% -2%, rgba(251,114,153,.15), transparent 70%),
+      radial-gradient(205px 170px at 0% 102%, rgba(255,170,88,.12), transparent 72%),
+      linear-gradient(152deg,#FFFFFF 0%,#FFFDFD 56%,#FFF8F9 100%);
+    border-color:rgba(251,114,153,.18);
+    box-shadow:0 30px 54px -38px rgba(122,58,82,.42),inset 0 1px 0 #fff;
+  }
+  .aura{position:absolute;border-radius:50%;filter:blur(22px);pointer-events:none;z-index:0}
+  .aura.a{width:190px;height:190px;right:-70px;top:-86px;background:radial-gradient(circle,rgba(251,114,153,.23),transparent 66%);animation:drift 11s ease-in-out infinite alternate}
+  .aura.b{width:160px;height:160px;left:-72px;bottom:-90px;background:radial-gradient(circle,rgba(255,170,88,.17),transparent 66%);animation:drift 13s ease-in-out infinite alternate-reverse}
+  .screen[data-theme="light"] .aura.a{background:radial-gradient(circle,rgba(251,114,153,.2),transparent 66%)}
+  .screen[data-theme="light"] .aura.b{background:radial-gradient(circle,rgba(255,170,88,.22),transparent 66%)}
+
+  .p-head{position:relative;z-index:2;display:flex;align-items:center;gap:14px}
+  .avatar{position:relative;width:70px;height:70px;flex-shrink:0;border-radius:50%;padding:2px;
+    background:conic-gradient(from 155deg,#FB7299,#FFB35C 28%,#D8B4FE 54%,#FB7299 78%,#FB7299);
+    box-shadow:0 12px 26px -14px rgba(251,114,153,.75),0 0 0 4px rgba(251,114,153,.06);
+  }
+  .avatar-in{display:block;width:100%;height:100%;border-radius:50%;padding:3px;background:var(--avatar-gap);transition:background .45s ease}
+  .avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+  .online{position:absolute;right:3px;bottom:3px;width:12px;height:12px;border-radius:50%;
+    background:var(--green);border:2.5px solid var(--avatar-gap);
+    box-shadow:0 0 0 3px rgba(94,224,160,.1),0 0 10px rgba(94,224,160,.45);
+    animation:breathe 3s ease-in-out infinite;transition:border-color .45s ease;
+  }
+  .identity{flex:1;min-width:0}
+  .name-row{display:flex;align-items:center;gap:8px;min-width:0}
+  .name{flex:1;min-width:0;font-size:19px;line-height:1.3;font-weight:700;letter-spacing:.15px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub{display:flex;align-items:center;gap:5px;margin-top:6px;font-size:11.5px;color:var(--text-3);white-space:nowrap;overflow:hidden}
+  .sub .ok{color:var(--green);font-weight:600}
+  .sub .sep{opacity:.45;margin:0 1px}
+  .sub svg{width:10.5px;height:10.5px;opacity:.9;flex-shrink:0}
+  .lv{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;height:25px;padding:0 8.5px;border-radius:8px;
+    background:linear-gradient(135deg,#FFC46E 0%,#FF8B60 52%,#FF6C80 100%);
+    color:#fff;font-size:11px;font-weight:750;letter-spacing:.5px;
+    box-shadow:0 7px 18px -9px rgba(255,138,96,.9),inset 0 1px 0 rgba(255,255,255,.38);
+  }
+
+  .stats{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:17px}
+  .stat{display:flex;align-items:center;gap:10px;min-width:0;padding:11px 12px;border-radius:14px;
+    background:var(--tile);border:1px solid var(--tile-line);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+    transition:background .45s ease,border-color .45s ease;
+  }
+  .stat-ic{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;flex-shrink:0}
+  .stat-ic svg{width:17px;height:17px}
+  .stat-ic.coin{background:rgba(255,179,92,.13);color:#FFC078}
+  .stat-ic.book{background:rgba(251,114,153,.14);color:#FF9DB8}
+  .screen[data-theme="light"] .stat{box-shadow:0 6px 16px -14px rgba(122,58,82,.4),inset 0 1px 0 #fff}
+  .screen[data-theme="light"] .stat-ic.coin{background:#FFF3E2;color:#E18A25}
+  .screen[data-theme="light"] .stat-ic.book{background:#FFF0F4;color:#EF6188}
+  .stat-txt{min-width:0;display:flex;flex-direction:column}
+  .stat-val{font-size:17px;font-weight:700;line-height:1.15;letter-spacing:-.2px;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .stat-lbl{margin-top:2px;font-size:10.5px;color:var(--text-3);letter-spacing:.2px;white-space:nowrap}
+
+  .exp{position:relative;z-index:2;margin-top:18px}
+  .exp-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .exp-title{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;letter-spacing:.2px;color:var(--text-2)}
+  .exp-title::before{content:"";width:3px;height:11px;border-radius:2px;background:linear-gradient(180deg,#FB7299,#FFB35C)}
+  .exp-num{font-size:10.5px;color:var(--text-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .exp-num b{font-size:12px;font-weight:650;color:var(--text)}
+  .exp-bar{position:relative;height:8px;margin-top:10px;border-radius:99px;background:rgba(255,255,255,.09);box-shadow:inset 0 1px 2px rgba(0,0,0,.32)}
+  .screen[data-theme="light"] .exp-bar{background:rgba(27,29,34,.07);box-shadow:inset 0 1px 2px rgba(20,24,32,.06)}
+  .exp-fill{position:absolute;left:0;top:0;bottom:0;width:var(--p,44%);border-radius:99px;overflow:visible;
+    background:linear-gradient(90deg,#F25C8A 0%,#FB7299 38%,#FF9FA6 72%,#FFC57F 100%);
+    box-shadow:0 0 14px rgba(251,114,153,.42);
+    animation:grow 1.15s cubic-bezier(.2,.8,.2,1) .3s both;
+  }
+  .exp-fill::before{content:"";position:absolute;inset:0;border-radius:inherit;overflow:hidden;
+    background:linear-gradient(100deg,transparent 18%,rgba(255,255,255,.42) 50%,transparent 82%);
+    background-size:220% 100%;animation:shimmer 3.8s ease-in-out infinite;
+  }
+  .exp-fill::after{content:"";position:absolute;right:1.5px;top:1.5px;bottom:1.5px;width:2px;border-radius:3px;
+    background:rgba(255,255,255,.72);box-shadow:0 0 8px 1px rgba(255,255,255,.35);
+  }
+  .exp-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;font-size:10.5px;color:var(--text-3)}
+  .exp-foot b{font-weight:600;color:var(--text-2);font-variant-numeric:tabular-nums}
+  .pct{color:var(--accent-text);font-size:11px;font-weight:700;letter-spacing:.3px;font-variant-numeric:tabular-nums}
+
+  .actions{display:flex;justify-content:flex-end;margin:9px 0 0}
+  .logout{display:inline-flex;align-items:center;gap:5px;padding:6px 9px;border-radius:8px;font-size:11.5px;color:var(--text-3);transition:color .2s,background .2s}
+  .logout svg{width:13px;height:13px}
+  .logout:hover{color:#FF8BA3;background:rgba(251,114,153,.08)}
+  .screen[data-theme="light"] .logout:hover{color:#E64A7A;background:rgba(251,114,153,.07)}
+
+  /* ───────── settings group ───────── */
+  .section{margin-top:21px}
+  .sec-head{display:flex;align-items:center;gap:7px;padding:0 5px 10px;font-size:11.5px;font-weight:600;letter-spacing:.5px;color:var(--text-3)}
+  .sec-head svg{width:12px;height:12px;opacity:.8}
+  .panel{overflow:hidden;border-radius:18px;border:1px solid var(--line);background:var(--surface);
+    box-shadow:0 16px 34px -30px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.03);
+    transition:background .45s ease,border-color .45s ease;
+  }
+  .screen[data-theme="light"] .panel{box-shadow:0 16px 34px -32px rgba(40,30,36,.35),inset 0 1px 0 rgba(255,255,255,.9)}
+  .row{position:relative;display:flex;align-items:center;gap:12px;height:58px;padding:0 14px;transition:background .2s}
+  .row + .row::before{content:"";position:absolute;left:56px;right:14px;top:0;height:1px;background:var(--line)}
+  .row:hover{background:var(--row-hover)}
+  .row-ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex-shrink:0}
+  .row-ic svg{width:16px;height:16px}
+  .row-ic.pink{background:rgba(251,114,153,.12);color:#FF95B0}
+  .row-ic.green{background:rgba(94,224,160,.1);color:#71E0AA}
+  .row-ic.amber{background:rgba(255,179,92,.12);color:#FFC078}
+  .screen[data-theme="light"] .row-ic.pink{background:#FFF0F4;color:#EF6188}
+  .screen[data-theme="light"] .row-ic.green{background:#EAFBF3;color:#0FA971}
+  .screen[data-theme="light"] .row-ic.amber{background:#FFF4E5;color:#E18A25}
+  .row-t{flex:1;min-width:0;font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row-v{font-size:11.5px;color:var(--text-3);white-space:nowrap;letter-spacing:.1px}
+  .row .chev{width:14px;height:14px;flex-shrink:0;color:var(--text-3);opacity:.55;margin-left:-4px}
+
+
+  /* ───────── bottom nav ───────── */
+  .nav{
+    position:absolute;left:16px;right:16px;bottom:18px;height:64px;z-index:10;
+    display:flex;align-items:center;padding:0 6px;border-radius:32px;
+    background:var(--nav);border:1px solid var(--line-strong);
+    backdrop-filter:blur(24px) saturate(1.7);-webkit-backdrop-filter:blur(24px) saturate(1.7);
+    box-shadow:0 24px 44px -24px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.07);
+    transition:background .45s ease,border-color .45s ease;
+  }
+  .screen[data-theme="light"] .nav{box-shadow:0 24px 44px -26px rgba(60,40,50,.35),inset 0 1px 0 #fff}
+  .nav-item{flex:1;height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:26px;color:var(--text-3);font-size:11px;font-weight:500;letter-spacing:.2px;transition:color .2s}
+  .nav-item .ic{width:38px;height:27px;border-radius:14px;display:grid;place-items:center;transition:background .25s,box-shadow .25s}
+  .nav-item svg{width:20px;height:20px}
+  .nav-item:hover{color:var(--text-2)}
+  .nav-item.on{color:var(--accent-text);font-weight:600}
+  .nav-item.on .ic{background:rgba(251,114,153,.13);box-shadow:inset 0 0 0 1px rgba(251,114,153,.1)}
+  .screen[data-theme="light"] .nav-item.on .ic{background:rgba(251,114,153,.1);box-shadow:inset 0 0 0 1px rgba(251,114,153,.08)}
+
+  @keyframes cardIn{from{transform:translateY(10px) scale(.995)}to{transform:none}}
+  @keyframes grow{from{width:0}to{width:var(--p,44%)}}
+  @keyframes shimmer{0%,55%{background-position:180% 0}100%{background-position:-80% 0}}
+  @keyframes drift{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(-12px,14px,0) scale(1.12)}}
+  @keyframes breathe{0%,100%{box-shadow:0 0 0 3px rgba(94,224,160,.1),0 0 10px rgba(94,224,160,.4)}50%{box-shadow:0 0 0 5px rgba(94,224,160,.03),0 0 14px rgba(94,224,160,.55)}}
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  }
+
+  /* ───────── tablet: keep the device, drop the notes ───────── */
+  @media (max-width:920px){
+    .notes{display:none}
+    .stage{max-width:440px}
+  }
+
+  /* ───────── mobile: become the app ───────── */
+  @media (max-width:600px){
+    body{display:block;padding:0;background:#15171B}
+    body:has(.screen[data-theme="light"]){background:#F3F4F6}
+    .stage{display:block;max-width:none}
+    .phone{width:100%;height:100vh;height:100dvh;padding:0;border-radius:0;background:none;box-shadow:none}
+    .phone::before{display:none}
+    .screen{height:100vh;height:100dvh;border-radius:0}
+    .status{display:none}
+    .appbar{height:calc(58px + env(safe-area-inset-top));padding-top:calc(env(safe-area-inset-top) + 4px)}
+    .body{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+    .nav{left:14px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom))}
+  }
+  @media (max-width:400px){
+    .identity{padding-right:58px}
+    .name{font-size:18.5px}
+    .profile-card{padding:16px;border-radius:24px}
+    .lv{right:16px;top:17px}
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <aside class="notes">
+    <p class="eyebrow">BiliBox · Profile</p>
+    <h1>把一张资料卡<br>做成账号的<em>等级通行证</em></h1>
+    <p class="lede">去掉冷灰底、散落文字和那条没有说明的细进度条。用头像里的落日琥珀与 B 站玫瑰粉，重新组织“我是谁、我有什么、我离下一级还有多远”。</p>
+    <ul>
+      <li><span class="no">01</span><div><b>一眼读懂身份</b>头像以渐变光环收束，昵称、等级、登录状态在同一视线内完成阅读。</div></li>
+      <li><span class="no">02</span><div><b>数据各有容器</b>硬币与收藏拆成两张磨砂信息卡，不再和经验挤在同一行被截断。</div></li>
+      <li><span class="no">03</span><div><b>进度成为主角</b>经验条拥有起点、终点与明确数值，还差多少经验升级清清楚楚。</div></li>
+      <li><span class="no">04</span><div><b>克制的情绪色</b>暗色仍是主调，只让琥珀、玫瑰与一点紫在边缘发光，不喧宾夺主。</div></li>
+    </ul>
+    <p class="hint"><span class="k"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.5 4.5l1.4 1.4M18.1 18.1l1.4 1.4M2.5 12h2M19.5 12h2M4.5 19.5l1.4-1.4M18.1 5.9l1.4-1.4"/></svg></span>点击机身右上角，可切换浅色 / 深色主题</p>
+  </aside>
+
+  <div class="phone">
+    <div class="screen" id="screen" data-theme="dark">
+      <div class="app-bg"></div>
+
+      <div class="status">
+        <span>23:16</span>
+        <span class="status-icons">
+          <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor" aria-hidden="true">
+            <rect x="0" y="7.5" width="3" height="4.5" rx="1"/>
+            <rect x="5" y="5.5" width="3" height="6.5" rx="1"/>
+            <rect x="10" y="3" width="3" height="9" rx="1"/>
+            <rect x="15" y="0.5" width="3" height="11.5" rx="1" opacity=".35"/>
+          </svg>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+            <path d="M1.2 4.1a10.3 10.3 0 0 1 13.6 0"/>
+            <path d="M3.7 6.7a6.7 6.7 0 0 1 8.6 0"/>
+            <path d="M6.2 9.2a3.1 3.1 0 0 1 3.6 0"/>
+          </svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="none" aria-hidden="true">
+            <rect x=".6" y=".6" width="21" height="10.8" rx="3.2" stroke="currentColor" stroke-opacity=".4"/>
+            <rect x="2.4" y="2.4" width="14.5" height="7.2" rx="1.8" fill="currentColor"/>
+            <path d="M23.2 4.2v3.6a1.9 1.9 0 0 0 0-3.6z" fill="currentColor" fill-opacity=".55"/>
+          </svg>
+        </span>
+      </div>
+
+      <header class="appbar">
+        <div class="logo">bilibox</div>
+        <button class="theme-btn" id="themeBtn" type="button" aria-label="切换明暗主题" title="切换明暗主题">
+          <svg class="ico sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4.1"/>
+            <path d="M12 2.4v2.1M12 19.5v2.1M4.8 4.8l1.5 1.5M17.7 17.7l1.5 1.5M2.4 12h2.1M19.5 12h2.1M4.8 19.2l1.5-1.5M17.7 6.3l1.5-1.5"/>
+          </svg>
+          <svg class="ico moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.2 14.2A8.2 8.2 0 0 1 9.8 3.8a8.6 8.6 0 1 0 10.4 10.4z"/>
+          </svg>
+        </button>
+      </header>
+
+      <main class="body">
+        <section class="profile-card" aria-label="个人资料">
+          <i class="aura a"></i><i class="aura b"></i>
+
+          <div class="p-head">
+            <div class="avatar">
+              <span class="avatar-in"><img src="data:image/webp;base64,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" alt="ことみいちのせ 的头像" draggable="false"></span>
+              <i class="online" title="在线"></i>
+            </div>
+            <div class="identity">
+              <div class="name-row">
+                <h1 class="name" title="ことみいちのせ">ことみいちのせ</h1>
+                <span class="lv" aria-label="等级 5">LV5</span>
+              </div>
+              <p class="sub">
+                <span class="ok">已登录</span><span class="sep">·</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="4.5" y="10.5" width="15" height="10" rx="2.6"/>
+                  <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>
+                </svg>
+                <span>会话已加密</span>
+              </p>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <span class="stat-ic coin">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <ellipse cx="12" cy="6.6" rx="6.6" ry="2.7"/>
+                  <path d="M5.4 6.6v4.5c0 1.5 3 2.7 6.6 2.7s6.6-1.2 6.6-2.7V6.6"/>
+                  <path d="M5.4 11.1v4.5c0 1.5 3 2.7 6.6 2.7s6.6-1.2 6.6-2.7v-4.5"/>
+                </svg>
+              </span>
+              <span class="stat-txt"><span class="stat-val">1,102.1</span><span class="stat-lbl">硬币</span></span>
+            </div>
+            <div class="stat">
+              <span class="stat-ic book">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-4.1L6 21V4.8z"/>
+                </svg>
+              </span>
+              <span class="stat-txt"><span class="stat-val">0</span><span class="stat-lbl">收藏视频</span></span>
+            </div>
+          </div>
+
+          <div class="exp">
+            <div class="exp-head">
+              <span class="exp-title">等级经验</span>
+              <span class="exp-num"><b>12,580</b> / 28,800</span>
+            </div>
+            <div class="exp-bar"><span class="exp-fill" style="--p:43.7%"></span></div>
+            <div class="exp-foot">
+              <span>距 LV6 还差 <b>16,220</b> 经验</span>
+              <span class="pct">44%</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="actions">
+          <button class="logout" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/>
+              <path d="M10 12h10m0 0l-3-3m3 3l-3 3"/>
+            </svg>
+            退出登录
+          </button>
+        </div>
+
+        <section class="section">
+          <div class="sec-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3l7 3v5.2c0 4.4-2.9 7.7-7 9.8-4.1-2.1-7-5.4-7-9.8V6l7-3z"/>
+            </svg>
+            账号与安全
+          </div>
+          <div class="panel">
+            <div class="row">
+              <span class="row-ic pink">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="8.2" cy="8.2" r="3.4"/>
+                  <path d="M10.7 10.7L20 20m-2.7-2.7l2.2-2.2m-5-.4l1.8-1.8"/>
+                </svg>
+              </span>
+              <span class="row-t">登录方式</span>
+              <span class="row-v">扫码 / 密码 / 短信</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+            </div>
+            <div class="row">
+              <span class="row-ic green">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="4.5" y="10.5" width="15" height="10" rx="2.6"/>
+                  <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>
+                  <circle cx="12" cy="15.5" r="1.15" fill="currentColor" stroke="none"/>
+                </svg>
+              </span>
+              <span class="row-t">会话保存</span>
+              <span class="row-v">仅加密保存在本机</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+            </div>
+            <div class="row">
+              <span class="row-ic amber">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 4.5h14v15l-7-4.6-7 4.6v-15z"/>
+                </svg>
+              </span>
+              <span class="row-t">我的收藏</span>
+              <span class="row-v">0 个视频</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+            </div>
+          </div>
+        </section>
+
+        <footer class="page-foot"><span class="mark">bilibox</span><span class="dot"></span><span>v1.0</span></footer>
+      </main>
+
+      <nav class="nav" aria-label="底部导航">
+        <button class="nav-item" type="button">
+          <span class="ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3.5" y="6.5" width="17" height="13" rx="3.2"/>
+              <path d="M8.5 2.8L12 6.5l3.5-3.7"/><path d="M9.5 11.2v4l3.4-2z" fill="currentColor" stroke="none"/>
+            </svg>
+          </span>
+          动态
+        </button>
+        <button class="nav-item" type="button">
+          <span class="ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="4.5" width="18" height="15" rx="3.2"/>
+              <path d="M10.2 9.4l4.8 2.6-4.8 2.6z" fill="currentColor" stroke="none"/>
+            </svg>
+          </span>
+          视频
+        </button>
+        <button class="nav-item on" type="button" aria-current="page">
+          <span class="ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="8" r="3.6"/>
+              <path d="M5 20c0-3.4 3.1-5.6 7-5.6s7 2.2 7 5.6"/>
+            </svg>
+          </span>
+          我的
+        </button>
+      </nav>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  (function () {
+    var screen = document.getElementById('screen');
+    var btn = document.getElementById('themeBtn');
+    var m = location.search.match(/theme=(light|dark)/);
+    if (m) screen.setAttribute('data-theme', m[1]);
+    btn.addEventListener('click', function () {
+      var isLight = screen.getAttribute('data-theme') === 'light';
+      screen.setAttribute('data-theme', isLight ? 'dark' : 'light');
+      btn.setAttribute('aria-label', isLight ? '切换到浅色主题' : '切换到深色主题');
+    });
+  })();
+</script>
+</body>
+</html>
