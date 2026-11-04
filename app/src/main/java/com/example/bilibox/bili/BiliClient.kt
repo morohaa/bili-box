@@ -81,12 +81,17 @@ class BiliClient(
                 put("pubtime_end_s", pubtimeEnd.toString())
             }
         }
-        buvid()
-        var response = getJson<JsonObject>(signedSearchUrl(params, false))
+        // 未登录时只带 buvid3 的请求会被 B 站下发 v_voucher 风控并返回空结果，
+        // 所以匿名搜索不带指纹 Cookie；已登录请求保持原有指纹逻辑。
+        val anonymous = cookieHeader.isNullOrBlank() && sessData.isNullOrBlank()
+        if (!anonymous) buvid()
+        var response = getJson<JsonObject>(signedSearchUrl(params, false), includeFingerprint = !anonymous)
         if (response.code == CODE_RISK || response.code == CODE_SIGN_EXPIRED) {
-            buvid3 = null
-            runCatching { buvid() }
-            response = getJson(signedSearchUrl(params, true))
+            if (!anonymous) {
+                buvid3 = null
+                runCatching { buvid() }
+            }
+            response = getJson(signedSearchUrl(params, true), includeFingerprint = !anonymous)
         }
         ensureOk(response)
         val data = response.data ?: return VideoSearchPage(page = currentPage)
@@ -197,14 +202,18 @@ class BiliClient(
         }
     }
 
-    private suspend inline fun <reified T : Any> getJson(url: String, withCookie: Boolean = true): ApiResponse<T> =
+    private suspend inline fun <reified T : Any> getJson(
+        url: String,
+        withCookie: Boolean = true,
+        includeFingerprint: Boolean = true,
+    ): ApiResponse<T> =
         withContext(Dispatchers.IO) {
             val builder = Request.Builder()
                 .url(url)
                 .header("User-Agent", UA)
                 .header("Referer", "https://www.bilibili.com/")
                 .header("Accept", "application/json, text/plain, */*")
-            if (withCookie) buildCookieHeader()?.let { builder.header("Cookie", it) }
+            if (withCookie) buildCookieHeader(includeFingerprint)?.let { builder.header("Cookie", it) }
             http.newCall(builder.build()).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful || body.isEmpty()) throw BiliException(response.code, "HTTP ${response.code} $url")
@@ -212,11 +221,14 @@ class BiliClient(
             }
         }
 
-    private fun buildCookieHeader(): String? {
+    private fun buildCookieHeader(includeFingerprint: Boolean = true): String? {
         val existing = cookieHeader?.takeIf { it.isNotBlank() }
             ?: sessData?.takeIf { it.isNotBlank() }?.let { "SESSDATA=$it" }
-        val fingerprint = buvid3?.takeIf { !existing.orEmpty().contains("buvid3=") }
-            ?.let { "buvid3=$it" }
+        val fingerprint = if (includeFingerprint) {
+            buvid3?.takeIf { !existing.orEmpty().contains("buvid3=") }?.let { "buvid3=$it" }
+        } else {
+            null
+        }
         return listOfNotNull(existing, fingerprint).joinToString("; ").takeIf { it.isNotBlank() }
     }
 
