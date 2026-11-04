@@ -214,7 +214,7 @@ internal fun DarkModeToggle(darkMode: Boolean, onToggle: () -> Unit) {
 @Composable
 internal fun EmptyCard(title: String, text: String, darkMode: Boolean = false) {
     Column(Modifier.fillMaxWidth().background(if (darkMode) Color(0xFF24272D) else Color.White.copy(alpha = .7f), RoundedCornerShape(24.dp)).padding(24.dp)) {
-        Text(title, color = if (darkMode) Color(0xFFE7E9ED) else HomeInk, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Text(title, color = if (darkMode) DarkInkSoft else HomeInk, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
         Text(text, color = if (darkMode) Color(0xFF9BA3AE) else HomeMuted, fontSize = 14.sp, lineHeight = 22.sp)
     }

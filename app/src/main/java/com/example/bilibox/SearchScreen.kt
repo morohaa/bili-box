@@ -150,7 +150,7 @@ internal fun SearchLoading(darkMode: Boolean = false) {
 @Composable
 internal fun SearchError(message: String, darkMode: Boolean = false, onRetry: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("暂时没有搜到结果", color = if (darkMode) Color(0xFFE7E9ED) else Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Text("暂时没有搜到结果", color = if (darkMode) DarkInkSoft else Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         Text(message, color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 12.sp)
         Spacer(Modifier.height(16.dp))
@@ -209,7 +209,7 @@ internal fun SearchResults(
 @Composable
 private fun SearchResultBar(count: Int, darkMode: Boolean) {
     val muted = if (darkMode) Color(0xFF9BA3AE) else Muted
-    val strong = if (darkMode) Color(0xFFE7E9ED) else Ink
+    val strong = if (darkMode) DarkInkSoft else Ink
     Text(
         text = buildAnnotatedString {
             withStyle(SpanStyle(color = muted)) { append("找到 ") }
@@ -248,7 +248,7 @@ private fun SearchResultCard(video: SearchVideo, darkMode: Boolean, modifier: Mo
         Box(Modifier.weight(1f).height(90.dp)) {
             Text(
                 video.title,
-                color = if (darkMode) Color(0xFFE7E9ED) else Ink,
+                color = if (darkMode) DarkInkSoft else Ink,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
@@ -293,7 +293,7 @@ private fun SearchGridCard(video: SearchVideo, darkMode: Boolean, modifier: Modi
         Spacer(Modifier.height(7.dp))
         Text(
             video.title,
-            color = if (darkMode) Color(0xFFE7E9ED) else Ink,
+            color = if (darkMode) DarkInkSoft else Ink,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             lineHeight = 18.sp,

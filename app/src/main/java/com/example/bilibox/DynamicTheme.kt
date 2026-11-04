@@ -6,6 +6,9 @@ import androidx.compose.ui.graphics.Color
 /** 设计稿里的回弹曲线 cubic-bezier(.34, 1.56, .64, 1)，用于搜索态展开/收起。 */
 internal val BrandSpringEasing = CubicBezierEasing(0.34f, 1.56f, 0.64f, 1f)
 
+/** 夜间模式正文色：比纯白柔和，避免在 #121314 上显得刺眼。 */
+internal val DarkInkSoft = Color(0xFFC9CED6)
+
 /** 动态页与底部玻璃导航共用的配色，色值取自参考稿。 */
 internal data class DynamicColors(
     val background: Color,
@@ -30,7 +33,7 @@ internal fun dynamicColors(darkMode: Boolean): DynamicColors = if (darkMode) {
     DynamicColors(
         background = Color(0xFF121314),
         card = Color(0xFF1D1F21),
-        ink = Color(0xFFE7E9EB),
+        ink = DarkInkSoft,
         ink2 = Color(0xFFA2A7AE),
         ink3 = Color(0xFF6D7278),
         line = Color(0xFF2C2F33),
