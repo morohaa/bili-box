@@ -10,5 +10,6 @@ local assets, so each page renders standalone (open it in a browser as-is).
 | `bili_search_ui.html` | Video search results redesign |
 | `bili_profile_redesign.html` | Profile tab, profile card redesign |
 | `bili_profile_official.html` | Profile tab, official-style rebuild |
+| `bili_dynamic_search.html` | Dynamic tab: search landing, typing state and results |
 
 `*_preview.png` are full-page screenshots of the two profile variants.

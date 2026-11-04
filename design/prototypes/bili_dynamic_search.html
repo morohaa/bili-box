@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>搜索</title>
+<style>
+:root{
+  color-scheme:light;
+  --pink:#FB7299; --pink-deep:#E85A85; --pink-soft:#FFECF1; --blue:#00AEEC;
+  --bg:#F6F7F8; --card:#FFFFFF; --ink:#18191C; --ink2:#61666D; --ink3:#9499A0; --line:#E3E5E7;
+  --field:#FFFFFF; --glass:rgba(255,255,255,.72);
+  --font:"HarmonyOS Sans SC","MiSans","PingFang SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  
+  /* bilibox Logo 变量 */
+  --pink-brand: #FF3D77;
+  --rose-gold: #E5A87B;
+  --bx-top: url(#bx-top-light);
+  --bx-left: url(#bx-left-light);
+  --bx-right: url(#bx-right-light);
+}
+body.dark{
+  color-scheme:dark;
+  --pink-soft:#3A2129; --bg:#121314; --card:#1D1F21; --ink:#E7E9EB; --ink2:#A2A7AE; --ink3:#6D7278; --line:#2C2F33;
+  --field:#1D1F21; --glass:rgba(32,34,37,.72);
+
+  /* bilibox Logo 暗色变量 */
+  --pink-brand: #FF6B9D;
+  --rose-gold: #FFCBA4;
+  --bx-top: url(#bx-top-dark);
+  --bx-left: url(#bx-left-dark);
+  --bx-right: url(#bx-right-dark);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:var(--font);background:#DADDE1;display:grid;place-items:center;min-height:100vh;color:var(--ink);transition:background .3s}
+body.dark{background:#050506}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:10px}
+svg{display:block}
+
+.device{width:390px;height:844px;border-radius:44px;overflow:hidden;position:relative;background:var(--bg);
+  box-shadow:0 0 0 10px #1b1c1e,0 30px 80px rgba(0,0,0,.35);transition:background .3s}
+@media (max-width:500px){
+  body{display:block;background:var(--bg)}
+  .device{width:100%;height:100vh;height:100dvh;border-radius:0;box-shadow:none}
+}
+
+/* status bar */
+.status{height:44px;padding:0 26px;display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.status .sig{display:flex;gap:6px;align-items:center}
+
+/* scroll area */
+.scroll{position:absolute;inset:44px 0 0 0;overflow-y:auto;padding-bottom:120px;scrollbar-width:none;overflow-anchor:none}
+.scroll::-webkit-scrollbar{display:none}
+
+/* ---------------- 核心动效区 ---------------- */
+
+/* Logo 容器 */
+.logo-wrap{
+  display: flex;
+  justify-content: center; 
+  align-items: flex-end;
+  height: 48px; 
+  margin-bottom: 16px; 
+  overflow: hidden;
+  opacity: 1;
+  will-change: margin-top, height, opacity;
+  transition: margin-top 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              margin-bottom 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              opacity 0.4s ease;
+}
+.logo{
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  animation: rise .7s cubic-bezier(.22, 1, .36, 1) both;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes rise{
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+.logo .pink { color: var(--pink-brand); }
+
+/* 修复 b 字体的渐变切边问题 */
+.logo .bridge {
+  color: var(--rose-gold);
+  background: linear-gradient(135deg, var(--pink-brand) 10%, var(--rose-gold) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  padding-right: 0.05em;
+  margin-right: -0.05em; 
+}
+.logo .gold { color: var(--rose-gold); }
+.logo .box{
+  flex: none;
+  width: 0.62em;
+  height: 0.62em;
+  margin: 0 0.08em;
+  transform-origin: 50% 100%;
+  transition: transform .5s cubic-bezier(.34, 1.56, .64, 1);
+  filter: drop-shadow(0 0.04em 0.05em rgba(255, 61, 119, 0.15));
+}
+body.dark .logo .box{
+  filter: drop-shadow(0 0.04em 0.06em rgba(255, 61, 119, 0.2));
+}
+
+/* 首页状态：把搜索框推到屏幕视觉中心 */
+.mode-home .logo-wrap {
+  margin-top: calc(50vh - 100px); 
+}
+
+/* 离开首页：Logo 收起并飞走 */
+#app:not(.mode-home) .logo-wrap {
+  margin-top: 0;
+  height: 0;
+  margin-bottom: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+#app:not(.mode-home) .logo {
+  transform: translateY(-40px) scale(0.85) rotate(-2deg);
+}
+
+/* 搜索栏外层容器 */
+.field-wrap{
+  position:sticky;top:0;z-index:5;
+  padding:0 16px 10px;
+  background:var(--bg);
+  transition:background .3s, padding 0.3s ease;
+}
+
+/* 拆分后的搜索行布局 */
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* 增加元素间的呼吸感 */
+  width: 100%;
+}
+
+/* 纯圆角输入框容器 */
+.field-container {
+  flex: 1;
+  min-width: 0;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 输入框本体（胶囊形，高度降为 44px） */
+.field{
+  height: 44px;
+  border-radius: 22px; 
+  background: var(--field);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1.5px solid transparent;
+  will-change: transform, box-shadow;
+  transition: 
+    box-shadow 0.4s ease,
+    border-color 0.3s ease,
+    padding 0.3s ease;
+}
+.field:focus-within{border-color:var(--pink)}
+.field input{flex:1;border:0;outline:0;background:none;font-size:15px;min-width:0}
+.field input::placeholder{color:var(--ink3)}
+
+/* 隐藏 WebKit 原生的搜索清除按钮 */
+.field input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  display: none;
+}
+
+/* 外部返回按钮 */
+.back-btn {
+  height: 44px;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink2);
+  flex: none;
+  border-radius: 50%; /* 圆形点击反馈 */
+  transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              opacity 0.3s ease;
+}
+.typing .back-btn, .showing .back-btn {
+  width: 32px; /* 扩大宽度，不再单薄 */
+  opacity: 1;
+}
+.back-btn:active {
+  color: var(--ink);
+  background: var(--line);
+}
+
+/* 搜索图标 */
+.ico-search {
+  color: var(--pink);
+  flex: none;
+  transition: transform 0.4s;
+}
+
+/* 输入框内的清空按钮 */
+.clear{width:24px;height:24px;border-radius:50%;display:none;place-items:center;color:var(--ink3);}
+.has-text .clear{display:grid}
+
+/* 外部搜索按钮（高度对齐，收窄宽度） */
+.go{
+  height: 44px;
+  border-radius: 22px; 
+  background: var(--pink);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  flex: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 初始收起状态 */
+  width: 0;
+  opacity: 0;
+  transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              opacity 0.3s ease,
+              transform 0.4s ease;
+}
+.typing .go, .showing .go {
+  width: 62px; /* 宽度恰到好处 */
+  opacity: 1;
+}
+.go:active{background:var(--pink-deep); transform: scale(0.95);}
+
+/* 首页时的搜索框状态 */
+.mode-home .field {
+  box-shadow: 0 12px 36px rgba(251, 114, 153, 0.15), 0 2px 8px rgba(0,0,0,.02);
+}
+.mode-home .ico-search {
+  transform: scale(1.1);
+}
+
+/* 吸顶时的搜索框状态 */
+#app:not(.mode-home) .field {
+  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(24,25,28,.05);
+}
+
+/* 修正吸顶时的顶栏 padding */
+#app:not(.mode-home) .field-wrap {
+  padding-top: 16px;
+}
+
+/* ---------------- 搜索历史模块 ---------------- */
+.hist-sec {
+  display: none;
+  padding: 8px 16px 16px;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+/* 当处于打字状态且不是显示结果时，展示搜索历史 */
+.typing:not(.showing) .hist-sec {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px; padding: 0 4px;}
+.sec-h h2{font-size:15px;font-weight:700;color:var(--ink);}
+.sec-h button{font-size:13px;color:var(--ink3); transition: color 0.2s;}
+.sec-h button:active{color:var(--ink);}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+
+/* 历史标签的消失动画 */
+.chip{
+  height:34px;padding:0 14px;border-radius:17px;background:var(--card);font-size:14px;color:var(--ink);
+  display:inline-flex;align-items:center;gap:6px;max-width:100%;cursor:pointer;
+}
+.chip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@keyframes chipDrop {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(10px) scale(0.85); }
+}
+.chip.dropping {
+  animation: chipDrop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  pointer-events: none;
+}
+
+/* 空历史提示文字淡入 */
+.no-hist-text {
+  font-size: 13px; color: var(--ink3); padding: 4px;
+  animation: fadeIn 0.3s ease both;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---------------- 其余 UI 样式 ---------------- */
+.results{display:none}
+.showing .home{display:none}
+.showing .results{display:block}
+
+.rtabs{display:flex;gap:22px;padding:4px 20px 0;border-bottom:1px solid var(--line);position:sticky;top:116px;background:var(--bg);z-index:4}
+.rtabs button{height:40px;font-size:15px;color:var(--ink2);position:relative}
+.rtabs button[aria-selected="true"]{color:var(--ink);font-weight:700}
+.rtabs button[aria-selected="true"]::after{content:"";position:absolute;left:50%;bottom:0;width:18px;height:3px;border-radius:2px;background:var(--pink);transform:translateX(-50%)}
+.rlist{padding:6px 16px}
+.rv{display:flex;gap:12px;padding:10px 0;text-align:left;width:100%}
+.rv .thumb{width:150px;flex:none;aspect-ratio:16/10}
+.rv .meta{flex:1;min-width:0;display:flex;flex-direction:column}
+.rv h3{font-size:14px;font-weight:500;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rv h3 em{font-style:normal;color:var(--pink-deep)}
+.rv small{margin-top:auto;font-size:12px;color:var(--ink3);display:flex;align-items:center;gap:4px}
+.rv small+small{margin-top:3px}
+.empty{padding:60px 30px;text-align:center;color:var(--ink2);font-size:14px;line-height:1.7}
+
+.thumb{aspect-ratio:16/10;border-radius:12px;position:relative;overflow:hidden}
+.thumb .dur{position:absolute;right:6px;bottom:8px;font-size:11px;color:#fff;background:rgba(0,0,0,.5);padding:1px 5px;border-radius:4px;font-variant-numeric:tabular-nums}
+.thumb .src{position:absolute;left:6px;top:6px;font-size:10px;color:#fff;background:rgba(0,0,0,.4);padding:1px 6px;border-radius:4px}
+
+.nav{position:absolute;left:24px;right:24px;bottom:22px;height:66px;border-radius:33px;display:flex;padding:5px;z-index:10;
+  background:var(--glass);backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
+  border:1px solid rgba(255,255,255,.6);box-shadow:0 10px 30px rgba(24,25,28,.12),inset 0 1px 0 rgba(255,255,255,.7)}
+body.dark .nav{border-color:rgba(255,255,255,.08);box-shadow:0 10px 30px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
+.nav button{flex:1;border-radius:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;color:var(--ink2)}
+.nav button[aria-current="page"]{color:var(--pink);font-weight:600;background:rgba(251,114,153,.12)}
+.typing .nav,.showing .nav{transform:translateY(120px)}
+.nav{transition:transform .4s cubic-bezier(0.34, 1.56, 0.64, 1)}
+
+.toast{position:absolute;left:50%;bottom:110px;transform:translate(-50%,20px);opacity:0;background:rgba(24,25,28,.88);color:#fff;font-size:13px;padding:9px 16px;border-radius:20px;transition:.25s;pointer-events:none;white-space:nowrap;z-index:20}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+  <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;overflow:hidden">
+    <defs>
+      <linearGradient id="bx-top-light" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF0E6"/><stop offset="1" stop-color="#FFD4C2"/></linearGradient>
+      <linearGradient id="bx-left-light" x1="0" y1="0" x2="0.7" y2="1"><stop offset="0" stop-color="#F2B999"/><stop offset="1" stop-color="#E5A87B"/></linearGradient>
+      <linearGradient id="bx-right-light" x1="0" y1="0" x2="0.7" y2="1"><stop offset="0" stop-color="#D9976B"/><stop offset="1" stop-color="#C77E56"/></linearGradient>
+      <linearGradient id="bx-top-dark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFF5F0"/><stop offset="1" stop-color="#FFE2D1"/></linearGradient>
+      <linearGradient id="bx-left-dark" x1="0" y1="0" x2="0.7" y2="1"><stop offset="0" stop-color="#FFD4BA"/><stop offset="1" stop-color="#FFCBA4"/></linearGradient>
+      <linearGradient id="bx-right-dark" x1="0" y1="0" x2="0.7" y2="1"><stop offset="0" stop-color="#F2B48F"/><stop offset="1" stop-color="#E59B72"/></linearGradient>
+    </defs>
+  </svg>
+
+  <div class="device" id="app">
+    <div class="status">
+      <span id="clock">15:21</span>
+      <span class="sig">
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1" opacity=".35"/></svg>
+        <svg width="26" height="12" viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="15" height="8" rx="2" fill="currentColor"/><rect x="24" y="4" width="2" height="4" rx="1" fill="currentColor" opacity=".4"/></svg>
+      </span>
+    </div>
+
+    <main class="scroll" id="scroll">
+      <div class="logo-wrap">
+        <div class="logo" role="img" aria-label="bilibox">
+          <span class="pink">bili</span><span class="bridge">b</span><svg class="box" viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,3 95,26.5 50,50 5,26.5" fill="var(--bx-top)"/><polygon points="5,26.5 50,50 50,97 5,73.5" fill="var(--bx-left)"/><polygon points="95,26.5 50,50 50,97 95,73.5" fill="var(--bx-right)"/></svg><span class="gold">x</span>
+        </div>
+      </div>
+
+      <div class="field-wrap">
+        <div class="search-row">
+          <!-- 扩大宽度并增加点击反馈 -->
+          <button type="button" class="back-btn" id="backBtn" aria-label="返回">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+
+          <div class="field-container">
+            <form class="field" id="form" role="search" onsubmit="event.preventDefault(); search();">
+              <svg class="ico-search" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input id="q" type="search" placeholder="输入关键词、BV 号或粘贴链接" autocomplete="off" aria-label="搜索">
+              <button type="button" class="clear" id="clearBtn" aria-label="清空输入">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" opacity=".25"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </button>
+            </form>
+          </div>
+
+          <!-- 宽度收窄，高度对齐 -->
+          <button type="button" class="go" onclick="search()">搜索</button>
+        </div>
+      </div>
+
+      <div class="hist-sec" id="histSec">
+        <div class="sec-h"><h2>最近搜过</h2><button id="clearHistBtn">清空</button></div>
+        <div class="chips" id="hist"></div>
+      </div>
+
+      <div class="home"></div>
+
+      <div class="results" id="results">
+        <div class="rtabs" role="tablist" id="rtabs">
+          <button role="tab" aria-selected="true" data-t="all">综合</button>
+          <button role="tab" aria-selected="false" data-t="online">B 站视频</button>
+          <button role="tab" aria-selected="false" data-t="local">本机</button>
+        </div>
+        <div class="rlist" id="rlist"></div>
+      </div>
+    </main>
+
+    <nav class="nav" aria-label="主导航">
+      <button aria-current="page">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="6" width="18" height="14" rx="4"/><path d="M8 3l2 3M16 3l-2 3M9 12v2M15 12v2"/></svg>动态</button>
+      <button onclick="toast('视频')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="15" rx="3"/><path d="M7 3h10M10.5 10.5v6l5-3z"/></svg>视频</button>
+      <button onclick="toast('我的')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>我的</button>
+    </nav>
+    <div class="toast" id="toast" role="status"></div>
+  </div>
+
+<script>
+const $ = s => document.querySelector(s);
+const app = $('#app'), q = $('#q');
+const grad = i => ['linear-gradient(135deg,#FFB3C7,#FB7299)','linear-gradient(135deg,#9BE3FF,#00AEEC)','linear-gradient(135deg,#FFD9A0,#F59E5B)','linear-gradient(135deg,#C9B8FF,#7C6CF0)','linear-gradient(135deg,#B6F0D2,#2BB673)','linear-gradient(135deg,#D6DAE0,#7A8290)'][i%6];
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let searchHistory = ['线性代数 3Blue1Brown', '番茄炒蛋 王刚', '进击的巨人 S4E28', 'Kotlin 协程', '雨中漫步 4K'];
+
+const pool = [
+  {t:'【官方双语】线性代数的本质 合集', up:'3Blue1Brown', meta:'186.2 万播放', dur:'2:41:10', local:false},
+  {t:'线性代数 期末复习 两小时速通', up:'考研数学周老师', meta:'42.7 万播放', dur:'2:03:55', local:false},
+  {t:'MIT 18.06 线性代数 Gilbert Strang 中英字幕', up:'网易公开课搬运', meta:'97.1 万播放', dur:'35:12', local:false},
+  {t:'线性代数 第一章 行列式.mp4', up:'Download/学习', meta:'1.2 GB', dur:'48:20', local:true},
+  {t:'番茄炒蛋 王刚 家常版', up:'美食作家王刚R', meta:'1203 万播放', dur:'05:41', local:false},
+  {t:'进击的巨人 最终季 S4E28.mkv', up:'Download/Anime', meta:'1.4 GB', dur:'23:40', local:true},
+  {t:'Kotlin 协程 原理与实战', up:'Android 开发者', meta:'12.4 万播放', dur:'58:30', local:false},
+  {t:'Jetpack Compose 从入门到实战', up:'扔物线', meta:'33.0 万播放', dur:'1:12:00', local:false},
+  {t:'雨中漫步 4K 东京街头', up:'Rambalac', meta:'8.3 万播放', dur:'1:02:44', local:false},
+  {t:'VID_20261012_ 城墙骑行.mp4', up:'Camera', meta:'312 MB', dur:'03:18', local:true}
+];
+
+const icoFile = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M10 9.5v5l4-2.5z"/></svg>';
+const icoUp = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M8 3l2 3M16 3l-2 3"/></svg>';
+
+let tab = 'all';
+
+function renderHistory(){
+  const box = $('#hist');
+  if (searchHistory.length === 0) {
+    box.innerHTML = '<span class="no-hist-text">暂无搜索历史</span>';
+    return;
+  }
+  box.innerHTML = searchHistory.map((h, i) => `<button class="chip" data-i="${i}"><span>${esc(h)}</span></button>`).join('');
+}
+
+$('#hist').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (!c) return;
+  q.value = searchHistory[+c.dataset.i];
+  search();
+});
+
+// 带有动画的清空逻辑
+$('#clearHistBtn').onclick = () => {
+  const chips = document.querySelectorAll('.chip');
+  if (chips.length === 0) return;
+  
+  chips.forEach((chip, index) => {
+    chip.style.animation = `chipDrop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards`;
+    chip.style.animationDelay = `${index * 20}ms`; // 交错下落
+  });
+
+  // 等最后一颗下落完后重绘
+  setTimeout(() => {
+    searchHistory = [];
+    renderHistory();
+  }, 300 + chips.length * 20);
+};
+
+function hl(text, kw){
+  if(!kw) return esc(text);
+  const i = text.toLowerCase().indexOf(kw.toLowerCase());
+  if(i<0) return esc(text);
+  return esc(text.slice(0,i))+'<em>'+esc(text.slice(i,i+kw.length))+'</em>'+esc(text.slice(i+kw.length));
+}
+function match(kw){
+  const k = kw.trim().toLowerCase(); if(!k) return [];
+  return pool.filter(v => v.t.toLowerCase().includes(k) || v.up.toLowerCase().includes(k) ||
+    k.split(/\s+/).some(w => w && v.t.toLowerCase().includes(w)));
+}
+
+function renderResults(){
+  const kw = q.value.trim();
+  let list = match(kw);
+  if(tab!=='all') list = list.filter(v => (tab==='local') === v.local);
+  $('#rlist').innerHTML = list.length ? list.map((v,i)=>`
+    <button class="rv" onclick="toast('播放：${esc(v.t).replace(/'/g,'')}')">
+      <div class="thumb" style="background:${grad(i+2)}"><span class="src">${v.local?'本机':'B 站'}</span><span class="dur">${v.dur}</span></div>
+      <div class="meta"><h3>${hl(v.t, kw)}</h3>
+        <small>${v.local?icoFile.replace(/18/g,'12'):icoUp} ${esc(v.up)}</small><small>${esc(v.meta)}</small></div>
+    </button>`).join('')
+    : `<div class="empty">没有找到“${esc(kw)}”相关的${tab==='local'?'本机视频':tab==='online'?'B 站视频':'视频'}。<br>换个关键词，或者检查一下拼写。</div>`;
+}
+document.querySelectorAll('#rtabs button').forEach(b=>b.onclick=()=>{
+  tab = b.dataset.t;
+  document.querySelectorAll('#rtabs button').forEach(x=>x.setAttribute('aria-selected', x===b));
+  renderResults();
+});
+
+function setMode(m){
+  app.classList.toggle('typing', m==='typing');
+  app.classList.toggle('showing', m==='results');
+  app.classList.toggle('has-text', !!q.value);
+  app.classList.toggle('mode-home', m === 'home');
+}
+function search(){
+  const kw = q.value.trim(); if(!kw) return;
+  searchHistory = [kw, ...searchHistory.filter(h => h !== kw)].slice(0, 10);
+  renderHistory();
+
+  tab = 'all'; 
+  document.querySelectorAll('#rtabs button').forEach(x=>x.setAttribute('aria-selected', x.dataset.t===tab));
+  q.blur(); renderResults(); setMode('results'); $('#scroll').scrollTop = 0;
+}
+
+q.addEventListener('focus', ()=>{ setMode('typing'); });
+q.addEventListener('input', ()=>{ setMode('typing'); });
+q.addEventListener('blur', ()=>{
+  setTimeout(() => {
+    if(!q.value && !app.classList.contains('showing')) {
+      setMode('home');
+    }
+  }, 150);
+});
+$('#clearBtn').onclick = ()=>{ q.value=''; setMode('typing'); q.focus(); };
+
+$('#backBtn').onclick = () => {
+  q.value = '';
+  setMode('home');
+  q.blur();
+};
+
+let tt; function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('on'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),1400); }
+function tick(){ const d=new Date(); $('#clock').textContent = d.getHours()+':'+String(d.getMinutes()).padStart(2,'0'); }
+tick(); setInterval(tick, 30000);
+renderHistory();
+setMode('home');
+</script>
+</body>
+</html>

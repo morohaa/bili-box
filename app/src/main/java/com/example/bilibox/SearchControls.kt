@@ -7,8 +7,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,15 +20,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -52,89 +46,26 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * 搜索页固定顶栏：返回 + 搜索框 + 搜索按钮，以及排序、筛选、单双列切换。
+ * 搜索结果上方的排序 / 筛选 / 单双列控制条。
  *
- * 样式对齐设计稿 v2：搜索行 44dp、输入框 40dp 圆角 20dp、
- * 控制行 34dp 胶囊，排序弹层与筛选面板紧贴顶栏。
+ * 搜索行本身由 [DynamicPage] 绘制；这里只保留结果页需要的那一行，
+ * 样式沿用参考稿的白色胶囊 + 粉色高亮。
  */
-
-private val SearchAccentLight = Color(0xFFC92C63)
-private val SearchAccentDark = Color(0xFFFF9AB6)
-private val SearchSoftLight = Color(0xFFFFF0F5)
-private val SearchSoftDark = Color(0xFF2A1A21)
-private val SearchFillLight = Color(0xFFF2F3F5)
-private val SearchFillDark = Color(0xFF24272D)
-private val SearchLineLight = Color(0xFFE9EDF2)
-private val SearchLineDark = Color(0xFF30343A)
-private val SearchElevatedLight = Color.White
-private val SearchElevatedDark = Color(0xFF1F2226)
-
-private class SearchHeaderPalette(
-    val background: Color,
-    val elevated: Color,
-    val ink: Color,
-    val muted: Color,
-    val accent: Color,
-    val soft: Color,
-    val fill: Color,
-    val line: Color,
-    val clearFill: Color,
-    val clearInk: Color,
-    val onAccent: Color,
-)
-
-private fun searchHeaderPalette(darkMode: Boolean): SearchHeaderPalette = if (darkMode) {
-    SearchHeaderPalette(
-        background = Color(0xFF17191D),
-        elevated = SearchElevatedDark,
-        ink = Color(0xFFE7E9ED),
-        muted = Color(0xFF9BA3AE),
-        accent = SearchAccentDark,
-        soft = SearchSoftDark,
-        fill = SearchFillDark,
-        line = SearchLineDark,
-        clearFill = Color(0xFF3A3A40),
-        clearInk = Color(0xFFE8E8EC),
-        onAccent = Color(0xFF2A0A14),
-    )
-} else {
-    SearchHeaderPalette(
-        background = Color.White,
-        elevated = SearchElevatedLight,
-        ink = Ink,
-        muted = Muted,
-        accent = SearchAccentLight,
-        soft = SearchSoftLight,
-        fill = SearchFillLight,
-        line = SearchLineLight,
-        clearFill = Color(0xFFDCDCE1),
-        clearInk = Color(0xFF4A4A50),
-        onAccent = Color.White,
-    )
-}
-
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-internal fun SearchTopBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onSubmit: () -> Unit,
-    onBack: () -> Unit,
+internal fun SearchControlsBar(
     order: SearchOrder,
     onOrderChange: (SearchOrder) -> Unit,
     duration: SearchDuration?,
@@ -142,56 +73,30 @@ internal fun SearchTopBar(
     onFiltersChange: (SearchDuration?, SearchTimeRange?) -> Unit,
     gridLayout: Boolean,
     onToggleLayout: () -> Unit,
-    darkMode: Boolean = false,
+    colors: DynamicColors,
 ) {
-    val palette = searchHeaderPalette(darkMode)
-    val focusManager = LocalFocusManager.current
     val activeFilters = listOfNotNull(duration, timeRange).size
     var filterSheetOpen by rememberSaveable { mutableStateOf(false) }
-    val submit = {
-        focusManager.clearFocus()
-        onSubmit()
-    }
 
-    Column(
-        Modifier.fillMaxWidth()
-            .background(palette.background)
-            .statusBarsPadding()
-    ) {
+    Column(Modifier.fillMaxWidth()) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BackButton(palette, onBack)
-            Spacer(Modifier.width(6.dp))
-            SearchField(
-                query = query,
-                onQueryChange = onQueryChange,
-                onSearch = submit,
-                palette = palette,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(6.dp))
-            SubmitButton(palette, submit)
-        }
-        Row(
-            Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SortChip(order, palette, onOrderChange)
+            SortChip(order, colors, onOrderChange)
             Spacer(Modifier.weight(1f))
-            FilterChip(palette, activeCount = activeFilters) { filterSheetOpen = true }
+            FilterChip(colors, activeCount = activeFilters) { filterSheetOpen = true }
             Spacer(Modifier.width(8.dp))
-            LayoutButton(gridLayout, palette, onToggleLayout)
+            LayoutButton(gridLayout, colors, onToggleLayout)
         }
-        HorizontalDivider(color = palette.line, thickness = 1.dp)
+        HorizontalDivider(color = colors.line, thickness = 1.dp)
     }
 
     if (filterSheetOpen) {
         SearchFilterSheet(
             duration = duration,
             timeRange = timeRange,
-            palette = palette,
+            colors = colors,
             onDismiss = { filterSheetOpen = false },
             onApply = { selectedDuration, selectedRange ->
                 filterSheetOpen = false
@@ -204,152 +109,36 @@ internal fun SearchTopBar(
 }
 
 @Composable
-private fun BackButton(palette: SearchHeaderPalette, onBack: () -> Unit) {
-    Box(
-        Modifier.size(44.dp)
-            .clip(CircleShape)
-            .clickable(role = Role.Button, onClick = onBack)
-            .semantics { contentDescription = "返回" },
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.size(22.dp)) {
-            val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-            val path = Path().apply {
-                moveTo(size.width * .64f, size.height * .18f)
-                lineTo(size.width * .30f, size.height * .5f)
-                lineTo(size.width * .64f, size.height * .82f)
-            }
-            drawPath(path, palette.ink, style = stroke)
-        }
-    }
-}
-
-@Composable
-private fun SearchField(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
-    palette: SearchHeaderPalette,
-    modifier: Modifier = Modifier,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val focused by interactionSource.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(20.dp)
-    Row(
-        modifier.height(40.dp)
-            .clip(shape)
-            .background(if (focused) palette.background else palette.fill)
-            .border(1.5.dp, if (focused) palette.accent else Color.Transparent, shape)
-            .padding(start = 12.dp, end = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SearchGlyph(Modifier.size(17.dp), palette.muted)
-        Spacer(Modifier.width(8.dp))
-        BasicTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            textStyle = TextStyle(color = palette.ink, fontSize = 15.sp),
-            cursorBrush = SolidColor(palette.accent),
-            interactionSource = interactionSource,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-            decorationBox = { innerTextField ->
-                Box(contentAlignment = Alignment.CenterStart) {
-                    if (query.isEmpty()) {
-                        Text(
-                            "搜索视频、UP主",
-                            color = palette.muted,
-                            fontSize = 15.sp,
-                            maxLines = 1,
-                        )
-                    }
-                    innerTextField()
-                }
-            },
-        )
-        if (query.isNotEmpty()) {
-            ClearButton(palette) { onQueryChange("") }
-        }
-    }
-}
-
-@Composable
-private fun ClearButton(palette: SearchHeaderPalette, onClear: () -> Unit) {
-    Box(
-        Modifier.size(32.dp)
-            .clip(CircleShape)
-            .clickable(role = Role.Button, onClick = onClear)
-            .semantics { contentDescription = "清空搜索词" },
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(Modifier.size(18.dp)) {
-            drawCircle(palette.clearFill)
-            val stroke = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round)
-            drawLine(
-                palette.clearInk,
-                Offset(size.width * .34f, size.height * .34f),
-                Offset(size.width * .66f, size.height * .66f),
-                stroke.width,
-                StrokeCap.Round,
-            )
-            drawLine(
-                palette.clearInk,
-                Offset(size.width * .66f, size.height * .34f),
-                Offset(size.width * .34f, size.height * .66f),
-                stroke.width,
-                StrokeCap.Round,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SubmitButton(palette: SearchHeaderPalette, onSubmit: () -> Unit) {
-    Box(
-        Modifier.height(44.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(role = Role.Button, onClick = onSubmit)
-            .semantics { contentDescription = "搜索" }
-            .padding(horizontal = 6.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text("搜索", color = palette.accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
 private fun SortChip(
     order: SearchOrder,
-    palette: SearchHeaderPalette,
+    colors: DynamicColors,
     onSelect: (SearchOrder) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val background by animateColorAsState(
-        if (expanded) palette.soft else palette.fill,
+        if (expanded) colors.pinkSoft else colors.card,
         label = "sort chip background",
     )
     val content by animateColorAsState(
-        if (expanded) palette.accent else palette.ink,
+        if (expanded) colors.pink else colors.ink,
         label = "sort chip content",
     )
     val arrowRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "sort arrow")
 
     Box {
         Row(
-            Modifier.height(34.dp)
-                .clip(RoundedCornerShape(17.dp))
+            Modifier.height(30.dp)
+                .clip(RoundedCornerShape(15.dp))
                 .background(background)
                 .clickable(role = Role.Button) { expanded = !expanded }
                 .semantics { contentDescription = "排序方式：${order.label}" }
                 .padding(start = 12.dp, end = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(order.label, color = content, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text(order.label, color = content, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.width(6.dp))
-            Canvas(Modifier.size(10.dp).rotate(arrowRotation)) {
-                val stroke = Stroke(width = 1.7.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            Canvas(Modifier.size(9.dp).rotate(arrowRotation)) {
+                val stroke = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                 val path = Path().apply {
                     moveTo(size.width * .06f, size.height * .28f)
                     lineTo(size.width * .5f, size.height * .74f)
@@ -364,10 +153,10 @@ private fun SortChip(
             modifier = Modifier.width(152.dp),
             offset = DpOffset(0.dp, 2.dp),
             shape = RoundedCornerShape(14.dp),
-            containerColor = palette.elevated,
+            containerColor = colors.card,
             tonalElevation = 0.dp,
             shadowElevation = 14.dp,
-            border = BorderStroke(1.dp, palette.line),
+            border = BorderStroke(1.dp, colors.line),
         ) {
             Column(Modifier.padding(horizontal = 5.dp)) {
                 SearchOrder.entries.forEach { option ->
@@ -376,7 +165,7 @@ private fun SortChip(
                         Modifier.fillMaxWidth()
                             .height(42.dp)
                             .clip(RoundedCornerShape(9.dp))
-                            .background(if (selected) palette.soft else Color.Transparent)
+                            .background(if (selected) colors.pinkSoft else Color.Transparent)
                             .clickable(role = Role.Button) {
                                 expanded = false
                                 if (!selected) onSelect(option)
@@ -386,12 +175,12 @@ private fun SortChip(
                     ) {
                         Text(
                             option.label,
-                            color = if (selected) palette.accent else palette.ink,
+                            color = if (selected) colors.pink else colors.ink,
                             fontSize = 13.sp,
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                             modifier = Modifier.weight(1f),
                         )
-                        if (selected) CheckGlyph(Modifier.size(14.dp), palette.accent)
+                        if (selected) CheckGlyph(Modifier.size(14.dp), colors.pink)
                     }
                 }
             }
@@ -401,16 +190,16 @@ private fun SortChip(
 
 @Composable
 private fun FilterChip(
-    palette: SearchHeaderPalette,
+    colors: DynamicColors,
     activeCount: Int,
     onClick: () -> Unit,
 ) {
     val active = activeCount > 0
-    val content = if (active) palette.accent else palette.muted
+    val content = if (active) colors.pink else colors.ink2
     Row(
-        Modifier.height(34.dp)
-            .clip(RoundedCornerShape(17.dp))
-            .background(if (active) palette.soft else palette.fill)
+        Modifier.height(30.dp)
+            .clip(RoundedCornerShape(15.dp))
+            .background(if (active) colors.pinkSoft else colors.card)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = if (active) "筛选，已启用" else "筛选" }
             .padding(horizontal = 11.dp),
@@ -418,14 +207,14 @@ private fun FilterChip(
     ) {
         FunnelGlyph(Modifier.size(14.dp), content)
         Spacer(Modifier.width(5.dp))
-        Text("筛选", color = content, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Text("筛选", color = content, fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
         if (active) {
             Spacer(Modifier.width(6.dp))
             Box(
-                Modifier.size(16.dp).clip(CircleShape).background(palette.accent),
+                Modifier.size(16.dp).clip(CircleShape).background(colors.pink),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(activeCount.toString(), color = palette.onAccent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(activeCount.toString(), color = colors.onPink, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -434,21 +223,21 @@ private fun FilterChip(
 @Composable
 private fun LayoutButton(
     gridLayout: Boolean,
-    palette: SearchHeaderPalette,
+    colors: DynamicColors,
     onToggle: () -> Unit,
 ) {
     Box(
-        Modifier.size(34.dp)
+        Modifier.size(30.dp)
             .clip(CircleShape)
-            .background(palette.fill)
+            .background(colors.card)
             .clickable(role = Role.Button, onClick = onToggle)
             .semantics { contentDescription = if (gridLayout) "切换单列布局" else "切换双列布局" },
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(16.dp)) {
+        Canvas(Modifier.size(15.dp)) {
             val unit = size.minDimension / 24f
             val stroke = Stroke(width = 1.8f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round)
-            val tint = palette.muted
+            val tint = colors.ink2
             if (gridLayout) {
                 val corner = CornerRadius(1.2f * unit)
                 drawRoundRect(tint, Offset(3f * unit, 4f * unit), Size(5f * unit, 4.6f * unit), corner, style = stroke)
@@ -472,7 +261,7 @@ private fun LayoutButton(
 private fun SearchFilterSheet(
     duration: SearchDuration?,
     timeRange: SearchTimeRange?,
-    palette: SearchHeaderPalette,
+    colors: DynamicColors,
     onDismiss: () -> Unit,
     onApply: (SearchDuration?, SearchTimeRange?) -> Unit,
 ) {
@@ -484,8 +273,8 @@ private fun SearchFilterSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        containerColor = palette.elevated,
-        contentColor = palette.ink,
+        containerColor = colors.card,
+        contentColor = colors.ink,
         tonalElevation = 0.dp,
         dragHandle = null,
     ) {
@@ -494,7 +283,7 @@ private fun SearchFilterSheet(
                 Modifier.fillMaxWidth().padding(start = 18.dp, end = 8.dp, top = 12.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("筛选", color = palette.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("筛选", color = colors.ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
                 Box(
                     Modifier.size(40.dp)
@@ -506,14 +295,14 @@ private fun SearchFilterSheet(
                     Canvas(Modifier.size(20.dp)) {
                         val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
                         drawLine(
-                            palette.ink,
+                            colors.ink,
                             Offset(size.width * .18f, size.height * .18f),
                             Offset(size.width * .82f, size.height * .82f),
                             stroke.width,
                             StrokeCap.Round,
                         )
                         drawLine(
-                            palette.ink,
+                            colors.ink,
                             Offset(size.width * .82f, size.height * .18f),
                             Offset(size.width * .18f, size.height * .82f),
                             stroke.width,
@@ -524,49 +313,49 @@ private fun SearchFilterSheet(
             }
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 Spacer(Modifier.height(10.dp))
-                Text("时长", color = palette.muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("时长", color = colors.ink2, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(10.dp))
                 FlowRow(
                     modifier = Modifier.fillMaxWidth().selectableGroup(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    FilterOptionChip("全部", selected = draftDuration == null, palette = palette) { draftDuration = null }
+                    FilterOptionChip("全部", selected = draftDuration == null, colors = colors) { draftDuration = null }
                     SearchDuration.entries.forEach { option ->
-                        FilterOptionChip(option.label, selected = draftDuration == option, palette = palette) {
+                        FilterOptionChip(option.label, selected = draftDuration == option, colors = colors) {
                             draftDuration = if (draftDuration == option) null else option
                         }
                     }
                 }
                 Spacer(Modifier.height(18.dp))
-                Text("发布时间", color = palette.muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text("发布时间", color = colors.ink2, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(10.dp))
                 FlowRow(
                     modifier = Modifier.fillMaxWidth().selectableGroup(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    FilterOptionChip("全部", selected = draftTimeRange == null, palette = palette) { draftTimeRange = null }
+                    FilterOptionChip("全部", selected = draftTimeRange == null, colors = colors) { draftTimeRange = null }
                     SearchTimeRange.entries.forEach { option ->
-                        FilterOptionChip(option.label, selected = draftTimeRange == option, palette = palette) {
+                        FilterOptionChip(option.label, selected = draftTimeRange == option, colors = colors) {
                             draftTimeRange = if (draftTimeRange == option) null else option
                         }
                     }
                 }
                 Spacer(Modifier.height(16.dp))
             }
-            HorizontalDivider(color = palette.line, thickness = 1.dp)
+            HorizontalDivider(color = colors.line, thickness = 1.dp)
             Row(
                 Modifier.fillMaxWidth()
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                SheetButton("重置", palette, primary = false) {
+                SheetButton("重置", colors, primary = false) {
                     draftDuration = null
                     draftTimeRange = null
                 }
-                SheetButton("应用筛选", palette, primary = true) { onApply(draftDuration, draftTimeRange) }
+                SheetButton("应用筛选", colors, primary = true) { onApply(draftDuration, draftTimeRange) }
             }
         }
     }
@@ -576,21 +365,21 @@ private fun SearchFilterSheet(
 private fun FilterOptionChip(
     label: String,
     selected: Boolean,
-    palette: SearchHeaderPalette,
+    colors: DynamicColors,
     onClick: () -> Unit,
 ) {
     Box(
         Modifier.height(38.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) palette.soft else palette.fill)
-            .border(1.dp, if (selected) palette.accent else Color.Transparent, RoundedCornerShape(10.dp))
+            .background(if (selected) colors.pinkSoft else colors.background)
+            .border(1.dp, if (selected) colors.pink else Color.Transparent, RoundedCornerShape(10.dp))
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 15.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
-            color = if (selected) palette.accent else palette.ink,
+            color = if (selected) colors.pink else colors.ink,
             fontSize = 13.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
@@ -601,7 +390,7 @@ private fun FilterOptionChip(
 @Composable
 private fun RowScope.SheetButton(
     label: String,
-    palette: SearchHeaderPalette,
+    colors: DynamicColors,
     primary: Boolean,
     onClick: () -> Unit,
 ) {
@@ -609,36 +398,16 @@ private fun RowScope.SheetButton(
         Modifier.weight(1f)
             .height(44.dp)
             .clip(RoundedCornerShape(22.dp))
-            .background(if (primary) palette.accent else palette.fill)
+            .background(if (primary) colors.pink else colors.background)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
-            color = if (primary) palette.onAccent else palette.ink,
+            color = if (primary) colors.onPink else colors.ink,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
-        )
-    }
-}
-
-@Composable
-private fun SearchGlyph(modifier: Modifier = Modifier, tint: Color) {
-    Canvas(modifier) {
-        val stroke = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
-        drawCircle(
-            tint,
-            radius = size.minDimension * .3f,
-            center = Offset(size.width * .44f, size.height * .44f),
-            style = stroke,
-        )
-        drawLine(
-            tint,
-            Offset(size.width * .65f, size.height * .65f),
-            Offset(size.width * .9f, size.height * .9f),
-            stroke.width,
-            StrokeCap.Round,
         )
     }
 }

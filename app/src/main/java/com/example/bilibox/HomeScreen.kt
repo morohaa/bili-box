@@ -220,25 +220,42 @@ internal fun EmptyCard(title: String, text: String, darkMode: Boolean = false) {
     }
 }
 
-/** A single three-item capsule: (xxx). */
+/** 底部悬浮玻璃导航：三段胶囊，选中项用粉色浅底与粉色图标文字。 */
 @Composable
-internal fun LiquidNavigation(selected: Int, onSelect: (Int) -> Unit, backdrop: GraphicsLayer, darkMode: Boolean = false, modifier: Modifier = Modifier) {
+internal fun LiquidNavigation(
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    backdrop: GraphicsLayer,
+    darkMode: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    val colors = dynamicColors(darkMode)
     BoxWithConstraints(modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-        val itemWidth = (maxWidth - 12.dp) / 3
-        val indicatorOffset by animateDpAsState(itemWidth * selected.coerceIn(0, 2), label = "glass selection position")
-        GlassSurface(backdrop, darkMode, Modifier.fillMaxWidth().height(68.dp)) {
-            Box(Modifier.fillMaxSize().padding(6.dp)) {
-                val indicatorColors = if (darkMode) {
-                    listOf(Color(0xFF464C55), Color(0xFF343A43))
-                } else {
-                    listOf(Color.White.copy(alpha = .9f), Color.White.copy(alpha = .38f))
-                }
-                Box(Modifier.offset(x = indicatorOffset).width(itemWidth).fillMaxHeight()
-                    .background(Brush.verticalGradient(indicatorColors), CircleShape)
-                    .then(Modifier.clip(CircleShape)))
+        // 外层左右各留 5dp，让选中底色正好落在内层的一段宽度里。
+        val itemWidth = (maxWidth - 10.dp) / 3
+        val indicatorOffset by animateDpAsState(
+            targetValue = itemWidth * selected.coerceIn(0, 2),
+            animationSpec = tween(durationMillis = 420, easing = BrandSpringEasing),
+            label = "glass selection position",
+        )
+        GlassSurface(backdrop, darkMode, Modifier.fillMaxWidth().height(66.dp)) {
+            Box(Modifier.fillMaxSize().padding(5.dp)) {
+                Box(
+                    Modifier.offset(x = indicatorOffset)
+                        .width(itemWidth)
+                        .fillMaxHeight()
+                        .background(colors.pink.copy(alpha = .12f), CircleShape)
+                )
                 Row(Modifier.fillMaxSize().selectableGroup()) {
                     listOf("动态", "视频", "我的").forEachIndexed { index, title ->
-                        NavigationItem(index, title, selected == index, darkMode, { onSelect(index) }, Modifier.weight(1f))
+                        NavigationItem(
+                            index = index,
+                            title = title,
+                            selected = selected == index,
+                            colors = colors,
+                            onClick = { onSelect(index) },
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
             }
@@ -247,29 +264,61 @@ internal fun LiquidNavigation(selected: Int, onSelect: (Int) -> Unit, backdrop: 
 }
 
 @Composable
-private fun GlassSurface(backdrop: GraphicsLayer, darkMode: Boolean, modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+private fun GlassSurface(
+    backdrop: GraphicsLayer,
+    darkMode: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val colors = dynamicColors(darkMode)
     var position by remember { mutableStateOf(Offset.Zero) }
-    val blur = with(LocalDensity.current) { 18.dp.toPx() }
+    val blur = with(LocalDensity.current) { 20.dp.toPx() }
     val supportsBlur = android.os.Build.VERSION.SDK_INT >= 31
-    val shape = RoundedCornerShape(36.dp)
-    Box(modifier.onGloballyPositioned { position = it.positionInRoot() }
-        .graphicsLayer { shadowElevation = 18.dp.toPx(); this.shape = shape; ambientShadowColor = Color(0xFF5D7288).copy(alpha = .22f); spotShadowColor = Color(0xFF5D7288).copy(alpha = .22f) }) {
+    val shape = RoundedCornerShape(33.dp)
+    val tint = if (supportsBlur) {
+        listOf(colors.navGlassTop, colors.navGlassBottom)
+    } else if (darkMode) {
+        listOf(Color(0xFF24272B).copy(alpha = .97f), Color(0xFF1C1E21).copy(alpha = .97f))
+    } else {
+        listOf(Color.White.copy(alpha = .94f), Color(0xFFF2F4F6).copy(alpha = .92f))
+    }
+    Box(
+        modifier.onGloballyPositioned { position = it.positionInRoot() }
+            .graphicsLayer {
+                shadowElevation = 12.dp.toPx()
+                this.shape = shape
+                ambientShadowColor = colors.navShadow
+                spotShadowColor = colors.navShadow
+            }
+    ) {
         Box(Modifier.matchParentSize().clip(shape)) {
-            Box(Modifier.matchParentSize().graphicsLayer {
-                if (supportsBlur) renderEffect = BlurEffect(blur, blur, TileMode.Clamp)
-            }.drawWithContent { translate(-position.x, -position.y) { drawLayer(backdrop) } })
-            Box(Modifier.matchParentSize().background(Brush.verticalGradient(if (darkMode) {
-                listOf(Color(0xFF2B3038).copy(alpha = if (supportsBlur) .78f else .98f), Color(0xFF20242A).copy(alpha = if (supportsBlur) .82f else .98f))
-            } else {
-                listOf(Color.White.copy(alpha = if (supportsBlur) .62f else .93f), Color(0xFFF0F5FA).copy(alpha = if (supportsBlur) .38f else .92f))
-            })))
+            Box(
+                Modifier.matchParentSize().graphicsLayer {
+                    if (supportsBlur) renderEffect = BlurEffect(blur, blur, TileMode.Clamp)
+                }.drawWithContent { translate(-position.x, -position.y) { drawLayer(backdrop) } }
+            )
+            Box(Modifier.matchParentSize().background(Brush.verticalGradient(tint)))
             Canvas(Modifier.matchParentSize()) {
                 val stroke = 1.dp.toPx()
-                val edge = if (darkMode) Color(0xFF58616D) else Color.White
-                drawRoundRect(Brush.linearGradient(listOf(edge, edge.copy(alpha = .15f), edge.copy(alpha = .65f))),
-                    topLeft = Offset(stroke / 2, stroke / 2),
+                val inset = stroke / 2
+                drawRoundRect(
+                    colors.navEdge,
+                    topLeft = Offset(inset, inset),
                     size = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2), style = Stroke(stroke))
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2),
+                    style = Stroke(stroke),
+                )
+                if (!darkMode) {
+                    drawRoundRect(
+                        Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = .7f), Color.White.copy(alpha = 0f))
+                        ),
+                        topLeft = Offset(inset, inset),
+                        size = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2),
+                        style = Stroke(stroke),
+                    )
+                }
             }
         }
         content()
@@ -277,37 +326,79 @@ private fun GlassSurface(backdrop: GraphicsLayer, darkMode: Boolean, modifier: M
 }
 
 @Composable
-private fun NavigationItem(index: Int, title: String, selected: Boolean, darkMode: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val color by animateColorAsState(if (selected) HomePink else if (darkMode) Color(0xFFB4BDC8) else Color(0xFF667786), label = "navigation tint")
-    Column(modifier.fillMaxHeight().clip(CircleShape).selectable(selected, onClick = onClick, role = Role.Tab),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+private fun NavigationItem(
+    index: Int,
+    title: String,
+    selected: Boolean,
+    colors: DynamicColors,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val color by animateColorAsState(
+        targetValue = if (selected) colors.pink else colors.navIdle,
+        label = "navigation tint",
+    )
+    Column(
+        modifier.fillMaxHeight().clip(CircleShape).selectable(selected, onClick = onClick, role = Role.Tab),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
         NavIcon(index, color)
         Spacer(Modifier.height(3.dp))
-        Text(title, color = color, fontSize = 10.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+        Text(
+            title,
+            color = color,
+            fontSize = 11.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }
 
 @Composable
 private fun NavIcon(index: Int, tint: Color) {
-    Canvas(Modifier.size(23.dp)) {
+    Canvas(Modifier.size(24.dp)) {
         val unit = size.width / 24f
-        val stroke = Stroke(width = 1.8f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        fun line(x1: Float, y1: Float, x2: Float, y2: Float) = drawLine(tint, Offset(x1 * unit, y1 * unit), Offset(x2 * unit, y2 * unit), stroke.width, StrokeCap.Round)
+        val stroke = Stroke(width = 2f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        fun line(x1: Float, y1: Float, x2: Float, y2: Float) =
+            drawLine(tint, Offset(x1 * unit, y1 * unit), Offset(x2 * unit, y2 * unit), stroke.width, StrokeCap.Round)
         when (index) {
             0 -> {
-                drawRoundRect(tint, Offset(3 * unit, 6 * unit), androidx.compose.ui.geometry.Size(18 * unit, 15 * unit), androidx.compose.ui.geometry.CornerRadius(4 * unit), style = stroke)
-                line(8f, 2f, 10f, 6f); line(16f, 2f, 14f, 6f)
-                line(8f, 12f, 8f, 15f); line(16f, 12f, 16f, 15f)
+                drawRoundRect(
+                    tint,
+                    Offset(3 * unit, 6 * unit),
+                    androidx.compose.ui.geometry.Size(18 * unit, 14 * unit),
+                    androidx.compose.ui.geometry.CornerRadius(4 * unit),
+                    style = stroke,
+                )
+                line(8f, 3f, 10f, 6f)
+                line(16f, 3f, 14f, 6f)
+                line(9f, 12f, 9f, 14f)
+                line(15f, 12f, 15f, 14f)
             }
             1 -> {
-                drawRoundRect(tint, Offset(3 * unit, 7 * unit), androidx.compose.ui.geometry.Size(18 * unit, 14 * unit), androidx.compose.ui.geometry.CornerRadius(3 * unit), style = stroke)
+                drawRoundRect(
+                    tint,
+                    Offset(3 * unit, 6 * unit),
+                    androidx.compose.ui.geometry.Size(18 * unit, 15 * unit),
+                    androidx.compose.ui.geometry.CornerRadius(3 * unit),
+                    style = stroke,
+                )
                 line(7f, 3f, 17f, 3f)
-                val path = Path().apply { moveTo(10 * unit, 11 * unit); lineTo(15 * unit, 14 * unit); lineTo(10 * unit, 17 * unit); close() }
+                val path = Path().apply {
+                    moveTo(10.5f * unit, 10.5f * unit)
+                    lineTo(10.5f * unit, 16.5f * unit)
+                    lineTo(15.5f * unit, 13.5f * unit)
+                    close()
+                }
                 drawPath(path, tint, style = stroke)
             }
             else -> {
-                drawCircle(tint, 4 * unit, Offset(12 * unit, 7 * unit), style = stroke)
-                val path = Path().apply { moveTo(4 * unit, 21 * unit); cubicTo(4 * unit, 12 * unit, 20 * unit, 12 * unit, 20 * unit, 21 * unit) }
+                drawCircle(tint, 4 * unit, Offset(12 * unit, 8 * unit), style = stroke)
+                val path = Path().apply {
+                    moveTo(4 * unit, 21 * unit)
+                    cubicTo(5.5f * unit, 17 * unit, 8.5f * unit, 15 * unit, 12 * unit, 15 * unit)
+                    cubicTo(15.5f * unit, 15 * unit, 18.5f * unit, 17 * unit, 20 * unit, 21 * unit)
+                }
                 drawPath(path, tint, style = stroke)
             }
         }

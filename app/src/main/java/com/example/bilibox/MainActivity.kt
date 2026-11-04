@@ -172,7 +172,10 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     var searchTimeRange by rememberSaveable { mutableStateOf<SearchTimeRange?>(null) }
     var searchGrid by rememberSaveable { mutableStateOf(false) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
+    // 动态页处于搜索态（输入中或展示结果）时，底部导航随参考稿下滑隐藏。
+    var dynamicExpanded by rememberSaveable { mutableStateOf(false) }
     val pageScroll = rememberScrollState()
+    val dynamicScroll = rememberScrollState()
     // “我的”页是通栏头图，状态栏图标默认用白色压在图片上；头图滚出屏幕后
     // 状态栏落到浅色页面上，需要换回深色图标，否则会看不见。
     val bannerScrollPx = with(LocalDensity.current) { 200.dp.toPx() }
@@ -206,7 +209,8 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
             searchState = SearchState.Loading
             searchJob?.cancel()
             searchJob = scope.launch {
-                pageScroll.scrollTo(0)
+                // 新一轮搜索、翻页或筛选都从结果顶部开始；打开详情再返回时保留位置。
+                dynamicScroll.scrollTo(0)
                 searchState = try {
                     val result = searchClient.searchVideos(
                         keyword = keyword,
@@ -235,18 +239,26 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     var selectedLocalVideo by remember { mutableStateOf<LocalVideo?>(null) }
     var localPlaylist by remember { mutableStateOf<List<LocalVideo>>(emptyList()) }
     var libraryRefresh by remember { mutableIntStateOf(0) }
-    val searchActive = tab == 0 && searchState != SearchState.Idle
     val closeSearch = {
         searchJob?.cancel()
         searchState = SearchState.Idle
+        searchQuery = ""
         focusManager.clearFocus()
+    }
+    // 修改关键词即退出上一轮结果，回到“输入中”的历史面板（对齐参考稿）。
+    val updateQuery: (String) -> Unit = { value ->
+        searchQuery = value
+        if (searchState != SearchState.Idle) {
+            searchJob?.cancel()
+            searchState = SearchState.Idle
+        }
     }
     selectedVideo?.let { video ->
         BiliVideoDetail(video, session) { selectedVideo = null }
         return
     }
-    // 搜索结果是独立页面：系统返回键先退出搜索，再交给外层页面处理。
-    BackHandler(enabled = searchActive) { closeSearch() }
+    // 搜索态是动态页内部的独立界面：系统返回键先回到首页，再交给外层处理。
+    BackHandler(enabled = tab == 0 && dynamicExpanded) { closeSearch() }
     val backdrop = rememberGraphicsLayer()
     val appBackground = if (darkMode) Color(0xFF17191D) else Color(0xFFF4F6FA)
     Box(Modifier.fillMaxSize().background(appBackground)) {
@@ -254,102 +266,84 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
             backdrop.record { this@drawWithContent.drawContent() }
             drawLayer(backdrop)
         }) {
-            if (tab == 1) {
-                // The local-video browser owns its full-height layout so folders, the
-                // settings sheet and the floating resume card can use the whole screen.
-                LibraryPage(
-                    refreshToken = libraryRefresh,
-                    darkMode = darkMode,
-                    initialFilter = libraryFilter,
-                    onToggleDarkMode = onToggleDarkMode,
-                    onVideoSelected = { video, playlist ->
-                        localPlaylist = playlist
-                        selectedLocalVideo = video
-                    },
-                )
-            } else {
-                Column(Modifier.fillMaxSize()) {
-                    // “我的”页使用通栏头图，不再叠加固定顶栏；其余 Tab 共用同一条栏。
-                    // 固定顶栏：不跟随内容滚动，三个 Tab 共用尺寸与下边界。
-                    if (tab != 2) {
-                        if (searchActive) {
-                            SearchTopBar(
-                                query = searchQuery,
-                                onQueryChange = { searchQuery = it },
-                                onSubmit = { runSearch(1, searchOrder) },
-                                onBack = closeSearch,
-                                order = searchOrder,
-                                onOrderChange = { runSearch(1, it) },
-                                duration = searchDuration,
-                                timeRange = searchTimeRange,
-                                onFiltersChange = { duration, timeRange ->
-                                    searchDuration = duration
-                                    searchTimeRange = timeRange
-                                    runSearch(1, searchOrder)
-                                },
-                                gridLayout = searchGrid,
-                                onToggleLayout = { searchGrid = !searchGrid },
-                                darkMode = darkMode,
-                            )
-                        } else if (tab == 0) {
-                            AppTopBar(darkMode = darkMode) {
-                                DynamicTopBarContent(
-                                    query = searchQuery,
-                                    onQueryChange = { searchQuery = it },
-                                    onSearch = { runSearch(1, searchOrder) },
-                                    darkMode = darkMode,
-                                )
-                                Spacer(Modifier.width(2.dp))
-                                DarkModeToggle(darkMode, onToggleDarkMode)
-                            }
-                        } else {
-                            AppTopBar(darkMode = darkMode, onToggleDarkMode = onToggleDarkMode)
-                        }
-                    }
-                    // The scrollable page is captured once and shared by both glass surfaces.
-                    Column(
-                        Modifier.weight(1f).fillMaxWidth()
-                            .verticalScroll(pageScroll)
-                            .padding(horizontal = if (tab == 2) 0.dp else 16.dp)
-                    ) {
-                        when (tab) {
-                            0 -> when (val state = searchState) {
-                                SearchState.Idle -> Unit
-                                SearchState.Loading -> SearchLoading(darkMode)
-                                is SearchState.Error -> SearchError(state.message, darkMode) { runSearch(state.page, state.order) }
-                                is SearchState.Success -> {
-                                    SearchResults(
-                                        state = state,
-                                        darkMode = darkMode,
-                                        gridLayout = searchGrid,
-                                        onVideoClick = { selectedVideo = it },
-                                        onPageChange = { runSearch(it, state.order) },
-                                    )
-                                }
-                            }
-                            else -> MyPage(
-                                session = session,
-                                darkMode = darkMode,
-                                onToggleDarkMode = onToggleDarkMode,
-                                onOpenLibrary = { filter ->
-                                    libraryFilter = filter
-                                    selected = 1
-                                },
-                                onSessionChange = { session = it },
-                            )
-                        }
+            when (tab) {
+                1 -> {
+                    // The local-video browser owns its full-height layout so folders, the
+                    // settings sheet and the floating resume card can use the whole screen.
+                    LibraryPage(
+                        refreshToken = libraryRefresh,
+                        darkMode = darkMode,
+                        initialFilter = libraryFilter,
+                        onToggleDarkMode = onToggleDarkMode,
+                        onVideoSelected = { video, playlist ->
+                            localPlaylist = playlist
+                            selectedLocalVideo = video
+                        },
+                    )
+                }
+                2 -> {
+                    // “我的”页是通栏头图，独占整页滚动。
+                    Column(Modifier.fillMaxSize().verticalScroll(pageScroll)) {
+                        MyPage(
+                            session = session,
+                            darkMode = darkMode,
+                            onToggleDarkMode = onToggleDarkMode,
+                            onOpenLibrary = { filter ->
+                                libraryFilter = filter
+                                selected = 1
+                            },
+                            onSessionChange = { session = it },
+                        )
                         Spacer(Modifier.height(150.dp))
                         Spacer(Modifier.navigationBarsPadding())
                     }
                 }
+                else -> {
+                    DynamicPage(
+                        query = searchQuery,
+                        onQueryChange = updateQuery,
+                        onSearch = { runSearch(1, searchOrder) },
+                        onRetry = { page, order -> runSearch(page, order) },
+                        onVideoClick = { selectedVideo = it },
+                        onPageChange = { runSearch(it, searchOrder) },
+                        searchState = searchState,
+                        order = searchOrder,
+                        onOrderChange = { runSearch(1, it) },
+                        duration = searchDuration,
+                        timeRange = searchTimeRange,
+                        onFiltersChange = { duration, timeRange ->
+                            searchDuration = duration
+                            searchTimeRange = timeRange
+                            runSearch(1, searchOrder)
+                        },
+                        gridLayout = searchGrid,
+                        onToggleLayout = { searchGrid = !searchGrid },
+                        onExpandedChange = { dynamicExpanded = it },
+                        scrollState = dynamicScroll,
+                        darkMode = darkMode,
+                    )
+                }
             }
         }
         if (selectedLocalVideo == null) {
-            LiquidNavigation(tab, { index ->
-                libraryFilter = null
-                selected = index.coerceIn(0, 2)
-            }, backdrop, darkMode,
-                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp))
+            AnimatedVisibility(
+                visible = !(tab == 0 && dynamicExpanded),
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = tween(420, easing = BrandSpringEasing),
+                ) + fadeIn(tween(200)),
+                exit = slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(360, easing = BrandSpringEasing),
+                ) + fadeOut(tween(140)),
+            ) {
+                LiquidNavigation(tab, { index ->
+                    libraryFilter = null
+                    selected = index.coerceIn(0, 2)
+                }, backdrop, darkMode,
+                    Modifier.navigationBarsPadding().padding(bottom = 16.dp))
+            }
         }
         // Keep the library composed underneath so its folder position, search and
         // scroll state survive a playback session.
