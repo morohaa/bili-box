@@ -63,6 +63,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
+import io.github.bilibox.core.ui.component.coverBrush
+import io.github.bilibox.core.ui.component.rememberVideoThumbnail
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.Pink
@@ -76,6 +78,8 @@ import io.github.bilibox.data.localvideo.LocalVideoPlaybackState
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
 import io.github.bilibox.data.localvideo.LocalVideoSettings
 import io.github.bilibox.data.localvideo.LocalVideoSort
+import io.github.bilibox.data.localvideo.cachedVideoThumbnail
+import io.github.bilibox.data.localvideo.loadVideoThumbnail
 
 @Composable
 internal fun VideoList(
@@ -409,7 +413,9 @@ internal fun VideoThumbnail(
     modifier: Modifier = Modifier,
     showStatus: Boolean = true,
 ) {
-    val bitmap = rememberVideoThumbnail(video)
+    val bitmap = rememberVideoThumbnail(video.key, cachedVideoThumbnail(video.key)) { context ->
+        loadVideoThumbnail(context, video.uri, video.key)
+    }
     Box(modifier.clip(RoundedCornerShape(8.dp)).background(coverBrush(video.title))) {
         bitmap?.let { frame ->
             Image(
@@ -643,7 +649,11 @@ internal fun FolderCard(
 @Composable
 internal fun FolderCover(folder: LocalVideoFolder) {
     val cover = folder.cover
-    val bitmap = cover?.let { rememberVideoThumbnail(it) }
+    val bitmap = cover?.let { video ->
+        rememberVideoThumbnail(video.key, cachedVideoThumbnail(video.key)) { context ->
+            loadVideoThumbnail(context, video.uri, video.key)
+        }
+    }
     Box(Modifier.fillMaxSize().background(coverBrush(folder.path))) {
         if (bitmap != null) {
             Image(

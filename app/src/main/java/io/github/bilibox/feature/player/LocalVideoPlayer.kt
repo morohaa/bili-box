@@ -14,16 +14,18 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import io.github.bilibox.core.playback.LocalQueueMode
+import io.github.bilibox.core.ui.component.rememberVideoThumbnail
 import io.github.bilibox.data.localvideo.LocalPlaybackQueue
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.PlaybackProgressStore
+import io.github.bilibox.data.localvideo.cachedVideoThumbnail
+import io.github.bilibox.data.localvideo.loadVideoThumbnail
 import io.github.bilibox.data.localvideo.localListenSubtitle
-import io.github.bilibox.feature.library.LocalVideoIntro
-import io.github.bilibox.feature.library.LocalVideoMediaInfo
-import io.github.bilibox.feature.library.PlaybackModeSheet
-import io.github.bilibox.feature.library.rememberVideoThumbnail
 import io.github.bilibox.feature.listen.ListenControls
 import io.github.bilibox.feature.listen.ListenInfo
+import io.github.bilibox.feature.player.details.LocalVideoIntro
+import io.github.bilibox.feature.player.details.LocalVideoMediaInfo
+import io.github.bilibox.feature.player.details.PlaybackModeSheet
 import kotlinx.coroutines.delay
 
 @Composable
@@ -127,7 +129,9 @@ internal fun LocalVideoPlayer(
     val playbackByKey = remember(playlist, video.uri) {
         playlist.associate { item -> item.key to progressStore.playback(item.key, item.durationMs) }
     }
-    val listenThumbnail = rememberVideoThumbnail(video)
+    val listenThumbnail = rememberVideoThumbnail(video.key, cachedVideoThumbnail(video.key)) { context ->
+        loadVideoThumbnail(context, video.uri, video.key)
+    }
     VideoPlayerScreen(
         player = player,
         title = video.name,

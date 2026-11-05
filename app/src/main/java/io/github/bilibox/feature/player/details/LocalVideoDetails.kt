@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.library
+package io.github.bilibox.feature.player.details
 
 import androidx.compose.ui.graphics.Color
 import io.github.bilibox.data.localvideo.LocalVideo

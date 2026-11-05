@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.library
+package io.github.bilibox.feature.player.details
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -45,8 +45,11 @@ import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.core.util.formatBytes
+import io.github.bilibox.core.util.formatRelativeDate
 import io.github.bilibox.core.util.formatSpeedBadge
 import io.github.bilibox.core.util.formatVideoDuration
+import io.github.bilibox.core.util.resolutionLabel
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoPlayback
 import io.github.bilibox.feature.player.LocalPlayerDetailActions

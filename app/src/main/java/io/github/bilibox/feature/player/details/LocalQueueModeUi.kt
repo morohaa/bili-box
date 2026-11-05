@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.library
+package io.github.bilibox.feature.player.details
 
 import io.github.bilibox.core.playback.LocalQueueMode
 import io.github.bilibox.core.ui.component.AppIcon

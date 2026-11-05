@@ -3,7 +3,6 @@ package io.github.bilibox.feature.library
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.os.Build
 import android.text.format.Formatter
 import androidx.compose.foundation.background
@@ -25,13 +24,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -43,23 +39,19 @@ import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.Pink
+import io.github.bilibox.core.util.formatBytes
+import io.github.bilibox.core.util.formatFullDate
+import io.github.bilibox.core.util.formatRelativeDate
 import io.github.bilibox.core.util.formatVideoDuration
+import io.github.bilibox.core.util.frameRateLabel
+import io.github.bilibox.core.util.resolutionLabel
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoFolder
 import io.github.bilibox.data.localvideo.LocalVideoPlayback
 import io.github.bilibox.data.localvideo.LocalVideoPlaybackState
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
 import io.github.bilibox.data.localvideo.LocalVideoSettings
-import io.github.bilibox.data.localvideo.cachedVideoThumbnail
-import io.github.bilibox.data.localvideo.loadVideoThumbnail
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import kotlin.math.roundToInt
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @Composable
 internal fun PermissionState(onRequest: () -> Unit, onRecheck: () -> Unit) {
@@ -298,81 +290,6 @@ internal fun folderMetaParts(
         parts += MetaPart(resolutionLabel(folder.maxWidth, folder.maxHeight))
     }
     return parts
-}
-
-internal fun formatBytes(bytes: Long): String {
-    if (bytes <= 0L) return "0 B"
-    val gb = bytes / 1_000_000_000.0
-    if (gb >= 1.0) return "%.2f GB".format(gb)
-    val mb = bytes / 1_000_000.0
-    if (mb >= 1.0) return "%.0f MB".format(mb)
-    return "%.0f KB".format(bytes / 1_000.0)
-}
-
-internal fun resolutionLabel(width: Int, height: Int): String {
-    val shortSide = minOf(width, height)
-    return when {
-        shortSide >= 2160 -> "4K"
-        shortSide >= 1440 -> "2K"
-        shortSide >= 1080 -> "1080P"
-        shortSide >= 720 -> "720P"
-        shortSide >= 480 -> "480P"
-        else -> "${shortSide}P"
-    }
-}
-
-internal fun frameRateLabel(frameRate: Float): String {
-    val rounded = frameRate.roundToInt()
-    val text = if (kotlin.math.abs(frameRate - rounded) < .05f) {
-        "$rounded"
-    } else {
-        "%.2f".format(frameRate).trimEnd('0').trimEnd('.')
-    }
-    return "$text fps"
-}
-
-internal fun formatRelativeDate(milliseconds: Long): String {
-    if (milliseconds <= 0L) return "未知"
-    val zone = ZoneId.systemDefault()
-    val date = Instant.ofEpochMilli(milliseconds).atZone(zone).toLocalDate()
-    val today = LocalDate.now(zone)
-    val days = ChronoUnit.DAYS.between(date, today)
-    return when {
-        days <= 0L -> "今天"
-        days == 1L -> "昨天"
-        days < 7L -> "$days 天前"
-        date.year == today.year -> "${date.monthValue}月${date.dayOfMonth}日"
-        else -> "${date.year}年${date.monthValue}月${date.dayOfMonth}日"
-    }
-}
-
-internal fun formatFullDate(milliseconds: Long, formatter: DateTimeFormatter): String = if (milliseconds <= 0L) {
-    "未知"
-} else {
-    Instant.ofEpochMilli(milliseconds).atZone(ZoneId.systemDefault()).format(formatter)
-}
-
-internal fun coverBrush(seed: String): Brush {
-    val hash = seed.hashCode()
-    val hue = ((hash ushr 8) % 360 + 360) % 360
-    val secondHue = (hue + 42 + ((hash ushr 3) % 70)) % 360
-    return Brush.linearGradient(
-        listOf(
-            Color.hsl(hue.toFloat(), .46f, .44f),
-            Color.hsl(secondHue.toFloat(), .52f, .62f),
-        )
-    )
-}
-
-@Composable
-internal fun rememberVideoThumbnail(video: LocalVideo): Bitmap? {
-    val context = LocalContext.current
-    val bitmap by produceState<Bitmap?>(initialValue = cachedVideoThumbnail(video.key), video.key) {
-        if (value == null) {
-            value = withContext(Dispatchers.IO) { loadVideoThumbnail(context, video.uri, video.key) }
-        }
-    }
-    return bitmap
 }
 
 internal fun hasLocalVideoPermission(context: Context): Boolean {

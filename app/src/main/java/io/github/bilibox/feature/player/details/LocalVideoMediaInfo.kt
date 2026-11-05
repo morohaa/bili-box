@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.library
+package io.github.bilibox.feature.player.details
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -34,6 +34,8 @@ import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.util.formatVideoDuration
+import io.github.bilibox.core.util.frameRateLabel
+import io.github.bilibox.core.util.resolutionLabel
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.feature.player.LocalPlayerDetailActions
 import java.text.SimpleDateFormat

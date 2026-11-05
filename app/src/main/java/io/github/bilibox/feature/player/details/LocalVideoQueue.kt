@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.library
+package io.github.bilibox.feature.player.details
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -43,13 +43,19 @@ import io.github.bilibox.core.playback.LocalQueueMode
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.EqualizerBars
+import io.github.bilibox.core.ui.component.coverBrush
+import io.github.bilibox.core.ui.component.rememberVideoThumbnail
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.core.util.formatBytes
 import io.github.bilibox.core.util.formatVideoDuration
+import io.github.bilibox.core.util.resolutionLabel
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoPlayback
 import io.github.bilibox.data.localvideo.LocalVideoPlaybackState
+import io.github.bilibox.data.localvideo.cachedVideoThumbnail
+import io.github.bilibox.data.localvideo.loadVideoThumbnail
 
 /** Bottom sheet matching the reference "播放顺序 / 同文件夹" card. */
 @Composable
@@ -140,7 +146,9 @@ internal fun LocalQueueRow(
         watching?.fraction ?: 0f
     }
     val watched = playback?.state == LocalVideoPlaybackState.Watched
-    val thumbnail = rememberVideoThumbnail(item)
+    val thumbnail = rememberVideoThumbnail(item.key, cachedVideoThumbnail(item.key)) { context ->
+        loadVideoThumbnail(context, item.uri, item.key)
+    }
 
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))

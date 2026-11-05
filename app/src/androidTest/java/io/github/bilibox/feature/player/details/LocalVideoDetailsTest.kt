@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.library
+package io.github.bilibox.feature.player.details
 
 import android.net.Uri
 import androidx.compose.foundation.layout.Box

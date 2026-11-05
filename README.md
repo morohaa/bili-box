@@ -51,10 +51,11 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 │       ├── auth/                      # 登录、扫码与极验 UI
 │       ├── danmaku/                   # 弹幕层与播放器弹幕控制
 │       ├── dynamic/                   # 动态页 / 搜索首页
-│       ├── library/                   # 本地视频库与详情
+│       ├── library/                   # 本地视频库、文件夹与筛选
 │       ├── listen/                    # 听视频页面与播放状态绑定
 │       ├── online/                    # 在线视频详情、页面播放状态、选集与缓存
 │       ├── player/                    # 播放器页面、控制条、手势与定时播放绑定
+│       │   └── details/               # 本地播放简介、媒体信息、同文件夹队列与播放顺序
 │       ├── profile/                   # 我的页
 │       └── search/                    # 搜索页面状态、结果与筛选控件及文案
 ├── app/src/test/                      # JVM 单元测试（与主代码包镜像）
