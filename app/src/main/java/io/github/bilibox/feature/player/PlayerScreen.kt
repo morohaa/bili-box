@@ -44,6 +44,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import io.github.bilibox.core.playback.ListenQueue
 import io.github.bilibox.core.ui.theme.Pink
 import io.github.bilibox.core.util.captureVideoFrame
 import io.github.bilibox.core.util.saveVideoFrame
@@ -56,7 +57,6 @@ import io.github.bilibox.feature.listen.CollapsedListenOverlay
 import io.github.bilibox.feature.listen.ListenControls
 import io.github.bilibox.feature.listen.ListenInfo
 import io.github.bilibox.feature.listen.ListenPlaybackEffect
-import io.github.bilibox.feature.listen.ListenQueue
 import io.github.bilibox.feature.listen.ListenScreen
 import io.github.bilibox.feature.listen.rememberListenCover
 import kotlinx.coroutines.CancellationException

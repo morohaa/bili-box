@@ -26,6 +26,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import io.github.bilibox.core.model.PlaybackState
 import io.github.bilibox.core.model.SearchVideo
+import io.github.bilibox.core.playback.ListenPlaybackBridge
+import io.github.bilibox.core.playback.ListenQueue
 import io.github.bilibox.core.ui.theme.OnlineSurface
 import io.github.bilibox.data.auth.BiliSession
 import io.github.bilibox.data.auth.hasLoginCookies
@@ -40,8 +42,6 @@ import io.github.bilibox.data.danmaku.DanmakuParser
 import io.github.bilibox.data.danmaku.DanmakuPreferences
 import io.github.bilibox.data.danmaku.DanmakuSettings
 import io.github.bilibox.feature.listen.ListenInfo
-import io.github.bilibox.feature.listen.ListenPlaybackBridge
-import io.github.bilibox.feature.listen.ListenQueue
 import io.github.bilibox.feature.player.VideoPlayerScreen
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope

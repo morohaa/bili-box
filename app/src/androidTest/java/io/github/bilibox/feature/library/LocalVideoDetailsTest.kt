@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.media3.exoplayer.ExoPlayer
+import io.github.bilibox.core.playback.LocalQueueMode
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.feature.player.LocalPlayerDetailActions
 import io.github.bilibox.feature.player.PlaybackSleepTimer

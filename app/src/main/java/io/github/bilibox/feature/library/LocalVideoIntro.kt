@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.playback.LocalQueueMode
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlinePink

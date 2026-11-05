@@ -19,9 +19,11 @@
 
 - 新代码优先放入已有模块：
   - 共享模型 → `core/model`
+  - 播放队列协议、播放模式与后台媒体会话 → `core/playback`
   - 共享 UI / 主题 / 工具 → `core/ui`、`core/util`
   - 接口与存储 → `data/*`
   - 页面与页面组件 → `feature/*`
+- `data/` 不依赖 `feature/`；播放模式的文案和图标映射留在 UI 层，缩略图读取和缓存放在 `data/localvideo`。
 - 不要把数据存储或网络请求直接写进 Composable；能独立测试的逻辑放到 `data/` 或 `core/`。
 - 新增页面请在 `feature/<feature>/` 下建文件，测试目录保持同样的包结构。
 - 避免新增超过 500 行的单文件；优先按页面、控制条、弹层拆成多个文件。

@@ -5,10 +5,9 @@ import android.graphics.Bitmap
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import io.github.bilibox.feature.library.LocalQueueMode
-import io.github.bilibox.feature.library.loadVideoThumbnail
-import io.github.bilibox.feature.listen.ListenPlaybackBridge
-import io.github.bilibox.feature.listen.ListenQueue
+import io.github.bilibox.core.playback.ListenPlaybackBridge
+import io.github.bilibox.core.playback.ListenQueue
+import io.github.bilibox.core.playback.LocalQueueMode
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

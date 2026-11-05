@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.playback.LocalQueueMode
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlinePink
@@ -49,18 +50,6 @@ import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoPlayback
 import io.github.bilibox.data.localvideo.LocalVideoPlaybackState
 import io.github.bilibox.feature.online.EqualizerBars
-
-/** How playback continues when the current local video reaches its end. */
-internal enum class LocalQueueMode(
-    val label: String,
-    val description: String,
-    val icon: LocalIcon,
-) {
-    LIST_LOOP("列表循环", "播完自动下一个，列表结束后从头继续", LocalIcon.LOOP),
-    SINGLE_LOOP("单个循环", "循环播放当前视频", LocalIcon.LOOP_ONE),
-    STOP_AFTER("播完暂停", "播放完当前视频后停止", LocalIcon.WAVEFORM),
-    SHUFFLE("随机播放", "随机播放同文件夹里的下一个视频", LocalIcon.SHUFFLE),
-}
 
 /** Bottom sheet matching the reference "播放顺序 / 同文件夹" card. */
 @Composable

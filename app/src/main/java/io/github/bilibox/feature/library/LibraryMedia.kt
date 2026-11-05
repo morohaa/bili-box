@@ -4,12 +4,8 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.media.MediaMetadataRetriever
-import android.net.Uri
 import android.os.Build
 import android.text.format.Formatter
-import android.util.LruCache
-import android.util.Size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -53,6 +49,8 @@ import io.github.bilibox.data.localvideo.LocalVideoPlayback
 import io.github.bilibox.data.localvideo.LocalVideoPlaybackState
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
 import io.github.bilibox.data.localvideo.LocalVideoSettings
+import io.github.bilibox.data.localvideo.cachedVideoThumbnail
+import io.github.bilibox.data.localvideo.loadVideoThumbnail
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -365,40 +363,15 @@ internal fun coverBrush(seed: String): Brush {
     )
 }
 
-internal val thumbnailCache = object : LruCache<String, Bitmap>(24 * 1024 * 1024) {
-    override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
-}
-
 @Composable
 internal fun rememberVideoThumbnail(video: LocalVideo): Bitmap? {
     val context = LocalContext.current
-    val bitmap by produceState<Bitmap?>(initialValue = thumbnailCache.get(video.key), video.key) {
+    val bitmap by produceState<Bitmap?>(initialValue = cachedVideoThumbnail(video.key), video.key) {
         if (value == null) {
             value = withContext(Dispatchers.IO) { loadVideoThumbnail(context, video.uri, video.key) }
         }
     }
     return bitmap
-}
-
-internal fun loadVideoThumbnail(context: Context, uri: Uri, key: String): Bitmap? {
-    thumbnailCache.get(key)?.let { return it }
-    val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        runCatching { context.contentResolver.loadThumbnail(uri, Size(480, 270), null) }.getOrNull()
-    } else {
-        null
-    } ?: run {
-        val retriever = MediaMetadataRetriever()
-        try {
-            retriever.setDataSource(context, uri)
-            retriever.getScaledFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 480, 270)
-        } catch (_: Exception) {
-            null
-        } finally {
-            runCatching { retriever.release() }
-        }
-    }
-    if (frame != null) thumbnailCache.put(key, frame)
-    return frame
 }
 
 internal fun hasLocalVideoPermission(context: Context): Boolean {

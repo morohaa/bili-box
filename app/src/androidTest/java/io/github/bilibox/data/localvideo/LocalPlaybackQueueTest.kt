@@ -5,7 +5,7 @@ import android.net.Uri
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import io.github.bilibox.feature.library.LocalQueueMode
+import io.github.bilibox.core.playback.LocalQueueMode
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

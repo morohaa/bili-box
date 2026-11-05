@@ -13,11 +13,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import io.github.bilibox.core.playback.LocalQueueMode
 import io.github.bilibox.data.localvideo.LocalPlaybackQueue
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.PlaybackProgressStore
 import io.github.bilibox.data.localvideo.localListenSubtitle
-import io.github.bilibox.feature.library.LocalQueueMode
 import io.github.bilibox.feature.library.LocalVideoIntro
 import io.github.bilibox.feature.library.LocalVideoMediaInfo
 import io.github.bilibox.feature.library.PlaybackModeSheet
