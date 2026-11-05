@@ -59,6 +59,8 @@ internal enum class AppIcon {
     COPY,
     HISTORY,
     TV,
+    DANMAKU,
+    BULB,
     LOOP_ONE,
     WAVEFORM,
     SHUFFLE,
@@ -304,6 +306,18 @@ internal fun DrawScope.drawAppGlyph(
                 drawRoundRect(tint, Offset(3f, 5f), Size(18f, 13f), CornerRadius(2.5f), style = stroke)
                 line(8f, 20f, 16f, 20f)
                 line(12f, 18f, 12f, 20f)
+            }
+
+            AppIcon.DANMAKU -> {
+                drawRoundRect(tint, Offset(3f, 5f), Size(18f, 13f), CornerRadius(2f), style = stroke)
+                line(8f, 9f, 16f, 9f)
+                line(9f, 12f, 15f, 12f)
+                line(10f, 15f, 14f, 15f)
+            }
+
+            AppIcon.BULB -> {
+                path("M9 18h6M10 21h4")
+                path("M12 2a7 7 0 0 0-4.9 11.9c.6.6 1 1.5 1 2.4V17h7.8v-.7c0-.9.4-1.8 1-2.4A7 7 0 0 0 12 2z")
             }
 
             AppIcon.LOOP_ONE -> {

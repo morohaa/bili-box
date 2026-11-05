@@ -1,9 +1,7 @@
 package io.github.bilibox.feature.player
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -11,33 +9,21 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.bilibox.core.ui.component.AppGlyphIcon
-import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.playback.SpeedPanel
 import io.github.bilibox.core.ui.component.playback.SpeedPanelMode
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
-import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.Pink
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +37,11 @@ internal fun PlayerDetailsPane(
     onDetailsTabChange: (Int) -> Unit,
     sourcePill: Boolean,
     sourceLabel: String,
+    danmakuEnabled: Boolean,
+    onOpenDanmakuComposer: (() -> Unit)?,
+    onToggleDanmaku: (() -> Unit)?,
+    lightsOff: Boolean,
+    onToggleLights: (() -> Unit)?,
     playbackError: String?,
     onRetry: () -> Unit,
     commentMessage: String,
@@ -87,89 +78,17 @@ internal fun PlayerDetailsPane(
             Modifier.fillMaxSize().verticalScroll(detailScroll)
         ) {
             if (showDetailTabs) {
-                var tabCenters by remember { mutableStateOf<Map<Int, Float>>(emptyMap()) }
-                val density = LocalDensity.current
-                val indicatorWidth = 28.dp
-                val indicatorWidthPx = with(density) { indicatorWidth.toPx() }
-                val activeCenter = tabCenters[detailsTab]
-                Box(Modifier.fillMaxWidth().height(44.dp)) {
-                    Row(
-                        Modifier.fillMaxSize().padding(start = 4.dp, end = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        detailTabs.forEachIndexed { index, label ->
-                            val selected = detailsTab == index
-                            val textColor by animateColorAsState(
-                                targetValue = if (selected) OnlinePink else Color(0xFF61666D),
-                                animationSpec = tween(180),
-                                label = "详情标签颜色",
-                            )
-                            Box(
-                                Modifier.fillMaxHeight()
-                                    .clickable { onDetailsTabChange(index) }
-                                    .onGloballyPositioned { coordinates ->
-                                        val center = coordinates.positionInParent().x +
-                                            coordinates.size.width / 2f
-                                        if (tabCenters[index] != center) {
-                                            tabCenters = tabCenters + (index to center)
-                                        }
-                                    }
-                                    .padding(horizontal = 14.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    label,
-                                    color = textColor,
-                                    fontSize = 15.sp,
-                                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-                                )
-                            }
-                        }
-                        Spacer(Modifier.weight(1f))
-                        if (sourcePill) {
-                            Row(
-                                Modifier.height(32.dp).clip(RoundedCornerShape(16.dp))
-                                    .background(Color(0xFFF6F7F8))
-                                    .border(1.dp, Color(0xFFE3E5E7), RoundedCornerShape(16.dp))
-                                    .padding(start = 12.dp, end = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    sourceLabel,
-                                    color = Color(0xFF9499A0),
-                                    fontSize = 11.5.sp,
-                                    maxLines = 1,
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Box(
-                                    Modifier.size(26.dp).clip(CircleShape).background(Color.White)
-                                        .border(1.dp, Color(0xFFE3E5E7), CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    AppGlyphIcon(AppIcon.TV, OnlinePink, Modifier.size(14.dp), 1.7f)
-                                }
-                            }
-                        } else {
-                            Text(sourceLabel, color = Muted, fontSize = 12.sp)
-                        }
-                    }
-                    if (activeCenter != null) {
-                        val indicatorX by animateDpAsState(
-                            targetValue = with(density) {
-                                ((activeCenter - indicatorWidthPx / 2f).coerceAtLeast(0f)).toDp()
-                            },
-                            animationSpec = tween(220, easing = FastOutSlowInEasing),
-                            label = "详情标签下划线",
-                        )
-                        Box(
-                            Modifier.align(Alignment.BottomStart)
-                                .offset(x = indicatorX)
-                                .width(indicatorWidth).height(3.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(OnlinePink)
-                        )
-                    }
-                }
+                PlayerDetailBar(
+                    tabs = detailTabs,
+                    selectedTab = detailsTab,
+                    onSelectTab = onDetailsTabChange,
+                    sourcePill = sourcePill,
+                    sourceLabel = sourceLabel,
+                    danmakuEnabled = danmakuEnabled,
+                    onOpenDanmakuComposer = onOpenDanmakuComposer,
+                    onToggleDanmaku = onToggleDanmaku,
+                    onToggleLights = onToggleLights,
+                )
                 HorizontalDivider(color = if (detailsBackground == Color.White) Color(0xFFE3E5E7) else Color.White.copy(alpha = .08f), thickness = 1.dp)
             }
 
@@ -249,6 +168,10 @@ internal fun PlayerDetailsPane(
             PlayerDrawerVisibility(visible = playbackModeExpanded, fromBottom = true) {
                 modeSheet { onDismissPlaybackMode() }
             }
+        }
+
+        if (lightsOff && onToggleLights != null) {
+            PlayerLightsOffOverlay(onToggleLights)
         }
     }
 }

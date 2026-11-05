@@ -125,6 +125,8 @@ internal fun VideoPlayerScreen(
     var qualityMenuExpanded by remember(player) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableIntStateOf(player.playbackState) }
     var detailsTab by remember(player) { mutableIntStateOf(0) }
+    var lightsOff by remember(player) { mutableStateOf(false) }
+    LaunchedEffect(fullScreen) { if (fullScreen) lightsOff = false }
     var playbackModeExpanded by remember(player) { mutableStateOf(false) }
     var sleepTimerOpen by remember(player) { mutableStateOf(false) }
     var danmakuSettingsOpen by remember(player) { mutableStateOf(false) }
@@ -145,6 +147,18 @@ internal fun VideoPlayerScreen(
         onSpeedChange = { speed = it },
     )
     val screenshot = rememberPlayerScreenshotController(playerView, hasVideoFrame, screenLocked, playbackError)
+    // 从详情操作栏或底栏进入同一个发送弹层；发送前先把弹幕打开，新弹幕才看得见。
+    val openDanmakuComposer: () -> Unit = {
+        if (onSendDanmaku == null) {
+            Toast.makeText(context, "登录后才能发送弹幕", Toast.LENGTH_SHORT).show()
+        } else {
+            if (!danmakuSettings.enabled) {
+                onDanmakuSettingsChange(danmakuSettings.copy(enabled = true))
+            }
+            danmakuSendError = null
+            danmakuComposerOpen = true
+        }
+    }
 
     // 听视频: not keyed by player, so it survives switching to the next local file.
     var listening by rememberSaveable { mutableStateOf(false) }
@@ -526,14 +540,7 @@ internal fun VideoPlayerScreen(
                                 )
                             },
                             onDanmakuSettings = { danmakuSettingsOpen = true },
-                            onDanmakuSend = {
-                                if (onSendDanmaku == null) {
-                                    Toast.makeText(context, "登录后才能发送弹幕", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    danmakuSendError = null
-                                    danmakuComposerOpen = true
-                                }
-                            },
+                            onDanmakuSend = openDanmakuComposer,
                             onEpisodes = {
                                 speedMenuExpanded = false
                                 qualityMenuExpanded = false
@@ -672,6 +679,19 @@ internal fun VideoPlayerScreen(
                     onDetailsTabChange = { detailsTab = it },
                     sourcePill = sourcePill,
                     sourceLabel = sourceLabel,
+                    danmakuEnabled = danmakuSettings.enabled,
+                    onOpenDanmakuComposer = if (danmakuSupported) openDanmakuComposer else null,
+                    onToggleDanmaku = if (danmakuSupported) {
+                        {
+                            onDanmakuSettingsChange(
+                                danmakuSettings.copy(enabled = !danmakuSettings.enabled)
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                    lightsOff = lightsOff,
+                    onToggleLights = { lightsOff = !lightsOff },
                     playbackError = playbackError,
                     onRetry = onRetry,
                     commentMessage = commentMessage,
