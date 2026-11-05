@@ -154,7 +154,7 @@ internal fun LiquidNavigation(
                         .background(colors.pink.copy(alpha = .12f), CircleShape)
                 )
                 Row(Modifier.fillMaxSize().selectableGroup()) {
-                    listOf("动态", "视频", "我的").forEachIndexed { index, title ->
+                    listOf("首页", "视频", "我的").forEachIndexed { index, title ->
                         NavigationItem(
                             index = index,
                             title = title,

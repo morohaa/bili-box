@@ -29,7 +29,7 @@ import io.github.bilibox.feature.player.details.PlaybackModeSheet
 import kotlinx.coroutines.delay
 
 @Composable
-internal fun LocalVideoPlayer(
+internal fun LocalVideoScreen(
     video: LocalVideo,
     playlist: List<LocalVideo>,
     onVideoSelected: (LocalVideo) -> Unit,

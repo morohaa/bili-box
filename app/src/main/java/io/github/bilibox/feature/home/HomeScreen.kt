@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.dynamic
+package io.github.bilibox.feature.home
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -94,14 +94,14 @@ import io.github.bilibox.feature.search.SearchUiState
 import kotlinx.coroutines.delay
 
 /**
- * 「动态」页：主界面是居中的 bilibox 标志与胶囊搜索框；点按搜索框后标志收起，
+ * 首页容器：主界面是居中的 bilibox 标志与胶囊搜索框；点按搜索框后标志收起，
  * 搜索行移到状态栏下方并让出返回与「搜索」按钮，下方展示最近搜索。
  *
  * 提交后沿用既有搜索结果渲染（[SearchResults]），顶栏样式与参考稿保持一致。
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun DynamicPage(
+internal fun HomeScreen(
     query: String,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
@@ -136,7 +136,7 @@ internal fun DynamicPage(
     val progress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
         animationSpec = tween(durationMillis = 520, easing = BrandSpringEasing),
-        label = "dynamic search expansion",
+        label = "home search expansion",
     )
     // 回弹曲线会短暂越过 1，尺寸类插值需要夹紧，避免出现负高度。
     val travel = progress.coerceIn(0f, 1f)

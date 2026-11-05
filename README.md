@@ -6,7 +6,7 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 
 ## 功能
 
-- **动态 / 搜索**：品牌搜索首页、搜索历史、排序与时长 / 发布时间筛选、单双列切换、分页加载。
+- **首页 / 搜索**：品牌搜索首页、搜索历史、排序与时长 / 发布时间筛选、单双列切换、分页加载。
 - **在线视频**：视频详情、多 P 选集、自动连播、清晰度切换、CDN 容灾回退、离线缓存、截屏。
 - **弹幕**：按分 P 拉取弹幕、滚动 / 顶部 / 底部弹幕绘制、进度同步、显示开关、不透明度 / 字号 / 显示区域 / 速度设置；登录后可从播放器直接发送弹幕。
 - **本地视频**：扫描设备视频、文件夹浏览、缩略图、搜索、排序、播放进度续播、后台连播队列。
@@ -28,12 +28,16 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 
 ## 目录结构
 
-源码采用 feature-first 的单模块结构；`app` 下按职责分为 `core`、`data` 和 `feature`。
+源码采用 feature-first 的单模块结构；源码根包下按职责分为应用组装层 `app`、共享层 `core`、数据层 `data` 和功能层 `feature`。
 
 ```text
 .
 ├── app/src/main/java/io/github/bilibox/
-│   ├── MainActivity.kt                 # 应用入口、页面切换与全局状态
+│   ├── MainActivity.kt                # Activity 入口与 Compose 挂载
+│   ├── app/
+│   │   ├── BiliBoxApp.kt              # 根布局、主题与系统栏外观
+│   │   ├── AppNavigation.kt           # 顶层标签、页面切换与播放覆盖层
+│   │   └── BiliBoxAppState.kt         # 会话、导航与搜索状态组装及恢复
 │   ├── core/
 │   │   ├── playback/                  # 队列协议、播放模式、倍速规则、定时状态与后台媒体会话
 │   │   ├── model/                     # 跨功能共享的视频摘要与搜索业务选项
@@ -50,7 +54,7 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 │   └── feature/
 │       ├── auth/                      # 登录、扫码与极验 UI
 │       ├── danmaku/                   # 弹幕层与播放器弹幕控制
-│       ├── dynamic/                   # 动态页 / 搜索首页
+│       ├── home/                      # 首页容器与搜索入口
 │       ├── library/                   # 本地视频库、文件夹与筛选
 │       ├── listen/                    # 听视频页面与播放状态绑定
 │       ├── online/                    # 在线视频详情、页面播放状态、选集与缓存
@@ -73,6 +77,8 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 ```
 
 `design/` 里的 HTML 仅作为视觉参考，不会被编译进 APK；应用实际界面全部由 Compose 实现。单模块的包边界优先于多模块拆分，后续只有在出现独立复用需求时再拆 `:core` / `:feature` 模块。
+
+页面入口统一使用 `*Screen`，例如 `HomeScreen`、`LibraryScreen`、`ProfileScreen`；局部组件文件按职责命名，例如 `SearchResults.kt`、`SearchControls.kt`。`home` 组合搜索首页，`search` 提供结果、筛选与请求状态；跨功能导航和状态组装集中在 `app`，功能包不反向依赖应用组装层。
 
 ## 环境要求
 
@@ -130,7 +136,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 ## 测试说明
 
-- `app/src/test` 覆盖 WBI 签名、搜索历史、播放缓存、弹幕 XML / 压缩解码与轨道排布等纯逻辑。
+- `app/src/test` 覆盖应用状态恢复、WBI 签名、搜索历史、播放缓存、弹幕 XML / 压缩解码与轨道排布等逻辑。
 - `app/src/androidTest` 覆盖播放器控件、手势、本地视频详情、听视频和弹幕设置弹层等 Compose 交互。
 - 首次运行 Gradle 需要联网下载依赖；国内网络可自行配置 Maven 镜像，但不要把镜像的私有凭据提交到仓库。
 - GitHub Actions 会在 push / pull request 时执行 ktlint、文件行数检查、单元测试与 Debug 构建，见 `.github/workflows/android.yml`。

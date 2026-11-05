@@ -60,7 +60,7 @@ internal val LibraryLine = Color(0xFFE9EDF2)
 internal val LibraryCard = Color(0xFFFFFFFF)
 
 @Composable
-internal fun LibraryPage(
+internal fun LibraryScreen(
     refreshToken: Int = 0,
     darkMode: Boolean = false,
     initialFilter: LocalVideoQuickFilter? = null,

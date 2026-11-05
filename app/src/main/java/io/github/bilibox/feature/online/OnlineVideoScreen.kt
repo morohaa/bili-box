@@ -54,7 +54,7 @@ import kotlinx.coroutines.launch
 private enum class OnlineVideoCacheStatus { IDLE, DOWNLOADING, SAVED }
 
 @Composable
-internal fun BiliVideoDetail(video: VideoSummary, session: BiliSession?, onBack: () -> Unit) {
+internal fun OnlineVideoScreen(video: VideoSummary, session: BiliSession?, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val client = remember(video.bvid, session?.cookie) {

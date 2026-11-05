@@ -60,7 +60,7 @@ internal val MyOrange = Color(0xFFFF6600)
 internal val MyBadgeRed = Color(0xFFFA5A57)
 
 @Composable
-internal fun MyPage(
+internal fun ProfileScreen(
     session: BiliSession?,
     darkMode: Boolean = false,
     onToggleDarkMode: () -> Unit = {},

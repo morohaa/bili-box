@@ -60,12 +60,11 @@ import io.github.bilibox.core.model.SearchDuration
 import io.github.bilibox.core.model.SearchOrder
 import io.github.bilibox.core.model.SearchTimeRange
 import io.github.bilibox.core.ui.theme.DynamicColors
-import io.github.bilibox.feature.dynamic.DynamicPage
 
 /**
  * 搜索结果上方的排序 / 筛选 / 单双列控制条。
  *
- * 搜索行本身由 [DynamicPage] 绘制；这里只保留结果页需要的那一行，
+ * 搜索行本身由首页容器绘制；这里只保留结果页需要的那一行，
  * 样式沿用参考稿的白色胶囊 + 粉色高亮。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)

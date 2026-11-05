@@ -13,16 +13,20 @@
   - 验证方式
   ```
 
-  常用 scope：`danmaku`、`player`、`online`、`library`、`profile`、`search`、`auth`、`repo`。
+  常用 scope：`app`、`home`、`danmaku`、`player`、`online`、`library`、`profile`、`search`、`auth`、`repo`。
 
 ## 代码组织
 
 - 新代码优先放入已有模块：
+  - 应用根布局、顶层导航、会话和跨功能状态组装 → `app/`
   - 共享模型与业务筛选选项 → `core/model`，按职责命名文件
   - 播放队列协议、播放模式、倍速规则、定时状态与后台媒体会话 → `core/playback`
   - 共享 UI / 主题 / 工具 → `core/ui`、`core/util`
   - 接口与存储 → `data/*`
   - 页面与页面组件 → `feature/*`
+- `MainActivity` 只负责 Activity 生命周期和 Compose 挂载；`feature/`、`core/`、`data/` 不反向依赖应用组装包 `io.github.bilibox.app`。
+- 完整页面入口统一命名为 `*Screen`，承载入口的文件优先同名；局部组件按职责命名，例如 `SearchResults`、`SearchControls`、`*Sheet`、`*Pane`，不要使用没有对应页面入口的 `*Screen` 文件名。
+- `feature/home` 是首页容器，负责组合搜索入口；`feature/search` 提供搜索结果、筛选和请求状态，不反向依赖 `home`，也不承担应用导航。
 - `data/` 不依赖 `feature/`；播放模式的文案和图标映射留在 UI 层，缩略图读取和缓存放在 `data/localvideo`。
 - 已跨功能复用的封面、图标等 UI 放在 `core/ui/component`；共享播放面板放在其 `playback/` 子包，功能专用组件继续留在所属 `feature/`。
 - `core/` 不依赖 `feature/`。播放器组合听视频界面，听视频界面通过共享状态、组件和回调协作，避免反向引用播放器页面。
