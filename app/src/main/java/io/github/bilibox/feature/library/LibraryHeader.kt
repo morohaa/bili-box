@@ -27,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +44,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.component.AppGlyphIcon
+import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.Pink
@@ -83,7 +84,7 @@ internal fun LibraryHeader(
                     .padding(horizontal = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LocalGlyphIcon(LocalIcon.SEARCH, Pink, Modifier.size(17.dp), 2f)
+                AppGlyphIcon(AppIcon.SEARCH, Pink, Modifier.size(17.dp), 2f)
                 Spacer(Modifier.width(8.dp))
                 BasicTextField(
                     value = query,
@@ -110,7 +111,7 @@ internal fun LibraryHeader(
                             .clickable { onQueryChange("") },
                         contentAlignment = Alignment.Center,
                     ) {
-                        LocalGlyphIcon(LocalIcon.CLOSE, Muted, Modifier.size(13.dp), 2f)
+                        AppGlyphIcon(AppIcon.CLOSE, Muted, Modifier.size(13.dp), 2f)
                     }
                 }
             }
@@ -129,15 +130,15 @@ internal fun LibraryHeader(
                 letterSpacing = (-.5).sp,
                 modifier = Modifier.weight(1f),
             )
-            HeaderIconButton(LocalIcon.SEARCH, "搜索本地视频", onSearchOpen)
+            HeaderIconButton(AppIcon.SEARCH, "搜索本地视频", onSearchOpen)
             Spacer(Modifier.width(8.dp))
-            HeaderIconButton(LocalIcon.TUNE, "显示设置", onSettings)
+            HeaderIconButton(AppIcon.TUNE, "显示设置", onSettings)
         }
     }
 }
 
 @Composable
-internal fun HeaderIconButton(icon: LocalIcon, description: String, onClick: () -> Unit) {
+internal fun HeaderIconButton(icon: AppIcon, description: String, onClick: () -> Unit) {
     Box(
         Modifier.size(38.dp)
             .shadow(8.dp, CircleShape, ambientColor = Color(0xFF8A9AAF).copy(alpha = .18f), spotColor = Color(0xFF8A9AAF).copy(alpha = .18f))
@@ -147,7 +148,7 @@ internal fun HeaderIconButton(icon: LocalIcon, description: String, onClick: () 
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        LocalGlyphIcon(icon, Ink, Modifier.size(20.dp), 1.8f)
+        AppGlyphIcon(icon, Ink, Modifier.size(20.dp), 1.8f)
     }
 }
 
@@ -181,7 +182,7 @@ internal fun QuickFilterRow(
                     .padding(horizontal = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LocalGlyphIcon(quickFilterIcon(filter), contentColor, Modifier.size(14.dp), 2f)
+                AppGlyphIcon(quickFilterIcon(filter), contentColor, Modifier.size(14.dp), 2f)
                 Spacer(Modifier.width(5.dp))
                 Text(
                     filter.label,
@@ -195,12 +196,12 @@ internal fun QuickFilterRow(
     Spacer(Modifier.height(6.dp))
 }
 
-internal fun quickFilterIcon(filter: LocalVideoQuickFilter): LocalIcon = when (filter) {
-    LocalVideoQuickFilter.RECENT -> LocalIcon.CLOCK
-    LocalVideoQuickFilter.BILI_CACHE -> LocalIcon.DOWNLOAD
-    LocalVideoQuickFilter.PRIVATE -> LocalIcon.LOCK
-    LocalVideoQuickFilter.UNFINISHED -> LocalIcon.STATUS
-    LocalVideoQuickFilter.FINISHED -> LocalIcon.CHECK
+internal fun quickFilterIcon(filter: LocalVideoQuickFilter): AppIcon = when (filter) {
+    LocalVideoQuickFilter.RECENT -> AppIcon.CLOCK
+    LocalVideoQuickFilter.BILI_CACHE -> AppIcon.DOWNLOAD
+    LocalVideoQuickFilter.PRIVATE -> AppIcon.LOCK
+    LocalVideoQuickFilter.UNFINISHED -> AppIcon.STATUS
+    LocalVideoQuickFilter.FINISHED -> AppIcon.CHECK
 }
 
 @Composable
@@ -236,7 +237,7 @@ internal fun SortBar(
                 CrumbLink("根目录", onRoot)
                 nav.forEachIndexed { index, path ->
                     Spacer(Modifier.width(2.dp))
-                    LocalGlyphIcon(LocalIcon.CHEVRON_RIGHT, Muted.copy(alpha = .7f), Modifier.size(11.dp), 2f)
+                    AppGlyphIcon(AppIcon.CHEVRON_RIGHT, Muted.copy(alpha = .7f), Modifier.size(11.dp), 2f)
                     Spacer(Modifier.width(2.dp))
                     val isLast = index == nav.lastIndex
                     val label = localVideoFolderLabel(path)

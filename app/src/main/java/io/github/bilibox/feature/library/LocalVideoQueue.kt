@@ -21,9 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +40,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.playback.LocalQueueMode
+import io.github.bilibox.core.ui.component.AppGlyphIcon
+import io.github.bilibox.core.ui.component.AppIcon
+import io.github.bilibox.core.ui.component.EqualizerBars
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlinePink
@@ -49,7 +50,6 @@ import io.github.bilibox.core.util.formatVideoDuration
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoPlayback
 import io.github.bilibox.data.localvideo.LocalVideoPlaybackState
-import io.github.bilibox.feature.online.EqualizerBars
 
 /** Bottom sheet matching the reference "播放顺序 / 同文件夹" card. */
 @Composable
@@ -97,7 +97,7 @@ internal fun PlaybackModeSheet(
                         .semantics { contentDescription = mode.label },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    LocalGlyphIcon(
+                    AppGlyphIcon(
                         mode.icon,
                         if (active) OnlinePink else Color(0xFF61666D),
                         Modifier.size(21.dp),
@@ -112,7 +112,7 @@ internal fun PlaybackModeSheet(
                     )
                     Spacer(Modifier.weight(1f))
                     if (active) {
-                        LocalGlyphIcon(LocalIcon.CHECK, OnlinePink, Modifier.size(18.dp), 2.2f)
+                        AppGlyphIcon(AppIcon.CHECK, OnlinePink, Modifier.size(18.dp), 2.2f)
                     }
                 }
             }
@@ -228,8 +228,8 @@ internal fun LocalQueueRow(
             }
         }
         if (!isCurrent) {
-            LocalGlyphIcon(
-                LocalIcon.CHEVRON_RIGHT,
+            AppGlyphIcon(
+                AppIcon.CHEVRON_RIGHT,
                 Muted.copy(alpha = .55f),
                 Modifier.padding(start = 2.dp).size(14.dp),
                 1.8f,

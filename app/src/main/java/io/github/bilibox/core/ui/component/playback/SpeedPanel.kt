@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.player
+package io.github.bilibox.core.ui.component.playback
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,7 +8,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,16 +19,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.core.playback.PlaybackSpeedMax
+import io.github.bilibox.core.playback.PlaybackSpeedMin
+import io.github.bilibox.core.playback.PlaybackSpeedStep
+import io.github.bilibox.core.playback.quantizePlaybackSpeed
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /*
  * 播放倍速面板。
@@ -40,20 +38,6 @@ import kotlin.math.roundToInt
 
 internal enum class SpeedPanelMode { Drawer, Sheet }
 
-internal const val PlaybackSpeedMin = 0.5f
-internal const val PlaybackSpeedMax = 3f
-internal const val PlaybackSpeedStep = 0.05f
-internal val PlaybackSpeedPresets = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f, 3f)
-
-/** Temporary speed used while the video area is held down. */
-internal const val PlaybackSpeedBoost = 2f
-
-/**
- * 长按只会加速：当前倍速低于 2x 时临时切到 2x，已经更快时保持用户的选择，
- * 避免“长按反而慢下来”。
- */
-internal fun longPressPlaybackSpeed(current: Float): Float = maxOf(current, PlaybackSpeedBoost)
-
 internal val SpeedBlue = Color(0xFF00AEEC)
 internal val SpeedInk = Color(0xFF18191C)
 internal val SpeedPinkDeep = Color(0xFFE8547F)
@@ -62,18 +46,7 @@ internal val SpeedScreen = Color(0xFFFDFCFB)
 
 internal const val SpeedTickCount = 50
 
-internal fun quantizePlaybackSpeed(value: Float): Float {
-    val stepped = (value / PlaybackSpeedStep).roundToInt() * PlaybackSpeedStep
-    return stepped.coerceIn(PlaybackSpeedMin, PlaybackSpeedMax)
-}
-
 internal fun formatSpeedReadout(value: Float): String = String.format(Locale.US, "%.2f", value)
-
-/** Compact label for pills and the player bar: 1x / 1.5x / 0.75x. */
-internal fun formatSpeedBadge(value: Float): String {
-    val text = String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
-    return "${text}x"
-}
 
 internal fun speedMood(value: Float): String = when {
     value < 0.6f -> "慢慢挪"
@@ -83,49 +56,6 @@ internal fun speedMood(value: Float): String = when {
     value < 1.8f -> "快跑中"
     value < 2.5f -> "冲刺！"
     else -> "起飞！！"
-}
-
-/** Speed entry point used by the player chrome. */
-@Composable
-internal fun SpeedBarChip(
-    speed: Float,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    val active = abs(speed - 1f) > 0.001f
-    Row(
-        modifier.height(30.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(
-                if (active) OnlinePink.copy(alpha = .16f) else Color.White.copy(alpha = .10f)
-            )
-            .border(
-                1.dp,
-                if (active) OnlinePink.copy(alpha = .55f) else Color.White.copy(alpha = .10f),
-                RoundedCornerShape(8.dp)
-            )
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 9.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            "倍速",
-            color = if (active) OnlinePink else Color.White.copy(alpha = .92f),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1
-        )
-        if (active) {
-            Spacer(Modifier.width(4.dp))
-            Text(
-                formatSpeedBadge(speed),
-                color = OnlinePink,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1
-            )
-        }
-    }
 }
 
 @Composable

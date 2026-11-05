@@ -70,8 +70,8 @@ import io.github.bilibox.core.ui.theme.OnlinePinkSoft
 import io.github.bilibox.core.ui.theme.OnlineSecondary
 import io.github.bilibox.core.ui.theme.OnlineStroke
 import io.github.bilibox.core.ui.theme.OnlineText
+import io.github.bilibox.core.util.formatPlaybackTime
 import io.github.bilibox.data.bili.Page
-import io.github.bilibox.feature.player.formatPlaybackTime
 
 @Composable
 internal fun OnlineEpisodeCard(

@@ -20,8 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +29,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.component.AppGlyphIcon
+import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.util.formatVideoDuration
@@ -61,7 +61,7 @@ internal fun LocalVideoMediaInfo(
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 22.dp)) {
         MediaInfoSection(
             title = "文件",
-            icon = LocalIcon.FILE,
+            icon = AppIcon.FILE,
             rows = listOf(
                 "文件名" to video.name,
                 "路径" to path,
@@ -73,7 +73,7 @@ internal fun LocalVideoMediaInfo(
         )
         MediaInfoSection(
             title = "视频",
-            icon = LocalIcon.FRAME,
+            icon = AppIcon.FRAME,
             rows = listOf(
                 "分辨率" to if (video.width > 0 && video.height > 0) {
                     "${video.width} × ${video.height}（${resolutionLabel(video.width, video.height)}）"
@@ -86,7 +86,7 @@ internal fun LocalVideoMediaInfo(
         )
         MediaInfoSection(
             title = "播放",
-            icon = LocalIcon.HISTORY,
+            icon = AppIcon.HISTORY,
             rows = listOf(
                 "进度" to if (durationMs > 0L) {
                     "${formatVideoDuration(positionMs)} / ${formatVideoDuration(durationMs)}" +
@@ -115,7 +115,7 @@ internal fun LocalVideoMediaInfo(
             contentAlignment = Alignment.Center,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                LocalGlyphIcon(LocalIcon.COPY, DetailSecondary, Modifier.size(14.dp), 1.8f)
+                AppGlyphIcon(AppIcon.COPY, DetailSecondary, Modifier.size(14.dp), 1.8f)
                 Spacer(Modifier.width(6.dp))
                 Text("复制文件路径", color = DetailSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             }
@@ -126,7 +126,7 @@ internal fun LocalVideoMediaInfo(
 @Composable
 private fun MediaInfoSection(
     title: String,
-    icon: LocalIcon,
+    icon: AppIcon,
     rows: List<Pair<String, String>>,
 ) {
     val visible = rows.filter { it.second.isNotBlank() }
@@ -135,7 +135,7 @@ private fun MediaInfoSection(
         Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LocalGlyphIcon(icon, Muted, Modifier.size(14.dp), 1.8f)
+        AppGlyphIcon(icon, Muted, Modifier.size(14.dp), 1.8f)
         Spacer(Modifier.width(5.dp))
         Text(title, color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }

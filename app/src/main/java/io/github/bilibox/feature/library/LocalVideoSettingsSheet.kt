@@ -42,6 +42,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.component.AppGlyphIcon
+import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.Pink
@@ -104,7 +106,7 @@ internal fun LocalVideoSettingsSheet(
                         .padding(horizontal = 9.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    LocalGlyphIcon(LocalIcon.REFRESH, Muted, Modifier.size(13.dp), 2f)
+                    AppGlyphIcon(AppIcon.REFRESH, Muted, Modifier.size(13.dp), 2f)
                     Spacer(Modifier.width(4.dp))
                     Text("恢复默认", color = Muted, fontSize = 11.5.sp)
                 }
@@ -203,7 +205,7 @@ internal fun LocalVideoSettingsSheet(
                                 .padding(horizontal = 11.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            LocalGlyphIcon(LocalIcon.REFRESH, Pink, Modifier.size(13.dp), 2f)
+                            AppGlyphIcon(AppIcon.REFRESH, Pink, Modifier.size(13.dp), 2f)
                             Spacer(Modifier.width(4.dp))
                             Text("扫描", color = Pink, fontSize = 11.5.sp)
                         }
@@ -244,8 +246,8 @@ private fun SettingsSection(
                 Text(subtitle, color = Muted, fontSize = 10.5.sp)
             }
             Spacer(Modifier.weight(1f))
-            LocalGlyphIcon(
-                LocalIcon.CHEVRON_DOWN,
+            AppGlyphIcon(
+                AppIcon.CHEVRON_DOWN,
                 Muted,
                 Modifier.size(16.dp).rotate(rotation),
                 2f,
@@ -277,17 +279,17 @@ private fun ViewModePicker(
     }
 }
 
-private data class ModeOption<T>(val value: T, val icon: LocalIcon, val label: String)
+private data class ModeOption<T>(val value: T, val icon: AppIcon, val label: String)
 
-private fun modeIcon(mode: LocalVideoViewMode): LocalIcon = when (mode) {
-    LocalVideoViewMode.ALL_FOLDERS -> LocalIcon.FOLDER
-    LocalVideoViewMode.FILES -> LocalIcon.FILE
-    LocalVideoViewMode.FOLDERS -> LocalIcon.FOLDER
+private fun modeIcon(mode: LocalVideoViewMode): AppIcon = when (mode) {
+    LocalVideoViewMode.ALL_FOLDERS -> AppIcon.FOLDER
+    LocalVideoViewMode.FILES -> AppIcon.FILE
+    LocalVideoViewMode.FOLDERS -> AppIcon.FOLDER
 }
 
-private fun layoutIcon(layout: LocalVideoLayout): LocalIcon = when (layout) {
-    LocalVideoLayout.LIST -> LocalIcon.LIST
-    LocalVideoLayout.GRID -> LocalIcon.GRID
+private fun layoutIcon(layout: LocalVideoLayout): AppIcon = when (layout) {
+    LocalVideoLayout.LIST -> AppIcon.LIST
+    LocalVideoLayout.GRID -> AppIcon.GRID
 }
 
 @Composable
@@ -314,7 +316,7 @@ private fun <T> SegmentedGroup(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                LocalGlyphIcon(option.icon, if (active) Pink else LibrarySecondary, Modifier.size(19.dp), 1.8f)
+                AppGlyphIcon(option.icon, if (active) Pink else LibrarySecondary, Modifier.size(19.dp), 1.8f)
                 Spacer(Modifier.height(3.dp))
                 Text(
                     option.label,
@@ -328,17 +330,17 @@ private fun <T> SegmentedGroup(
     }
 }
 
-private fun sortIcon(sort: LocalVideoSort): LocalIcon = when (sort) {
-    LocalVideoSort.TITLE -> LocalIcon.TITLE
-    LocalVideoSort.DATE -> LocalIcon.CALENDAR
-    LocalVideoSort.PLAYED -> LocalIcon.PLAYED
-    LocalVideoSort.STATUS -> LocalIcon.STATUS
-    LocalVideoSort.DURATION -> LocalIcon.TIMER
-    LocalVideoSort.SIZE -> LocalIcon.SIZE
-    LocalVideoSort.RESOLUTION -> LocalIcon.FRAME
-    LocalVideoSort.PATH -> LocalIcon.PIN
-    LocalVideoSort.FPS -> LocalIcon.FILM
-    LocalVideoSort.TYPE -> LocalIcon.DOCUMENT
+private fun sortIcon(sort: LocalVideoSort): AppIcon = when (sort) {
+    LocalVideoSort.TITLE -> AppIcon.TITLE
+    LocalVideoSort.DATE -> AppIcon.CALENDAR
+    LocalVideoSort.PLAYED -> AppIcon.PLAYED
+    LocalVideoSort.STATUS -> AppIcon.STATUS
+    LocalVideoSort.DURATION -> AppIcon.TIMER
+    LocalVideoSort.SIZE -> AppIcon.SIZE
+    LocalVideoSort.RESOLUTION -> AppIcon.FRAME
+    LocalVideoSort.PATH -> AppIcon.PIN
+    LocalVideoSort.FPS -> AppIcon.FILM
+    LocalVideoSort.TYPE -> AppIcon.DOCUMENT
 }
 
 @Composable
@@ -377,7 +379,7 @@ private fun SortPicker(
                                 ),
                             contentAlignment = Alignment.Center,
                         ) {
-                            LocalGlyphIcon(
+                            AppGlyphIcon(
                                 sortIcon(sort),
                                 if (active) Pink else Color(0xFF505660),
                                 Modifier.size(22.dp),
@@ -407,13 +409,13 @@ private fun SortPicker(
         ) {
             DirectionButton(
                 label = draft.sort.ascendingLabel,
-                icon = LocalIcon.ARROW_UP,
+                icon = AppIcon.ARROW_UP,
                 active = draft.ascending,
                 modifier = Modifier.weight(1f),
             ) { onDraftChange(draft.copy(ascending = true)) }
             DirectionButton(
                 label = draft.sort.descendingLabel,
-                icon = LocalIcon.ARROW_DOWN,
+                icon = AppIcon.ARROW_DOWN,
                 active = !draft.ascending,
                 modifier = Modifier.weight(1f),
             ) { onDraftChange(draft.copy(ascending = false)) }
@@ -424,7 +426,7 @@ private fun SortPicker(
 @Composable
 private fun DirectionButton(
     label: String,
-    icon: LocalIcon,
+    icon: AppIcon,
     active: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
@@ -437,7 +439,7 @@ private fun DirectionButton(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LocalGlyphIcon(icon, if (active) Pink else LibrarySecondary, Modifier.size(15.dp), 2f)
+        AppGlyphIcon(icon, if (active) Pink else LibrarySecondary, Modifier.size(15.dp), 2f)
         Spacer(Modifier.width(4.dp))
         Text(
             label,
@@ -468,7 +470,7 @@ private fun FieldPicker(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (active) {
-                            LocalGlyphIcon(LocalIcon.CHECK, Pink, Modifier.size(13.dp), 2.4f)
+                            AppGlyphIcon(AppIcon.CHECK, Pink, Modifier.size(13.dp), 2.4f)
                             Spacer(Modifier.width(3.dp))
                         }
                         Text(

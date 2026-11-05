@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.core.util.formatSpeedBadge
 import kotlinx.coroutines.withTimeoutOrNull
 
 internal enum class PlayerGestureSide { LEFT, RIGHT }

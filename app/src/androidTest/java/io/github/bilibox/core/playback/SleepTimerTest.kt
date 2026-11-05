@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.player
+package io.github.bilibox.core.playback
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

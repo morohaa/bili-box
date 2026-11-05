@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.player
+package io.github.bilibox.core.ui.component.playback
 
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
@@ -59,10 +59,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.playback.PlaybackSleepTimer
+import io.github.bilibox.core.playback.SleepTimerMode
+import io.github.bilibox.core.ui.component.AppGlyphIcon
+import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.OnlinePinkSoft
-import io.github.bilibox.feature.library.LocalGlyphIcon
-import io.github.bilibox.feature.library.LocalIcon
+import io.github.bilibox.core.util.formatPlaybackTime
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -105,46 +108,6 @@ internal fun SleepTimerLabel(timer: PlaybackSleepTimer, modifier: Modifier = Mod
     }
     if (text.isNotBlank()) {
         Text(text, color = Color(0xFFFFB3CA), fontSize = 12.sp, modifier = modifier)
-    }
-}
-
-/**
- * The last-minute banner over the video: "再看 10 分钟" extends, closing keeps
- * the timer running so it still stops playback on time.
- */
-@Composable
-internal fun SleepTimerWarning(
-    remainingMs: Long,
-    onExtend: () -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier.clip(RoundedCornerShape(18.dp)).background(Color(0xCC141418))
-            .semantics { contentDescription = "定时关闭提醒" }
-            .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        LocalGlyphIcon(LocalIcon.MOON, Color(0xFFFFB4C8), Modifier.size(14.dp), 1.8f)
-        Spacer(Modifier.width(6.dp))
-        Text(formatPlaybackTime(remainingMs), color = Color(0xFFFFB4C8), fontSize = 12.sp)
-        Text(" 后暂停", color = Color.White.copy(alpha = .9f), fontSize = 12.sp)
-        Spacer(Modifier.width(8.dp))
-        Box(
-            Modifier.height(26.dp).clip(RoundedCornerShape(13.dp)).background(OnlinePink)
-                .clickable(role = Role.Button, onClick = onExtend)
-                .padding(horizontal = 10.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("再看 10 分钟", color = Color.White, fontSize = 12.sp)
-        }
-        Box(
-            Modifier.size(26.dp).clip(CircleShape)
-                .clickable(role = Role.Button, onClick = onDismiss),
-            contentAlignment = Alignment.Center,
-        ) {
-            LocalGlyphIcon(LocalIcon.CLOSE, Color.White.copy(alpha = .7f), Modifier.size(13.dp), 2.2f)
-        }
     }
 }
 
@@ -250,7 +213,7 @@ internal fun SleepTimerSheet(
                 Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LocalGlyphIcon(LocalIcon.MOON, SleepInk, Modifier.size(20.dp), 1.9f)
+                AppGlyphIcon(AppIcon.MOON, SleepInk, Modifier.size(20.dp), 1.9f)
                 Spacer(Modifier.width(8.dp))
                 Text("定时关闭", color = SleepInk, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
@@ -324,8 +287,8 @@ internal fun SleepTimerSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
             ) {
-                LocalGlyphIcon(
-                    LocalIcon.CLOCK,
+                AppGlyphIcon(
+                    AppIcon.CLOCK,
                     if (customOpen || isCustomTime) OnlinePink else SleepSecondary,
                     Modifier.size(16.dp),
                     1.9f,
@@ -413,7 +376,7 @@ internal fun SleepTimerSheet(
                         fontSize = 11.sp,
                     )
                 }
-                LocalGlyphIcon(LocalIcon.FILM, SleepSecondary, Modifier.size(18.dp), 1.7f)
+                AppGlyphIcon(AppIcon.FILM, SleepSecondary, Modifier.size(18.dp), 1.7f)
             }
             Row(
                 Modifier.fillMaxWidth().clickable(role = Role.Button) {

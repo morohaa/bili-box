@@ -31,12 +31,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.component.AppGlyphIcon
+import io.github.bilibox.core.ui.component.AppIcon
+import io.github.bilibox.core.ui.component.playback.SpeedPanel
+import io.github.bilibox.core.ui.component.playback.SpeedPanelMode
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.Pink
-import io.github.bilibox.feature.library.LocalGlyphIcon
-import io.github.bilibox.feature.library.LocalIcon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,7 +146,7 @@ internal fun PlayerDetailsPane(
                                         .border(1.dp, Color(0xFFE3E5E7), CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    LocalGlyphIcon(LocalIcon.TV, OnlinePink, Modifier.size(14.dp), 1.7f)
+                                    AppGlyphIcon(AppIcon.TV, OnlinePink, Modifier.size(14.dp), 1.7f)
                                 }
                             }
                         } else {

@@ -41,6 +41,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.model.SearchVideo
+import io.github.bilibox.core.ui.component.RemoteCover
+import io.github.bilibox.core.ui.component.VideoMetaIcon
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlineDivider
 import io.github.bilibox.core.ui.theme.OnlineMuted
@@ -49,12 +51,10 @@ import io.github.bilibox.core.ui.theme.OnlineSecondary
 import io.github.bilibox.core.ui.theme.OnlineSurface
 import io.github.bilibox.core.ui.theme.OnlineText
 import io.github.bilibox.core.ui.theme.Pink
+import io.github.bilibox.core.util.formatPlaybackTime
 import io.github.bilibox.data.bili.Page
 import io.github.bilibox.data.bili.UserCardData
 import io.github.bilibox.data.bili.VideoInfo
-import io.github.bilibox.feature.player.formatPlaybackTime
-import io.github.bilibox.feature.search.RemoteCover
-import io.github.bilibox.feature.search.VideoMetaIcon
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

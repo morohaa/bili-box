@@ -25,13 +25,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.component.EqualizerBars
 import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.core.util.formatPlaybackTime
 import io.github.bilibox.data.bili.BiliQn
 import io.github.bilibox.data.bili.Dolby
 import io.github.bilibox.data.bili.Page
 import io.github.bilibox.data.bili.PlayData
 import io.github.bilibox.feature.player.PlayerQualityOption
-import io.github.bilibox.feature.player.formatPlaybackTime
 
 @Composable
 internal fun OnlineVideoEpisodes(
@@ -110,18 +111,6 @@ internal fun OnlineEpisodeRow(page: Page, selected: Boolean, onClick: () -> Unit
             fontSize = 11.sp,
             maxLines = 1
         )
-    }
-}
-
-@Composable
-internal fun EqualizerBars() {
-    Row(
-        Modifier.width(20.dp).height(16.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        val heights = listOf(8.dp, 13.dp, 10.dp)
-        heights.forEach { height -> Box(Modifier.width(3.dp).height(height).clip(RoundedCornerShape(2.dp)).background(OnlinePink)) }
     }
 }
 

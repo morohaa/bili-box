@@ -40,14 +40,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.playback.LocalQueueMode
+import io.github.bilibox.core.ui.component.AppGlyphIcon
+import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.core.util.formatSpeedBadge
 import io.github.bilibox.core.util.formatVideoDuration
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoPlayback
 import io.github.bilibox.feature.player.LocalPlayerDetailActions
-import io.github.bilibox.feature.player.formatSpeedBadge
 import kotlin.math.abs
 
 /**
@@ -119,8 +121,8 @@ internal fun LocalVideoIntro(
                     animationSpec = tween(180),
                     label = "标题展开箭头",
                 )
-                LocalGlyphIcon(
-                    LocalIcon.CHEVRON_DOWN,
+                AppGlyphIcon(
+                    AppIcon.CHEVRON_DOWN,
                     Muted,
                     Modifier.padding(start = 4.dp, top = 4.dp).size(16.dp).rotate(chevron),
                     2f,
@@ -134,7 +136,7 @@ internal fun LocalVideoIntro(
             val speedActive = abs(speed - 1f) > .009f
             LocalDetailAction(
                 modifier = Modifier.weight(1f),
-                icon = LocalIcon.SPEED,
+                icon = AppIcon.SPEED,
                 label = if (speedActive) formatSpeedBadge(speed) else "倍速",
                 active = speedActive,
                 enabled = actions != null,
@@ -149,14 +151,14 @@ internal fun LocalVideoIntro(
             )
             LocalDetailAction(
                 modifier = Modifier.weight(1f),
-                icon = LocalIcon.CAMERA,
+                icon = AppIcon.CAMERA,
                 label = "截图",
                 enabled = actions?.screenshotEnabled == true,
                 onClick = { actions?.takeScreenshot?.invoke() },
             )
             LocalDetailAction(
                 modifier = Modifier.weight(1f),
-                icon = LocalIcon.MOON,
+                icon = AppIcon.MOON,
                 label = "定时关闭",
                 active = actions?.sleepTimerActive == true,
                 enabled = actions != null,
@@ -164,7 +166,7 @@ internal fun LocalVideoIntro(
             )
             LocalDetailAction(
                 modifier = Modifier.weight(1f),
-                icon = LocalIcon.SHARE,
+                icon = AppIcon.SHARE,
                 label = "分享",
                 onClick = onShare,
             )
@@ -232,7 +234,7 @@ private fun LocalSourceHeader(video: LocalVideo) {
             Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(DetailPinkSoft),
             contentAlignment = Alignment.Center,
         ) {
-            LocalGlyphIcon(LocalIcon.FOLDER, OnlinePink, Modifier.size(22.dp), 1.7f)
+            AppGlyphIcon(AppIcon.FOLDER, OnlinePink, Modifier.size(22.dp), 1.7f)
             if (video.isBiliCache) {
                 Box(
                     Modifier.align(Alignment.BottomEnd).offset(x = 4.dp, y = 4.dp).size(16.dp)
@@ -285,21 +287,21 @@ private fun LocalMetaRow(video: LocalVideo, durationMs: Long) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        DetailMeta(LocalIcon.CLOCK, formatVideoDuration(durationMs).ifBlank { "未知" })
-        if (video.sizeBytes > 0L) DetailMeta(LocalIcon.SIZE, formatBytes(video.sizeBytes))
+        DetailMeta(AppIcon.CLOCK, formatVideoDuration(durationMs).ifBlank { "未知" })
+        if (video.sizeBytes > 0L) DetailMeta(AppIcon.SIZE, formatBytes(video.sizeBytes))
         if (video.width > 0 && video.height > 0) {
-            DetailMeta(LocalIcon.FRAME, "${video.width}×${video.height}")
+            DetailMeta(AppIcon.FRAME, "${video.width}×${video.height}")
         }
         if (video.dateModifiedMs > 0L) {
-            DetailMeta(LocalIcon.CALENDAR, formatRelativeDate(video.dateModifiedMs))
+            DetailMeta(AppIcon.CALENDAR, formatRelativeDate(video.dateModifiedMs))
         }
     }
 }
 
 @Composable
-private fun DetailMeta(icon: LocalIcon, text: String) {
+private fun DetailMeta(icon: AppIcon, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        LocalGlyphIcon(icon, Muted, Modifier.size(13.dp), 1.8f)
+        AppGlyphIcon(icon, Muted, Modifier.size(13.dp), 1.8f)
         Spacer(Modifier.width(3.dp))
         Text(text, color = Muted, fontSize = 11.5.sp, maxLines = 1)
     }
@@ -308,7 +310,7 @@ private fun DetailMeta(icon: LocalIcon, text: String) {
 @Composable
 private fun LocalDetailAction(
     modifier: Modifier = Modifier,
-    icon: LocalIcon,
+    icon: AppIcon,
     label: String,
     active: Boolean = false,
     enabled: Boolean = true,
@@ -326,7 +328,7 @@ private fun LocalDetailAction(
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        LocalGlyphIcon(icon, tint, Modifier.size(23.dp), 1.75f, fill = filled)
+        AppGlyphIcon(icon, tint, Modifier.size(23.dp), 1.75f, fill = filled)
         Spacer(Modifier.height(4.dp))
         Text(label, color = tint, fontSize = 11.sp, lineHeight = 13.sp, maxLines = 1)
     }
@@ -344,7 +346,7 @@ private fun LocalResumeBar(
             .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LocalGlyphIcon(LocalIcon.HISTORY, DetailOrange, Modifier.size(15.dp), 2f)
+        AppGlyphIcon(AppIcon.HISTORY, DetailOrange, Modifier.size(15.dp), 2f)
         Spacer(Modifier.width(6.dp))
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             Text("上次看到 ", color = DetailOrange, fontSize = 12.sp)
@@ -370,7 +372,7 @@ private fun LocalResumeBar(
                 .semantics { contentDescription = "关闭续播提示" },
             contentAlignment = Alignment.Center,
         ) {
-            LocalGlyphIcon(LocalIcon.CLOSE, DetailOrange.copy(alpha = .7f), Modifier.size(12.dp), 2f)
+            AppGlyphIcon(AppIcon.CLOSE, DetailOrange.copy(alpha = .7f), Modifier.size(12.dp), 2f)
         }
     }
 }

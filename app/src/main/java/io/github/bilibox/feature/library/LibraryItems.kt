@@ -61,6 +61,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.component.AppGlyphIcon
+import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.Pink
@@ -218,7 +220,7 @@ internal fun FolderRow(
             }
         }
         Spacer(Modifier.width(6.dp))
-        LocalGlyphIcon(LocalIcon.CHEVRON_RIGHT, Muted.copy(alpha = .62f), Modifier.size(17.dp), 1.8f)
+        AppGlyphIcon(AppIcon.CHEVRON_RIGHT, Muted.copy(alpha = .62f), Modifier.size(17.dp), 1.8f)
     }
 }
 
@@ -232,7 +234,7 @@ internal fun FolderIcon(folder: LocalVideoFolder) {
                 .background(LibrarySoftPink),
             contentAlignment = Alignment.Center,
         ) {
-            LocalGlyphIcon(LocalIcon.FOLDER, Pink, Modifier.size(24.dp), 1.7f)
+            AppGlyphIcon(AppIcon.FOLDER, Pink, Modifier.size(24.dp), 1.7f)
         }
         if (folder.unplayedCount > 0) {
             Box(
@@ -295,7 +297,7 @@ internal fun VideoRow(
                     .background(LibrarySoftPink),
                 contentAlignment = Alignment.Center,
             ) {
-                LocalGlyphIcon(LocalIcon.FILE, Pink, Modifier.size(if (compact) 20.dp else 23.dp), 1.7f)
+                AppGlyphIcon(AppIcon.FILE, Pink, Modifier.size(if (compact) 20.dp else 23.dp), 1.7f)
             }
         }
         Spacer(Modifier.width(if (compact) 9.dp else 11.dp))
@@ -353,13 +355,13 @@ internal fun VideoMoreMenu(
                 .clickable { expanded = true },
             contentAlignment = Alignment.Center,
         ) {
-            LocalGlyphIcon(LocalIcon.MORE, if (onThumbnail) Color.White else Muted, Modifier.size(16.dp), 1.8f)
+            AppGlyphIcon(AppIcon.MORE, if (onThumbnail) Color.White else Muted, Modifier.size(16.dp), 1.8f)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        LocalGlyphIcon(LocalIcon.PLAY, Pink, Modifier.size(15.dp), 1.8f)
+                        AppGlyphIcon(AppIcon.PLAY, Pink, Modifier.size(15.dp), 1.8f)
                         Spacer(Modifier.width(9.dp))
                         Text("播放", color = Ink, fontSize = 13.sp)
                     }
@@ -372,7 +374,7 @@ internal fun VideoMoreMenu(
             DropdownMenuItem(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        LocalGlyphIcon(LocalIcon.SHARE, LibrarySecondary, Modifier.size(15.dp), 1.7f)
+                        AppGlyphIcon(AppIcon.SHARE, LibrarySecondary, Modifier.size(15.dp), 1.7f)
                         Spacer(Modifier.width(9.dp))
                         Text("分享", color = Ink, fontSize = 13.sp)
                     }
@@ -385,7 +387,7 @@ internal fun VideoMoreMenu(
             DropdownMenuItem(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        LocalGlyphIcon(LocalIcon.INFO, LibrarySecondary, Modifier.size(15.dp), 1.7f)
+                        AppGlyphIcon(AppIcon.INFO, LibrarySecondary, Modifier.size(15.dp), 1.7f)
                         Spacer(Modifier.width(9.dp))
                         Text("文件信息", color = Ink, fontSize = 13.sp)
                     }
@@ -528,7 +530,7 @@ internal fun VideoCard(
                 VideoThumbnail(video, settings, playback, Modifier.fillMaxSize())
             } else {
                 Box(Modifier.fillMaxSize().background(coverBrush(video.title)), contentAlignment = Alignment.Center) {
-                    LocalGlyphIcon(LocalIcon.FILE, Color.White.copy(alpha = .9f), Modifier.size(28.dp), 1.5f)
+                    AppGlyphIcon(AppIcon.FILE, Color.White.copy(alpha = .9f), Modifier.size(28.dp), 1.5f)
                 }
             }
             Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
@@ -594,7 +596,7 @@ internal fun FolderCard(
                             .background(Color.White.copy(alpha = .82f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        LocalGlyphIcon(LocalIcon.FOLDER, Pink, Modifier.size(26.dp), 1.7f)
+                        AppGlyphIcon(AppIcon.FOLDER, Pink, Modifier.size(26.dp), 1.7f)
                     }
                 }
             }
@@ -607,7 +609,7 @@ internal fun FolderCard(
                     .padding(horizontal = 5.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LocalGlyphIcon(LocalIcon.FOLDER, Color.White, Modifier.size(11.dp), 2f)
+                AppGlyphIcon(AppIcon.FOLDER, Color.White, Modifier.size(11.dp), 2f)
                 Spacer(Modifier.width(3.dp))
                 Text("${folder.count}", color = Color.White, fontSize = 9.5.sp)
             }
@@ -672,7 +674,7 @@ internal fun FolderCover(folder: LocalVideoFolder) {
                     .background(Color.White.copy(alpha = .82f)),
                 contentAlignment = Alignment.Center,
             ) {
-                LocalGlyphIcon(LocalIcon.FOLDER, Pink, Modifier.size(26.dp), 1.7f)
+                AppGlyphIcon(AppIcon.FOLDER, Pink, Modifier.size(26.dp), 1.7f)
             }
         }
     }
@@ -728,7 +730,7 @@ internal fun ContinueWatchingBar(
                 .background(Pink),
             contentAlignment = Alignment.Center,
         ) {
-            LocalGlyphIcon(LocalIcon.PLAY, Color.White, Modifier.size(18.dp), 1.8f)
+            AppGlyphIcon(AppIcon.PLAY, Color.White, Modifier.size(18.dp), 1.8f)
         }
         Spacer(Modifier.width(4.dp))
     }

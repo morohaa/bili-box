@@ -1,6 +1,7 @@
 package io.github.bilibox.feature.library
 
 import io.github.bilibox.core.playback.LocalQueueMode
+import io.github.bilibox.core.ui.component.AppIcon
 
 internal val LocalQueueMode.label: String
     get() = when (this) {
@@ -18,10 +19,10 @@ internal val LocalQueueMode.description: String
         LocalQueueMode.SHUFFLE -> "随机播放同文件夹里的下一个视频"
     }
 
-internal val LocalQueueMode.icon: LocalIcon
+internal val LocalQueueMode.icon: AppIcon
     get() = when (this) {
-        LocalQueueMode.LIST_LOOP -> LocalIcon.LOOP
-        LocalQueueMode.SINGLE_LOOP -> LocalIcon.LOOP_ONE
-        LocalQueueMode.STOP_AFTER -> LocalIcon.WAVEFORM
-        LocalQueueMode.SHUFFLE -> LocalIcon.SHUFFLE
+        LocalQueueMode.LIST_LOOP -> AppIcon.LOOP
+        LocalQueueMode.SINGLE_LOOP -> AppIcon.LOOP_ONE
+        LocalQueueMode.STOP_AFTER -> AppIcon.WAVEFORM
+        LocalQueueMode.SHUFFLE -> AppIcon.SHUFFLE
     }

@@ -35,9 +35,10 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 ├── app/src/main/java/io/github/bilibox/
 │   ├── MainActivity.kt                 # 应用入口、页面切换与全局状态
 │   ├── core/
-│   │   ├── playback/                  # 播放队列协议、播放模式与后台媒体会话
+│   │   ├── playback/                  # 队列协议、播放模式、倍速规则、定时状态与后台媒体会话
 │   │   ├── model/                     # 跨功能共享的搜索 / 播放状态模型
-│   │   ├── ui/component/              # 顶栏、玻璃导航等共享 UI
+│   │   ├── ui/component/              # 顶栏、封面、图标与均衡器等共享 UI
+│   │   │   └── playback/              # 播放器与听视频共用的倍速、定时关闭面板
 │   │   ├── ui/theme/                  # 颜色、主题、字体与动态色板
 │   │   └── util/                      # 格式化、截帧等无业务工具
 │   ├── data/
@@ -53,7 +54,7 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 │       ├── library/                   # 本地视频库与详情
 │       ├── listen/                    # 听视频页面与播放状态绑定
 │       ├── online/                    # 在线视频详情、选集与缓存
-│       ├── player/                    # 播放器、倍速、定时关闭与手势
+│       ├── player/                    # 播放器页面、控制条、手势与定时播放绑定
 │       ├── profile/                   # 我的页
 │       └── search/                    # 搜索结果与筛选控件
 ├── app/src/test/                      # JVM 单元测试（与主代码包镜像）

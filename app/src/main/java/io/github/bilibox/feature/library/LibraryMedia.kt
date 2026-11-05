@@ -28,7 +28,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +38,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.component.AppGlyphIcon
+import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.Pink
@@ -63,7 +64,7 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun PermissionState(onRequest: () -> Unit, onRecheck: () -> Unit) {
     LibraryMessage(
-        icon = LocalIcon.FOLDER,
+        icon = AppIcon.FOLDER,
         title = "允许访问本地视频",
         message = "授权后，BiliBox 会读取设备中的视频文件，并按文件夹整理展示。",
         actionLabel = "允许访问并扫描",
@@ -88,7 +89,7 @@ internal fun LoadingState() {
 @Composable
 internal fun ErrorState(message: String, onRetry: () -> Unit) {
     LibraryMessage(
-        icon = LocalIcon.INFO,
+        icon = AppIcon.INFO,
         title = "扫描失败",
         message = message,
         actionLabel = "重试",
@@ -104,7 +105,7 @@ internal fun EmptyState(
     actionLabel: String? = null,
 ) {
     LibraryMessage(
-        icon = LocalIcon.FOLDER,
+        icon = AppIcon.FOLDER,
         title = title,
         message = message,
         actionLabel = actionLabel,
@@ -114,7 +115,7 @@ internal fun EmptyState(
 
 @Composable
 internal fun LibraryMessage(
-    icon: LocalIcon,
+    icon: AppIcon,
     title: String,
     message: String,
     actionLabel: String? = null,
@@ -130,7 +131,7 @@ internal fun LibraryMessage(
             Modifier.size(76.dp).clip(RoundedCornerShape(24.dp)).background(LibrarySoftPink),
             contentAlignment = Alignment.Center,
         ) {
-            LocalGlyphIcon(icon, Pink, Modifier.size(34.dp), 1.5f)
+            AppGlyphIcon(icon, Pink, Modifier.size(34.dp), 1.5f)
         }
         Spacer(Modifier.height(18.dp))
         Text(title, color = Ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)

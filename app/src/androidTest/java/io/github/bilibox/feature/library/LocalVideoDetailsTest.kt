@@ -6,10 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -18,12 +15,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.media3.exoplayer.ExoPlayer
 import io.github.bilibox.core.playback.LocalQueueMode
+import io.github.bilibox.core.playback.PlaybackSleepTimer
+import io.github.bilibox.core.playback.SleepTimerMode
+import io.github.bilibox.core.ui.component.playback.SleepTimerSheet
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.feature.player.LocalPlayerDetailActions
-import io.github.bilibox.feature.player.PlaybackSleepTimer
 import io.github.bilibox.feature.player.PlayerDetailActions
-import io.github.bilibox.feature.player.SleepTimerMode
-import io.github.bilibox.feature.player.SleepTimerSheet
 import io.github.bilibox.feature.player.VideoPlayerScreen
 import org.junit.Assert.assertEquals
 import org.junit.Rule

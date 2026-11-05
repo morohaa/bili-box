@@ -62,12 +62,13 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import io.github.bilibox.R
+import io.github.bilibox.core.ui.component.EqualizerBars
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.OnlineText
 import io.github.bilibox.core.ui.theme.Pink
+import io.github.bilibox.core.util.formatPlaybackTime
 import io.github.bilibox.core.util.formatVideoDuration
 import io.github.bilibox.data.localvideo.LocalVideo
-import io.github.bilibox.feature.online.EqualizerBars
 
 @Composable
 internal fun ScreenshotPreviewCard(
@@ -725,17 +726,4 @@ internal fun createTexturePlayerView(context: Context, player: ExoPlayer): Playe
 internal fun createCompatiblePlayer(context: Context): ExoPlayer {
     val renderersFactory = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
     return ExoPlayer.Builder(context, renderersFactory).build()
-}
-
-internal fun formatPlaybackTime(positionMs: Long, unknownWhenZero: Boolean = false): String {
-    if (unknownWhenZero && positionMs <= 0L) return "--:--"
-    val totalSeconds = (positionMs.coerceAtLeast(0L) / 1000L)
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) {
-        "%d:%02d:%02d".format(hours, minutes, seconds)
-    } else {
-        "%02d:%02d".format(minutes, seconds)
-    }
 }

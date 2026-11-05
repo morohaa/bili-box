@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.player
+package io.github.bilibox.core.ui.component.playback
 
 import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.Canvas
@@ -46,7 +46,12 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.playback.PlaybackSpeedBoost
+import io.github.bilibox.core.playback.PlaybackSpeedMax
+import io.github.bilibox.core.playback.PlaybackSpeedMin
+import io.github.bilibox.core.playback.PlaybackSpeedPresets
 import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.core.util.formatSpeedBadge
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
