@@ -40,16 +40,18 @@ import io.github.bilibox.data.danmaku.Danmaku
 import io.github.bilibox.data.danmaku.DanmakuParser
 import io.github.bilibox.data.danmaku.DanmakuPreferences
 import io.github.bilibox.data.danmaku.DanmakuSettings
+import io.github.bilibox.data.online.OnlineVideoCacheStore
 import io.github.bilibox.feature.listen.ListenInfo
 import io.github.bilibox.feature.player.VideoPlayerScreen
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private enum class OnlineVideoCacheStatus { IDLE, DOWNLOADING, SAVED }
 
 @Composable
 internal fun BiliVideoDetail(video: VideoSummary, session: BiliSession?, onBack: () -> Unit) {
@@ -90,6 +92,7 @@ internal fun BiliVideoDetail(video: VideoSummary, session: BiliSession?, onBack:
     var episodesInGridView by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(false) }
     var creatorCard by remember(video.bvid, session?.cookie) { mutableStateOf<UserCardData?>(null) }
     var cacheStatus by remember(video.bvid, selectedPage, session?.cookie) { mutableStateOf(OnlineVideoCacheStatus.IDLE) }
+    val cacheStore = remember(context) { OnlineVideoCacheStore(context) }
     // Cache entries belong to one quality, so do not reuse 1080P urls after a quality change.
     val episodePlayCache = remember(video.bvid, session?.cookie, selectedQn) { EpisodePlayCache() }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
@@ -385,61 +388,61 @@ internal fun BiliVideoDetail(video: VideoSummary, session: BiliSession?, onBack:
     // the background, Compose stops recomposing, so the end-of-part listener and the
     // notification "next" start the next part directly through [startLoad].
     val loadScope = remember(video.bvid, session?.cookie) { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
-    var loadJob by remember(video.bvid, session?.cookie) { mutableStateOf<Job?>(null) }
-    var lastRequestedLoad by remember(video.bvid, session?.cookie) { mutableStateOf<List<Any?>?>(null) }
-    DisposableEffect(loadScope) { onDispose { loadScope.cancel() } }
-    suspend fun loadPlayback() {
-        val resumeAtMs = qualityResumeMs
-        val resumePlaying = qualityResumePlaying
-        qualityResumeMs = 0L
-        qualityResumePlaying = true
-        playbackState = OnlinePlaybackState.Loading
-        playbackRefreshTried = false
-        dashFallbackTried = false
-        durlFallbackTried = false
-        html5FallbackTried = false
-        playbackData = null
-        playbackCid = 0L
-        exoPlayer.stop()
-        try {
-            // View + creator data do not change between parts; only playurl
-            // needs a fresh request when switching episodes.
-            val info = videoInfo ?: run {
-                client.warmUp()
-                client.videoInfo(video.bvid).also { loaded ->
-                    videoInfo = loaded
-                    if (loaded.owner.mid > 0) {
-                        scope.launch {
-                            creatorCard = runCatching { client.userCard(loaded.owner.mid) }.getOrNull()
-                        }
-                    }
-                }
-            }
-            val page = info.pages.firstOrNull { it.page == selectedPage }
-                ?: info.pages.firstOrNull()?.also { selectedPage = it.page }
-            val cid = page?.cid ?: info.cid
-            if (cid <= 0) throw IllegalStateException("B 站没有返回视频分 P 信息")
-            val resolvedBvid = info.bvid.ifBlank { video.bvid }
-            val play = episodePlayCache.take(cid)
-                ?: client.playUrl(resolvedBvid, cid, qn = selectedQn)
-            playbackCid = cid
-            attachPlayData(play, selectedQn, resumeMs = resumeAtMs)
-            if (!resumePlaying) exoPlayer.playWhenReady = false
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            playbackState = OnlinePlaybackState.Error(error.message ?: "无法获取视频播放地址")
+    val loadCoordinator = remember(client, video.bvid, loadScope) {
+        OnlinePlaybackLoadCoordinator(client, video.bvid, loadScope)
+    }
+    DisposableEffect(loadScope, loadCoordinator) {
+        onDispose {
+            loadCoordinator.cancel()
+            loadScope.cancel()
         }
     }
     fun startLoad(key: List<Any?>) {
-        lastRequestedLoad = key
-        loadJob?.cancel()
-        loadJob = loadScope.launch { loadPlayback() }
+        val request = OnlinePlaybackLoadRequest(
+            key = key,
+            page = selectedPage,
+            quality = selectedQn,
+            resumeAtMs = qualityResumeMs,
+            resumePlaying = qualityResumePlaying,
+        )
+        qualityResumeMs = 0L
+        qualityResumePlaying = true
+        loadCoordinator.load(
+            request = request,
+            cache = episodePlayCache,
+            callbacks = OnlinePlaybackLoadCallbacks(
+                onStart = {
+                    playbackState = OnlinePlaybackState.Loading
+                    playbackRefreshTried = false
+                    dashFallbackTried = false
+                    durlFallbackTried = false
+                    html5FallbackTried = false
+                    playbackData = null
+                    playbackCid = 0L
+                    exoPlayer.stop()
+                },
+                onVideoInfo = { info ->
+                    videoInfo = info
+                    if (info.owner.mid > 0) {
+                        scope.launch {
+                            creatorCard = runCatching { client.userCard(info.owner.mid) }.getOrNull()
+                        }
+                    }
+                },
+                onPageResolved = { selectedPage = it },
+                onLoaded = { cid, data, qn, resumeAtMs, resumePlaying ->
+                    playbackCid = cid
+                    attachPlayData(data, qn, resumeMs = resumeAtMs)
+                    if (!resumePlaying) exoPlayer.playWhenReady = false
+                },
+                onError = { message -> playbackState = OnlinePlaybackState.Error(message) },
+            ),
+        )
     }
     LaunchedEffect(video.bvid, session?.cookie, retryToken, selectedPage, selectedQn, qualityRequestToken) {
         val key = listOf(retryToken, selectedPage, selectedQn, qualityRequestToken)
         // The background queue may already have started exactly this part.
-        if (key != lastRequestedLoad) startLoad(key)
+        if (!loadCoordinator.hasRequested(key)) startLoad(key)
     }
     fun listenSubtitle(page: Int): String = listOfNotNull(
         videoInfo?.owner?.name?.takeIf { it.isNotBlank() } ?: video.author.takeIf { it.isNotBlank() },
@@ -472,17 +475,20 @@ internal fun BiliVideoDetail(video: VideoSummary, session: BiliSession?, onBack:
         }
         val cacheTitle = videoInfo?.title?.takeIf { it.isNotBlank() } ?: video.title
         val updateCacheStatus: (OnlineVideoCacheStatus) -> Unit = { cacheStatus = it }
-        startOnlineVideoCache(
-            scope = scope,
-            context = context,
-            client = client,
-            bvid = video.bvid,
-            cid = cid,
-            qn = selectedQn,
-            title = cacheTitle,
-            cookie = session?.cookie,
-            onStatus = updateCacheStatus,
-        )
+        scope.launch {
+            updateCacheStatus(OnlineVideoCacheStatus.DOWNLOADING)
+            try {
+                cacheStore.cache(client, video.bvid, cid, selectedQn, cacheTitle, session?.cookie)
+                updateCacheStatus(OnlineVideoCacheStatus.SAVED)
+                Toast.makeText(context, "已缓存到 Movies/BiliBox", Toast.LENGTH_SHORT).show()
+            } catch (cancelled: CancellationException) {
+                updateCacheStatus(OnlineVideoCacheStatus.IDLE)
+                throw cancelled
+            } catch (error: Exception) {
+                updateCacheStatus(OnlineVideoCacheStatus.IDLE)
+                Toast.makeText(context, "缓存失败：${error.message ?: "请稍后重试"}", Toast.LENGTH_LONG).show()
+            }
+        }
     }
     val cachePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()

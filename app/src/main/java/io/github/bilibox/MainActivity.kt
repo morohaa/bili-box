@@ -44,15 +44,13 @@ import io.github.bilibox.data.auth.BiliSessionStore
 import io.github.bilibox.data.bili.BiliClient
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
-import io.github.bilibox.data.search.toVideoSummary
 import io.github.bilibox.feature.dynamic.DynamicPage
 import io.github.bilibox.feature.library.LibraryPage
 import io.github.bilibox.feature.online.BiliVideoDetail
 import io.github.bilibox.feature.player.LocalVideoPlayer
 import io.github.bilibox.feature.profile.MyPage
+import io.github.bilibox.feature.search.SearchStateHolder
 import io.github.bilibox.feature.search.SearchUiState
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -82,12 +80,10 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     var session by remember { mutableStateOf<BiliSession?>(BiliSessionStore.load(context)) }
     var libraryFilter by remember { mutableStateOf<LocalVideoQuickFilter?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    var searchState by remember { mutableStateOf<SearchUiState>(SearchUiState.Idle) }
     var searchOrder by rememberSaveable { mutableStateOf(SearchOrder.RELEVANCE) }
     var searchDuration by rememberSaveable { mutableStateOf<SearchDuration?>(null) }
     var searchTimeRange by rememberSaveable { mutableStateOf<SearchTimeRange?>(null) }
     var searchGrid by rememberSaveable { mutableStateOf(false) }
-    var searchJob by remember { mutableStateOf<Job?>(null) }
     // 动态页处于搜索态（输入中或展示结果）时，底部导航随参考稿下滑隐藏。
     var dynamicExpanded by rememberSaveable { mutableStateOf(false) }
     val pageScroll = rememberScrollState()
@@ -115,38 +111,15 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     val searchClient = remember(session?.cookie) {
         BiliClient().also { it.cookieHeader = session?.cookie }
     }
+    val searchHolder = remember(searchClient, scope) { SearchStateHolder(searchClient, scope) }
+    DisposableEffect(searchHolder) { onDispose { searchHolder.reset() } }
+    val searchState = searchHolder.state
     val runSearch: (Int, SearchOrder) -> Unit = { page, order ->
         val keyword = searchQuery.trim()
         if (keyword.isNotEmpty()) {
-            val requestedDuration = searchDuration
-            val requestedRange = searchTimeRange
             searchOrder = order
-            searchState = SearchUiState.Loading
-            searchJob?.cancel()
-            searchJob = scope.launch {
-                // 新一轮搜索、翻页或筛选都从结果顶部开始；打开详情再返回时保留位置。
-                dynamicScroll.scrollTo(0)
-                searchState = try {
-                    val result = searchClient.searchVideos(
-                        keyword = keyword,
-                        page = page,
-                        order = order,
-                        duration = requestedDuration,
-                        timeRange = requestedRange,
-                    )
-                    SearchUiState.Success(
-                        items = result.items.map(::toVideoSummary),
-                        page = result.page,
-                        hasMore = result.hasMore,
-                        order = order,
-                        total = result.total,
-                    )
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (error: Exception) {
-                    SearchUiState.Error(error.message ?: "搜索失败，请稍后重试", page, order)
-                }
-            }
+            scope.launch { dynamicScroll.scrollTo(0) }
+            searchHolder.search(keyword, page, order, searchDuration, searchTimeRange)
         }
     }
     var selectedVideo by remember { mutableStateOf<VideoSummary?>(null) }
@@ -154,8 +127,7 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     var localPlaylist by remember { mutableStateOf<List<LocalVideo>>(emptyList()) }
     var libraryRefresh by remember { mutableIntStateOf(0) }
     val closeSearch = {
-        searchJob?.cancel()
-        searchState = SearchUiState.Idle
+        searchHolder.reset()
         searchQuery = ""
         focusManager.clearFocus()
     }
@@ -163,8 +135,7 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     val updateQuery: (String) -> Unit = { value ->
         searchQuery = value
         if (searchState != SearchUiState.Idle) {
-            searchJob?.cancel()
-            searchState = SearchUiState.Idle
+            searchHolder.reset()
         }
     }
     selectedVideo?.let { video ->
