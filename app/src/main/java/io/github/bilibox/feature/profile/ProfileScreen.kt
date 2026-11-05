@@ -4,18 +4,24 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.text.format.Formatter
 import android.widget.Toast
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.zxing.BarcodeFormat
@@ -59,6 +65,21 @@ internal val MyPink = Color(0xFFEF7196)
 internal val MyOrange = Color(0xFFFF6600)
 internal val MyBadgeRed = Color(0xFFFA5A57)
 
+// 视口低于这个高度（手机横屏、分屏）时，固定头部会把内容挤没，改用整页滚动。
+private val CompactHeightThreshold = 500.dp
+
+// 内容滚到头部下沿时的渐隐高度。
+private val HeaderFadeHeight = 24.dp
+
+// 内容底部留白。
+private val ContentBottomGap = 12.dp
+
+// 已登录时内容与头图之间的留白：未登录滚到底后宫格要对齐到同一位置。
+private val ContentTopGap = 12.dp
+
+// 悬浮导航栏高度 66dp + 16dp 间距：内容区预留出来，最后一项不会被挡住。
+private val NavigationBarClearance = 82.dp
+
 @Composable
 internal fun ProfileScreen(
     session: BiliSession?,
@@ -66,6 +87,8 @@ internal fun ProfileScreen(
     onToggleDarkMode: () -> Unit = {},
     onOpenLibrary: (LocalVideoQuickFilter?) -> Unit = {},
     onSessionChange: (BiliSession?) -> Unit,
+    scrollState: ScrollState,
+    onBannerScrollLimitChange: (Int) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -134,10 +157,37 @@ internal fun ProfileScreen(
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
-    Box(Modifier.fillMaxWidth().background(background)) {
-        Column(Modifier.fillMaxWidth()) {
-            ProfileHeader(session, avatar, darkMode, onToggleDarkMode)
+    // 头图固定在页面顶部，只让下方内容滚动：背景图始终完整露出，不随滚动被裁掉。
+    // 视口太矮（手机横屏、分屏）时固定头部会把内容挤没，那时退化成整页滚动。
+    BoxWithConstraints(Modifier.fillMaxSize().background(background)) {
+        val bannerHeight = profileBannerHeight(maxWidth, maxHeight)
+        val compact = maxHeight < CompactHeightThreshold
+        // 整页滚动时头图会滚走，滚过状态栏后要把图标换回深色；固定头图时永远不需要。
+        val scrollLimit = if (compact) {
+            val bannerPx = with(LocalDensity.current) { bannerHeight.roundToPx() }
+            val statusBarPx = with(LocalDensity.current) {
+                WindowInsets.statusBars.asPaddingValues().calculateTopPadding().roundToPx()
+            }
+            (bannerPx - statusBarPx).coerceAtLeast(0)
+        } else {
+            Int.MAX_VALUE
+        }
+        LaunchedEffect(scrollLimit) { onBannerScrollLimitChange(scrollLimit) }
 
+        // 未登录时补一段尾部空白：登录卡正好能完全滚出，滚到底时宫格落在登录后的位置。
+        var viewportPx by remember { mutableIntStateOf(0) }
+        var gridHeightPx by remember { mutableIntStateOf(0) }
+        val density = LocalDensity.current
+        val trailingSpace = if (!compact && session == null && viewportPx > 0) {
+            with(density) {
+                (viewportPx - gridHeightPx - ContentBottomGap.roundToPx() - ContentTopGap.roundToPx())
+                    .coerceAtLeast(0).toDp()
+            }
+        } else {
+            0.dp
+        }
+
+        val content: @Composable () -> Unit = {
             if (session == null) {
                 LoginCard(
                     state = state,
@@ -148,29 +198,31 @@ internal fun ProfileScreen(
                 )
             }
 
-            Spacer(Modifier.height(if (session == null) 18.dp else 12.dp))
+            Spacer(Modifier.height(if (session == null) 18.dp else ContentTopGap))
 
-            ActionGrid(
-                darkMode = darkMode,
-                background = background,
-                onOfflineCache = { onOpenLibrary(LocalVideoQuickFilter.BILI_CACHE) },
-                onHistory = { onOpenLibrary(LocalVideoQuickFilter.RECENT) },
-                onLocalVideos = { onOpenLibrary(null) },
-                onLoginMethods = { sheet = MySheet.LoginMethods },
-                onSession = { sheet = MySheet.Session },
-                onTheme = onToggleDarkMode,
-                onAbout = { sheet = MySheet.About },
-                onClearCache = {
-                    scope.launch {
-                        val freed = withContext(Dispatchers.IO) { clearAppCache(context) }
-                        toast(if (freed > 0) "已清理 ${Formatter.formatFileSize(context, freed)} 缓存" else "缓存已经是空的")
-                    }
-                },
-                onHelp = { sheet = MySheet.Help },
-                onUpdate = { sheet = MySheet.Update },
-                onFavorites = { toast("「我的收藏」需要 B 站账号数据接口，当前版本暂未接入") },
-                onWatchLater = { toast("「稍后再看」需要 B 站账号数据接口，当前版本暂未接入") },
-            )
+            Box(Modifier.onSizeChanged { gridHeightPx = it.height }) {
+                ActionGrid(
+                    darkMode = darkMode,
+                    background = background,
+                    onOfflineCache = { onOpenLibrary(LocalVideoQuickFilter.BILI_CACHE) },
+                    onHistory = { onOpenLibrary(LocalVideoQuickFilter.RECENT) },
+                    onLocalVideos = { onOpenLibrary(null) },
+                    onLoginMethods = { sheet = MySheet.LoginMethods },
+                    onSession = { sheet = MySheet.Session },
+                    onTheme = onToggleDarkMode,
+                    onAbout = { sheet = MySheet.About },
+                    onClearCache = {
+                        scope.launch {
+                            val freed = withContext(Dispatchers.IO) { clearAppCache(context) }
+                            toast(if (freed > 0) "已清理 ${Formatter.formatFileSize(context, freed)} 缓存" else "缓存已经是空的")
+                        }
+                    },
+                    onHelp = { sheet = MySheet.Help },
+                    onUpdate = { sheet = MySheet.Update },
+                    onFavorites = { toast("「我的收藏」需要 B 站账号数据接口，当前版本暂未接入") },
+                    onWatchLater = { toast("「稍后再看」需要 B 站账号数据接口，当前版本暂未接入") },
+                )
+            }
 
             if (session != null) {
                 Spacer(Modifier.height(10.dp))
@@ -184,7 +236,48 @@ internal fun ProfileScreen(
                     }
                 }
             }
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(ContentBottomGap))
+            Spacer(Modifier.height(trailingSpace))
+        }
+
+        val header: @Composable () -> Unit = {
+            ProfileHeader(session, avatar, darkMode, onToggleDarkMode, bannerHeight)
+        }
+
+        if (compact) {
+            Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
+                header()
+                content()
+                // 悬浮导航栏占位，让最后一项能滚到它上面。
+                Spacer(Modifier.height(NavigationBarClearance))
+                Spacer(Modifier.navigationBarsPadding())
+            }
+        } else {
+            val fadePx = with(density) { HeaderFadeHeight.toPx() }
+            Column(Modifier.fillMaxSize()) {
+                header()
+                Box(Modifier.fillMaxWidth().weight(1f)) {
+                    Column(
+                        Modifier.fillMaxSize()
+                            .navigationBarsPadding()
+                            .padding(bottom = NavigationBarClearance)
+                            .onSizeChanged { viewportPx = it.height }
+                            .verticalScroll(scrollState)
+                    ) { content() }
+                    // 内容滚到头部下沿时渐隐到背景色：透明度跟着滚动距离走，静止时不压暗首项。
+                    Box(
+                        Modifier.fillMaxWidth().height(HeaderFadeHeight)
+                            .graphicsLayer { alpha = (scrollState.value / fadePx).coerceIn(0f, 1f) }
+                            .background(
+                                Brush.verticalGradient(
+                                    0f to background,
+                                    0.6f to background,
+                                    1f to background.copy(alpha = 0f),
+                                )
+                            )
+                    )
+                }
+            }
         }
     }
 

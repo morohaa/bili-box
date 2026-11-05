@@ -4,9 +4,7 @@ import android.app.Activity
 import android.content.Context
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 
@@ -34,11 +32,15 @@ internal fun BiliBoxApp() {
 @Composable
 private fun AppSystemBars(appState: BiliBoxAppState, darkMode: Boolean) {
     val view = LocalView.current
-    // “我的”页的通栏头图滚出屏幕后，浅色模式下恢复深色状态栏图标。
-    val bannerScrollPx = with(LocalDensity.current) { 200.dp.toPx() }
-    val pastBanner by remember(appState, bannerScrollPx) {
-        derivedStateOf { appState.profileScroll.value > bannerScrollPx }
+    // 头图固定时阈值是 Int.MAX_VALUE，这一页始终用浅色图标；矮视口整页滚动时才按滚动位置切换。
+    val pastBannerState = remember(appState) {
+        derivedStateOf {
+            val limit = appState.profileBannerScrollLimitPx
+            limit != Int.MAX_VALUE && appState.profileScroll.value > limit
+        }
     }
+    // 在组合中读取，越过阈值时才会重组，SideEffect 才能重新应用系统栏外观。
+    val pastBanner = pastBannerState.value
     SideEffect {
         val window = (view.context as? Activity)?.window ?: return@SideEffect
         WindowCompat.getInsetsController(window, view).apply {
@@ -46,7 +48,7 @@ private fun AppSystemBars(appState: BiliBoxAppState, darkMode: Boolean) {
             isAppearanceLightNavigationBars = !darkMode
         }
     }
-    // 进入“我的”页时，头图与头像从顶部完整露出。
+    // 进入“我的”页时，内容回到顶部。
     LaunchedEffect(appState.selectedTab) {
         if (appState.selectedTab == AppTab.PROFILE) appState.profileScroll.scrollTo(0)
     }

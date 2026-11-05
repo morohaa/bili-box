@@ -40,9 +40,26 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.data.auth.BiliSession
+
+// 头图高度跟屏宽成比例：各机型裁切和观感一致，不再把系统状态栏高度加进高度。
+private const val BANNER_ASPECT_RATIO = 1.7f
+
+// 超宽窗口（横屏、平板）下不再继续放大，避免头图吃掉整屏。
+private val BannerMaxHeight = 320.dp
+
+// 头图固定在顶部不滚动，所以高度还要受可用高度限制：横屏或小屏时得给内容区留位置。
+private const val BANNER_MAX_HEIGHT_FRACTION = 0.42f
+
+/** 头图高度：优先按屏宽比例，再受绝对上限与可用高度限制。 */
+internal fun profileBannerHeight(availableWidth: Dp, availableHeight: Dp): Dp = minOf(
+    availableWidth / BANNER_ASPECT_RATIO,
+    BannerMaxHeight,
+    availableHeight * BANNER_MAX_HEIGHT_FRACTION,
+)
 
 @Composable
 internal fun ProfileHeader(
@@ -50,13 +67,16 @@ internal fun ProfileHeader(
     avatar: ImageBitmap?,
     darkMode: Boolean,
     onToggleDarkMode: () -> Unit,
+    bannerHeight: Dp,
 ) {
     val background = if (darkMode) MyBgDark else MyBgLight
-    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val bannerHeight = 200.dp + statusBar
 
     Box(Modifier.fillMaxWidth().height(bannerHeight + 56.dp)) {
-        Banner(avatar, darkMode, Modifier.fillMaxWidth().height(bannerHeight))
+        Banner(
+            avatar = avatar,
+            darkMode = darkMode,
+            modifier = Modifier.fillMaxWidth().height(bannerHeight),
+        )
         ProfileAvatar(
             session = session,
             avatar = avatar,

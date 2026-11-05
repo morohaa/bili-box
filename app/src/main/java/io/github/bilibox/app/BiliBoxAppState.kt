@@ -77,6 +77,14 @@ internal class BiliBoxAppState(
     var libraryRefresh by mutableIntStateOf(0)
         private set
 
+    // “我的”页头图滚过状态栏的阈值（px）：只在矮视口整页滚动时有效，固定头图时为 Int.MAX_VALUE。
+    var profileBannerScrollLimitPx by mutableIntStateOf(Int.MAX_VALUE)
+        private set
+
+    fun updateProfileBannerScrollLimit(px: Int) {
+        profileBannerScrollLimitPx = px
+    }
+
     fun selectTab(index: Int) {
         libraryFilter = null
         selectedIndex = index.coerceIn(0, AppTab.entries.lastIndex)

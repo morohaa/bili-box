@@ -9,7 +9,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,19 +60,15 @@ internal fun AppNavigation(appState: BiliBoxAppState, darkMode: Boolean, onToggl
                     onVideoSelected = appState::openLocalVideo,
                 )
 
-                AppTab.PROFILE -> {
-                    Column(Modifier.fillMaxSize().verticalScroll(appState.profileScroll)) {
-                        ProfileScreen(
-                            session = appState.session,
-                            darkMode = darkMode,
-                            onToggleDarkMode = onToggleDarkMode,
-                            onOpenLibrary = appState::openLibrary,
-                            onSessionChange = appState::updateSession,
-                        )
-                        Spacer(Modifier.height(150.dp))
-                        Spacer(Modifier.navigationBarsPadding())
-                    }
-                }
+                AppTab.PROFILE -> ProfileScreen(
+                    session = appState.session,
+                    darkMode = darkMode,
+                    onToggleDarkMode = onToggleDarkMode,
+                    onOpenLibrary = appState::openLibrary,
+                    onSessionChange = appState::updateSession,
+                    scrollState = appState.profileScroll,
+                    onBannerScrollLimitChange = appState::updateProfileBannerScrollLimit,
+                )
 
                 AppTab.HOME -> HomeScreen(
                     query = appState.searchQuery,
