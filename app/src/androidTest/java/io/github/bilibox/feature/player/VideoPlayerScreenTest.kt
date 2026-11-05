@@ -95,6 +95,37 @@ class VideoPlayerScreenTest {
     }
 
     @Test
+    fun portraitVerticalScreenToggleHidesDetailsAndRestores() {
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            VideoPlayerScreen(
+                player = player,
+                title = "搜索视频",
+                sourceLabel = "哔哩哔哩",
+                commentMessage = "暂不支持查看在线评论",
+                onBack = {},
+                onRetry = {},
+                details = { Text("搜索视频简介") }
+            )
+        }
+
+        compose.onNodeWithText("搜索视频简介").assertExists()
+        compose.onNodeWithContentDescription("竖屏").assertExists().performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("搜索视频简介").assertDoesNotExist()
+        compose.onNodeWithContentDescription("退出竖屏").assertExists()
+        // 横屏按钮保持原样，仍可从竖屏全屏直接切到横屏。
+        compose.onNodeWithContentDescription("切换横屏").assertExists()
+
+        compose.onNodeWithContentDescription("退出竖屏").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("搜索视频简介").assertExists()
+        compose.onNodeWithContentDescription("竖屏").assertExists()
+    }
+
+    @Test
     fun fullscreenSpeedPanelAppliesPresetsAndCloses() {
         compose.setContent {
             val context = LocalContext.current

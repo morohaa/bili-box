@@ -40,6 +40,7 @@ internal data class PlayerBottomBarState(
     val speed: Float,
     val qualityOptions: List<PlayerQualityOption>,
     val selectedQuality: Int?,
+    val verticalFullScreen: Boolean,
 )
 
 /** 底栏操作回调，避免把播放器的全部状态继续作为参数传进来。 */
@@ -55,6 +56,7 @@ internal class PlayerBottomBarActions(
     val onSpeed: () -> Unit,
     val onQuality: () -> Unit,
     val onToggleOrientation: () -> Unit,
+    val onToggleVerticalFullScreen: () -> Unit,
 )
 
 @Composable
@@ -149,6 +151,11 @@ internal fun PlayerBottomBar(
                     position = if (state.scrubbing) state.scrubPosition.toLong() else state.position,
                     duration = state.duration,
                     modifier = Modifier.padding(start = 10.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                PlayerVerticalScreenChip(
+                    active = state.verticalFullScreen,
+                    onClick = actions.onToggleVerticalFullScreen,
                 )
                 IconButton(
                     onClick = actions.onToggleOrientation,

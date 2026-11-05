@@ -82,6 +82,39 @@ internal fun PlayerBarAction(
     }
 }
 
+/** 竖屏全屏开关：半透明白底小胶囊，文字随状态在“竖屏 / 退出竖屏”之间切换。 */
+@Composable
+internal fun PlayerVerticalScreenChip(
+    active: Boolean,
+    onClick: () -> Unit,
+) {
+    val label = if (active) "退出竖屏" else "竖屏"
+    // Keep the visual capsule close to the reference; the 32dp box keeps it easy to tap.
+    Box(
+        Modifier.height(32.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            Modifier.clip(RoundedCornerShape(4.dp))
+                .background(Color.White.copy(alpha = .2f))
+                .padding(horizontal = 6.dp, vertical = 3.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                label,
+                color = Color.White,
+                fontSize = 10.sp,
+                // Material3 的 24sp 默认行高会把字挤到胶囊底部，按 1.2 倍字号收紧。
+                lineHeight = 12.sp,
+                fontWeight = FontWeight.Normal,
+                maxLines = 1
+            )
+        }
+    }
+}
+
 @Composable
 internal fun PlayerQualityChip(label: String, onClick: () -> Unit) {
     Box(

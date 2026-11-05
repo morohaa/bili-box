@@ -144,6 +144,8 @@ internal fun VideoPlayerScreen(
     var danmakuSendError by remember(player) { mutableStateOf<String?>(null) }
     var controlsVisible by remember(player) { mutableStateOf(true) }
     var screenLocked by remember(player) { mutableStateOf(false) }
+    // 竖屏全屏：保持竖屏方向，画面按原比例居中，不放大也不裁切。
+    var verticalFullScreen by remember(player) { mutableStateOf(false) }
     var orientationBeforeLock by remember(player) { mutableStateOf<Int?>(null) }
     var playerView by remember(player) { mutableStateOf<PlayerView?>(null) }
     var hasVideoFrame by remember(player) { mutableStateOf(false) }
@@ -223,7 +225,9 @@ internal fun VideoPlayerScreen(
             if (barsBehavior != null) controller?.systemBarsBehavior = barsBehavior
         }
     }
-    LaunchedEffect(activity, fullScreen) {
+    LaunchedEffect(activity, fullScreen, verticalFullScreen) {
+        // 横屏全屏时以方向为准，避免退出横屏后又回到竖屏全屏。
+        if (fullScreen) verticalFullScreen = false
         speedMenuExpanded = false
         playbackModeExpanded = false
         sleepTimerOpen = false
@@ -234,9 +238,9 @@ internal fun VideoPlayerScreen(
         activity?.let {
             WindowCompat.getInsetsController(it.window, it.window.decorView).apply {
                 isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = !fullScreen && detailsBackground == Color.White
+                isAppearanceLightNavigationBars = !fullScreen && !verticalFullScreen && detailsBackground == Color.White
                 systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                if (fullScreen) {
+                if (fullScreen || verticalFullScreen) {
                     hide(WindowInsetsCompat.Type.systemBars())
                 } else {
                     show(WindowInsetsCompat.Type.systemBars())
@@ -248,15 +252,16 @@ internal fun VideoPlayerScreen(
     // Runs after the effect above, so the dark 听视频 page keeps light nav icons
     // even when opening it rotates the screen back to portrait.
     val listenVisible by remember { derivedStateOf { listenReveal.value > 0f } }
-    LaunchedEffect(activity, fullScreen, listenVisible) {
+    LaunchedEffect(activity, fullScreen, verticalFullScreen, listenVisible) {
         activity?.let {
             WindowCompat.getInsetsController(it.window, it.window.decorView).isAppearanceLightNavigationBars =
-                !listenVisible && !fullScreen && detailsBackground == Color.White
+                !listenVisible && !fullScreen && !verticalFullScreen && detailsBackground == Color.White
         }
     }
 
     fun toggleOrientation() {
         controlsVisible = true
+        verticalFullScreen = false
         activity?.requestedOrientation = if (fullScreen) {
             ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         } else {
@@ -264,8 +269,15 @@ internal fun VideoPlayerScreen(
         }
     }
 
+    fun toggleVerticalFullScreen() {
+        controlsVisible = true
+        verticalFullScreen = !verticalFullScreen
+    }
+
     fun navigateBack() {
-        if (fullScreen) {
+        if (verticalFullScreen) {
+            verticalFullScreen = false
+        } else if (fullScreen) {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         } else {
             onBack()
@@ -366,7 +378,7 @@ internal fun VideoPlayerScreen(
         duration = defaultDurationMs
         position = player.currentPosition.coerceAtLeast(0L)
     }
-    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded) {
+    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded, verticalFullScreen) {
         if (controlsVisible && (isPlaying || screenLocked) && !scrubbing &&
             !speedMenuExpanded && !playbackModeExpanded && !sleepTimerOpen && !episodesExpanded && !qualityMenuExpanded
         ) {
@@ -391,6 +403,7 @@ internal fun VideoPlayerScreen(
             playbackModeExpanded -> playbackModeExpanded = false
             sleepTimerOpen -> sleepTimerOpen = false
             speedMenuExpanded -> speedMenuExpanded = false
+            verticalFullScreen -> verticalFullScreen = false
             else -> navigateBack()
         }
     }
@@ -410,10 +423,10 @@ internal fun VideoPlayerScreen(
     Box(Modifier.fillMaxSize().onGloballyPositioned { screenRootOffset = it.positionInRoot() }) {
         Column(
             Modifier.fillMaxSize().background(Color.Black)
-                .then(if (fullScreen) Modifier else Modifier.statusBarsPadding())
+                .then(if (fullScreen || verticalFullScreen) Modifier else Modifier.statusBarsPadding())
         ) {
             Box(
-                (if (fullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+                (if (fullScreen || verticalFullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                     .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
@@ -425,7 +438,10 @@ internal fun VideoPlayerScreen(
                         it.keepScreenOn = !listening
                         playerView = it
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize().then(
+                        // 竖屏时把画面略抬高到屏幕黄金观看区，而不是压在正中。
+                        if (verticalFullScreen) Modifier.offset(y = (-40).dp) else Modifier
+                    )
                 )
                 PlayerTouchSurface(
                     locked = screenLocked,
@@ -523,6 +539,7 @@ internal fun VideoPlayerScreen(
                             speed = speed,
                             qualityOptions = qualityOptions,
                             selectedQuality = selectedQuality,
+                            verticalFullScreen = verticalFullScreen,
                         ),
                         actions = PlayerBottomBarActions(
                             onSeekStart = {
@@ -566,6 +583,7 @@ internal fun VideoPlayerScreen(
                                 qualityMenuExpanded = true
                             },
                             onToggleOrientation = { toggleOrientation() },
+                            onToggleVerticalFullScreen = { toggleVerticalFullScreen() },
                         ),
                         modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                             .then(
@@ -678,7 +696,7 @@ internal fun VideoPlayerScreen(
                 }
             }
 
-            if (!fullScreen) {
+            if (!fullScreen && !verticalFullScreen) {
                 PlayerDetailsPane(
                     modifier = Modifier.weight(1f),
                     detailsBackground = detailsBackground,
