@@ -80,9 +80,8 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.model.SearchDuration
 import io.github.bilibox.core.model.SearchOrder
-import io.github.bilibox.core.model.SearchState
 import io.github.bilibox.core.model.SearchTimeRange
-import io.github.bilibox.core.model.SearchVideo
+import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.ui.theme.BrandSpringEasing
 import io.github.bilibox.core.ui.theme.DynamicColors
 import io.github.bilibox.core.ui.theme.dynamicColors
@@ -91,6 +90,7 @@ import io.github.bilibox.feature.search.SearchControlsBar
 import io.github.bilibox.feature.search.SearchError
 import io.github.bilibox.feature.search.SearchLoading
 import io.github.bilibox.feature.search.SearchResults
+import io.github.bilibox.feature.search.SearchUiState
 import kotlinx.coroutines.delay
 
 /**
@@ -106,9 +106,9 @@ internal fun DynamicPage(
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
     onRetry: (Int, SearchOrder) -> Unit,
-    onVideoClick: (SearchVideo) -> Unit,
+    onVideoClick: (VideoSummary) -> Unit,
     onPageChange: (Int) -> Unit,
-    searchState: SearchState,
+    searchState: SearchUiState,
     order: SearchOrder,
     onOrderChange: (SearchOrder) -> Unit,
     duration: SearchDuration?,
@@ -130,7 +130,7 @@ internal fun DynamicPage(
     val focused by interactionSource.collectIsFocusedAsState()
 
     // 首页 = 未聚焦、没有输入、也没有结果；其余情况都算搜索态。
-    val expanded = focused || query.isNotEmpty() || searchState != SearchState.Idle
+    val expanded = focused || query.isNotEmpty() || searchState != SearchUiState.Idle
     LaunchedEffect(expanded) { onExpandedChange(expanded) }
 
     val progress by animateFloatAsState(
@@ -200,7 +200,7 @@ internal fun DynamicPage(
                 )
                 Spacer(Modifier.height(10.dp))
 
-                if (searchState != SearchState.Idle) {
+                if (searchState != SearchUiState.Idle) {
                     Column(Modifier.fillMaxWidth().weight(1f)) {
                         SearchControlsBar(
                             order = order,
@@ -218,15 +218,15 @@ internal fun DynamicPage(
                                 .padding(horizontal = 16.dp)
                         ) {
                             when (val state = searchState) {
-                                SearchState.Idle -> Unit
+                                SearchUiState.Idle -> Unit
 
-                                SearchState.Loading -> SearchLoading(darkMode)
+                                SearchUiState.Loading -> SearchLoading(darkMode)
 
-                                is SearchState.Error -> SearchError(state.message, darkMode) {
+                                is SearchUiState.Error -> SearchError(state.message, darkMode) {
                                     onRetry(state.page, state.order)
                                 }
 
-                                is SearchState.Success -> SearchResults(
+                                is SearchUiState.Success -> SearchResults(
                                     state = state,
                                     darkMode = darkMode,
                                     gridLayout = gridLayout,

@@ -34,9 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import io.github.bilibox.core.model.SearchDuration
 import io.github.bilibox.core.model.SearchOrder
-import io.github.bilibox.core.model.SearchState
 import io.github.bilibox.core.model.SearchTimeRange
-import io.github.bilibox.core.model.SearchVideo
+import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.ui.component.LiquidNavigation
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.core.ui.theme.BrandSpringEasing
@@ -45,12 +44,13 @@ import io.github.bilibox.data.auth.BiliSessionStore
 import io.github.bilibox.data.bili.BiliClient
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
+import io.github.bilibox.data.search.toVideoSummary
 import io.github.bilibox.feature.dynamic.DynamicPage
 import io.github.bilibox.feature.library.LibraryPage
 import io.github.bilibox.feature.online.BiliVideoDetail
 import io.github.bilibox.feature.player.LocalVideoPlayer
 import io.github.bilibox.feature.profile.MyPage
-import io.github.bilibox.feature.search.toSearchVideo
+import io.github.bilibox.feature.search.SearchUiState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -82,7 +82,7 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     var session by remember { mutableStateOf<BiliSession?>(BiliSessionStore.load(context)) }
     var libraryFilter by remember { mutableStateOf<LocalVideoQuickFilter?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    var searchState by remember { mutableStateOf<SearchState>(SearchState.Idle) }
+    var searchState by remember { mutableStateOf<SearchUiState>(SearchUiState.Idle) }
     var searchOrder by rememberSaveable { mutableStateOf(SearchOrder.RELEVANCE) }
     var searchDuration by rememberSaveable { mutableStateOf<SearchDuration?>(null) }
     var searchTimeRange by rememberSaveable { mutableStateOf<SearchTimeRange?>(null) }
@@ -118,11 +118,10 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
     val runSearch: (Int, SearchOrder) -> Unit = { page, order ->
         val keyword = searchQuery.trim()
         if (keyword.isNotEmpty()) {
-            val nowSeconds = System.currentTimeMillis() / 1000L
             val requestedDuration = searchDuration
             val requestedRange = searchTimeRange
             searchOrder = order
-            searchState = SearchState.Loading
+            searchState = SearchUiState.Loading
             searchJob?.cancel()
             searchJob = scope.launch {
                 // 新一轮搜索、翻页或筛选都从结果顶部开始；打开详情再返回时保留位置。
@@ -131,13 +130,12 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
                     val result = searchClient.searchVideos(
                         keyword = keyword,
                         page = page,
-                        order = order.apiValue,
-                        duration = requestedDuration?.apiValue,
-                        pubtimeBegin = requestedRange?.let { nowSeconds - it.days * 86_400L },
-                        pubtimeEnd = requestedRange?.let { nowSeconds },
+                        order = order,
+                        duration = requestedDuration,
+                        timeRange = requestedRange,
                     )
-                    SearchState.Success(
-                        items = result.items.map(::toSearchVideo),
+                    SearchUiState.Success(
+                        items = result.items.map(::toVideoSummary),
                         page = result.page,
                         hasMore = result.hasMore,
                         order = order,
@@ -146,27 +144,27 @@ private fun BiliBoxApp(darkMode: Boolean = false, onToggleDarkMode: () -> Unit =
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
-                    SearchState.Error(error.message ?: "搜索失败，请稍后重试", page, order)
+                    SearchUiState.Error(error.message ?: "搜索失败，请稍后重试", page, order)
                 }
             }
         }
     }
-    var selectedVideo by remember { mutableStateOf<SearchVideo?>(null) }
+    var selectedVideo by remember { mutableStateOf<VideoSummary?>(null) }
     var selectedLocalVideo by remember { mutableStateOf<LocalVideo?>(null) }
     var localPlaylist by remember { mutableStateOf<List<LocalVideo>>(emptyList()) }
     var libraryRefresh by remember { mutableIntStateOf(0) }
     val closeSearch = {
         searchJob?.cancel()
-        searchState = SearchState.Idle
+        searchState = SearchUiState.Idle
         searchQuery = ""
         focusManager.clearFocus()
     }
     // 修改关键词即退出上一轮结果，回到“输入中”的历史面板（对齐参考稿）。
     val updateQuery: (String) -> Unit = { value ->
         searchQuery = value
-        if (searchState != SearchState.Idle) {
+        if (searchState != SearchUiState.Idle) {
             searchJob?.cancel()
-            searchState = SearchState.Idle
+            searchState = SearchUiState.Idle
         }
     }
     selectedVideo?.let { video ->

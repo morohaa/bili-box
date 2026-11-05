@@ -36,7 +36,7 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 │   ├── MainActivity.kt                 # 应用入口、页面切换与全局状态
 │   ├── core/
 │   │   ├── playback/                  # 队列协议、播放模式、倍速规则、定时状态与后台媒体会话
-│   │   ├── model/                     # 跨功能共享的搜索 / 播放状态模型
+│   │   ├── model/                     # 跨功能共享的视频摘要与搜索业务选项
 │   │   ├── ui/component/              # 顶栏、封面、图标与均衡器等共享 UI
 │   │   │   └── playback/              # 播放器与听视频共用的倍速、定时关闭面板
 │   │   ├── ui/theme/                  # 颜色、主题、字体与动态色板
@@ -46,17 +46,17 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 │   │   ├── bili/                      # B 站接口、模型、播放源与 WBI 签名
 │   │   ├── danmaku/                   # 弹幕解析、轨道排布与显示偏好
 │   │   ├── localvideo/                # 本地视频扫描、缩略图、播放队列与进度
-│   │   └── search/                    # 搜索历史存储
+│   │   └── search/                    # 搜索历史存储与视频摘要转换
 │   └── feature/
 │       ├── auth/                      # 登录、扫码与极验 UI
 │       ├── danmaku/                   # 弹幕层与播放器弹幕控制
 │       ├── dynamic/                   # 动态页 / 搜索首页
 │       ├── library/                   # 本地视频库与详情
 │       ├── listen/                    # 听视频页面与播放状态绑定
-│       ├── online/                    # 在线视频详情、选集与缓存
+│       ├── online/                    # 在线视频详情、页面播放状态、选集与缓存
 │       ├── player/                    # 播放器页面、控制条、手势与定时播放绑定
 │       ├── profile/                   # 我的页
-│       └── search/                    # 搜索结果与筛选控件
+│       └── search/                    # 搜索页面状态、结果与筛选控件及文案
 ├── app/src/test/                      # JVM 单元测试（与主代码包镜像）
 ├── app/src/androidTest/               # Compose / 设备测试（与主代码包镜像）
 ├── design/

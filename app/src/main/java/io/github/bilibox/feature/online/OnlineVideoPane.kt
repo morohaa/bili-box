@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.bilibox.core.model.SearchVideo
+import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.ui.component.RemoteCover
 import io.github.bilibox.core.ui.component.VideoMetaIcon
 import io.github.bilibox.core.ui.theme.Muted
@@ -62,7 +62,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun OnlineVideoDetails(
-    video: SearchVideo,
+    video: VideoSummary,
     info: VideoInfo?,
     creatorCard: UserCardData?,
     context: Context,

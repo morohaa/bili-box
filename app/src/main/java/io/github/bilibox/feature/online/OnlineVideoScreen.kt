@@ -24,8 +24,7 @@ import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import io.github.bilibox.core.model.PlaybackState
-import io.github.bilibox.core.model.SearchVideo
+import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.playback.ListenPlaybackBridge
 import io.github.bilibox.core.playback.ListenQueue
 import io.github.bilibox.core.ui.theme.OnlineSurface
@@ -53,7 +52,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: () -> Unit) {
+internal fun BiliVideoDetail(video: VideoSummary, session: BiliSession?, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val client = remember(video.bvid, session?.cookie) {
@@ -66,7 +65,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
     }
-    var playbackState by remember(video.bvid, session?.cookie) { mutableStateOf<PlaybackState>(PlaybackState.Loading) }
+    var playbackState by remember(video.bvid, session?.cookie) { mutableStateOf<OnlinePlaybackState>(OnlinePlaybackState.Loading) }
     var playbackData by remember(video.bvid, session?.cookie) { mutableStateOf<PlayData?>(null) }
     var playbackCid by remember(video.bvid, session?.cookie) { mutableLongStateOf(0L) }
     var playbackCandidateIndex by remember(video.bvid, session?.cookie) { mutableIntStateOf(0) }
@@ -169,7 +168,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         if (nextIndex >= playbackCandidateCount) return false
         val resumeMs = exoPlayer.currentPosition
         playbackCandidateIndex = nextIndex
-        playbackState = PlaybackState.Loading
+        playbackState = OnlinePlaybackState.Loading
         BiliPlayback.attach(
             exoPlayer,
             data,
@@ -206,7 +205,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         // the older single-file format.
         if (!playbackRefreshTried && playbackCid > 0) {
             playbackRefreshTried = true
-            playbackState = PlaybackState.Loading
+            playbackState = OnlinePlaybackState.Loading
             scope.launch {
                 try {
                     val refreshed = client.playUrl(
@@ -221,7 +220,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                 } catch (_: Exception) {
                     // The DURL fallback below provides the next
                     // compatibility path and its error is user-facing.
-                    playbackState = PlaybackState.Loading
+                    playbackState = OnlinePlaybackState.Loading
                     durlFallbackTried = true
                     try {
                         val fallback = client.playUrl(
@@ -236,7 +235,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                     } catch (error2: Exception) {
                         val html5Error = tryHtml5Fallback()
                         if (html5Error != null) {
-                            playbackState = PlaybackState.Error("播放器无法读取视频流：${error2.message ?: "单文件流也不可用"}；HTML5 回退失败：$html5Error")
+                            playbackState = OnlinePlaybackState.Error("播放器无法读取视频流：${error2.message ?: "单文件流也不可用"}；HTML5 回退失败：$html5Error")
                         }
                     }
                 }
@@ -245,7 +244,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         }
         if (!dashFallbackTried && !durlFallbackTried && playbackCid > 0) {
             dashFallbackTried = true
-            playbackState = PlaybackState.Loading
+            playbackState = OnlinePlaybackState.Loading
             scope.launch {
                 try {
                     val fallback = client.playUrl(
@@ -273,7 +272,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                     } catch (error: Exception) {
                         val html5Error = tryHtml5Fallback()
                         if (html5Error != null) {
-                            playbackState = PlaybackState.Error("播放器无法读取视频流：${error.message ?: "低清晰度视频流也不可用"}；HTML5 回退失败：$html5Error")
+                            playbackState = OnlinePlaybackState.Error("播放器无法读取视频流：${error.message ?: "低清晰度视频流也不可用"}；HTML5 回退失败：$html5Error")
                         }
                     }
                 }
@@ -284,7 +283,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         // request the older single-file stream format as a compatibility fallback.
         if (!durlFallbackTried && playbackCid > 0) {
             durlFallbackTried = true
-            playbackState = PlaybackState.Loading
+            playbackState = OnlinePlaybackState.Loading
             scope.launch {
                 try {
                     val fallback = client.playUrl(
@@ -299,18 +298,18 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
                 } catch (error: Exception) {
                     val html5Error = tryHtml5Fallback()
                     if (html5Error != null) {
-                        playbackState = PlaybackState.Error("播放器无法读取视频流：${error.message ?: "单文件流也不可用"}；HTML5 回退失败：$html5Error")
+                        playbackState = OnlinePlaybackState.Error("播放器无法读取视频流：${error.message ?: "单文件流也不可用"}；HTML5 回退失败：$html5Error")
                     }
                 }
             }
             return
         }
         if (!html5FallbackTried && playbackCid > 0) {
-            playbackState = PlaybackState.Loading
+            playbackState = OnlinePlaybackState.Loading
             scope.launch {
                 val fallbackError = tryHtml5Fallback()
                 if (fallbackError != null) {
-                    playbackState = PlaybackState.Error("播放器无法读取视频流：$fallbackError")
+                    playbackState = OnlinePlaybackState.Error("播放器无法读取视频流：$fallbackError")
                 }
             }
             return
@@ -328,13 +327,13 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
 
             else -> "播放器无法读取视频流：${error.errorCodeName}${detail?.let { "（$it）" }.orEmpty()}"
         }
-        playbackState = PlaybackState.Error(message)
+        playbackState = OnlinePlaybackState.Error(message)
     }
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) {
-                    playbackState = PlaybackState.Ready
+                    playbackState = OnlinePlaybackState.Ready
                 }
             }
 
@@ -356,7 +355,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         val candidateStartedAt = SystemClock.elapsedRealtime()
         var lastBuffered = -1L
         var lastProgressAt = candidateStartedAt
-        while (playbackState == PlaybackState.Loading) {
+        while (playbackState == OnlinePlaybackState.Loading) {
             delay(500)
             val now = SystemClock.elapsedRealtime()
             val buffered = exoPlayer.bufferedPosition
@@ -394,7 +393,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         val resumePlaying = qualityResumePlaying
         qualityResumeMs = 0L
         qualityResumePlaying = true
-        playbackState = PlaybackState.Loading
+        playbackState = OnlinePlaybackState.Loading
         playbackRefreshTried = false
         dashFallbackTried = false
         durlFallbackTried = false
@@ -429,7 +428,7 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            playbackState = PlaybackState.Error(error.message ?: "无法获取视频播放地址")
+            playbackState = OnlinePlaybackState.Error(error.message ?: "无法获取视频播放地址")
         }
     }
     fun startLoad(key: List<Any?>) {
@@ -608,8 +607,8 @@ internal fun BiliVideoDetail(video: SearchVideo, session: BiliSession?, onBack: 
     VideoPlayerScreen(
         player = exoPlayer,
         title = video.title,
-        playbackError = (playbackState as? PlaybackState.Error)?.message,
-        loadingMessage = if (playbackState == PlaybackState.Loading) {
+        playbackError = (playbackState as? OnlinePlaybackState.Error)?.message,
+        loadingMessage = if (playbackState == OnlinePlaybackState.Loading) {
             // 区分“请求播放地址”和“连接视频源”，等待时能看出卡在哪一步。
             if (playbackData == null) "正在获取播放地址…" else "正在连接视频源…"
         } else {

@@ -18,8 +18,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.bilibox.core.model.SearchState
-import io.github.bilibox.core.model.SearchVideo
+import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.ui.component.EmptyCard
 import io.github.bilibox.core.ui.component.RemoteCover
 import io.github.bilibox.core.ui.component.VideoMetaIcon
@@ -28,7 +27,6 @@ import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.Pink
 import io.github.bilibox.core.util.formatSearchDuration
-import io.github.bilibox.data.bili.VideoSearchItem
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -55,10 +53,10 @@ internal fun SearchError(message: String, darkMode: Boolean = false, onRetry: ()
 
 @Composable
 internal fun SearchResults(
-    state: SearchState.Success,
+    state: SearchUiState.Success,
     darkMode: Boolean = false,
     gridLayout: Boolean = false,
-    onVideoClick: (SearchVideo) -> Unit,
+    onVideoClick: (VideoSummary) -> Unit,
     onPageChange: (Int) -> Unit,
 ) {
     SearchResultBar(
@@ -117,7 +115,7 @@ private fun SearchResultBar(count: Int, darkMode: Boolean) {
 }
 
 @Composable
-private fun SearchResultCard(video: SearchVideo, darkMode: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun SearchResultCard(video: VideoSummary, darkMode: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
         modifier.fillMaxWidth().clickable(onClick = onClick)
             .padding(vertical = 6.dp),
@@ -167,7 +165,7 @@ private fun SearchResultCard(video: SearchVideo, darkMode: Boolean, modifier: Mo
 }
 
 @Composable
-private fun SearchGridCard(video: SearchVideo, darkMode: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun SearchGridCard(video: VideoSummary, darkMode: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Column(modifier.clickable(onClick = onClick).padding(bottom = 12.dp)) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)),
@@ -237,36 +235,6 @@ private fun VideoMeta(icon: String, value: String, darkMode: Boolean) {
         Spacer(Modifier.width(2.dp))
         Text(value, color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
-}
-
-internal fun toSearchVideo(item: VideoSearchItem): SearchVideo {
-    val cleanTitle = item.title.replace(Regex("<[^>]*>"), "")
-    return SearchVideo(
-        title = android.text.Html.fromHtml(cleanTitle, android.text.Html.FROM_HTML_MODE_LEGACY).toString(),
-        author = item.author,
-        playCount = formatPlayCount(item.play),
-        commentCount = item.commentCount,
-        publishTime = item.publishTime,
-        duration = item.duration,
-        bvid = item.bvid,
-        coverUrl = when {
-            item.pic.startsWith("//") -> "https:${item.pic}"
-            item.pic.startsWith("http://") -> item.pic.replaceFirst("http://", "https://")
-            else -> item.pic
-        },
-    )
-}
-
-private fun formatPlayCount(raw: String): String {
-    val normalized = raw.trim().replace(",", "")
-    val numeric = when {
-        normalized.endsWith("万") -> normalized.removeSuffix("万").toDoubleOrNull()?.times(10_000.0)
-        else -> normalized.toDoubleOrNull()
-    } ?: return raw.ifBlank { "--" }
-    if (numeric <= 10_000) return numeric.toLong().toString()
-    val tenThousands = numeric / 10_000.0
-    val formatted = String.format(Locale.US, "%.1f", tenThousands).trimEnd('0').trimEnd('.')
-    return "$formatted 万".replace(" ", "")
 }
 
 private fun formatPublishDate(timestampSeconds: Long): String {

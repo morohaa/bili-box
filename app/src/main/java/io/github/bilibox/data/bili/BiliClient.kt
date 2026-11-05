@@ -1,5 +1,8 @@
 package io.github.bilibox.data.bili
 
+import io.github.bilibox.core.model.SearchDuration
+import io.github.bilibox.core.model.SearchOrder
+import io.github.bilibox.core.model.SearchTimeRange
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -155,31 +158,18 @@ class BiliClient(
     }
 
     /** 使用 Web 端 WBI 签名搜索视频，支持排序、时长 / 发布时间筛选和分页。 */
-    suspend fun searchVideos(
+    internal suspend fun searchVideos(
         keyword: String,
         page: Int = 1,
-        order: String = SEARCH_ORDER_TOTALRANK,
-        duration: String? = null,
-        pubtimeBegin: Long? = null,
-        pubtimeEnd: Long? = null,
+        order: SearchOrder = SearchOrder.RELEVANCE,
+        duration: SearchDuration? = null,
+        timeRange: SearchTimeRange? = null,
         pageSize: Int = 20,
     ): VideoSearchPage {
         require(keyword.isNotBlank()) { "搜索关键词不能为空" }
         val currentPage = page.coerceAtLeast(1)
         val size = pageSize.coerceIn(1, 50)
-        val params = buildMap {
-            put("search_type", "video")
-            put("keyword", keyword.trim())
-            put("page", currentPage.toString())
-            put("pagesize", size.toString())
-            put("order", order)
-            put("web_location", "1430654")
-            if (!duration.isNullOrBlank()) put("duration", duration)
-            if (pubtimeBegin != null && pubtimeEnd != null) {
-                put("pubtime_begin_s", pubtimeBegin.toString())
-                put("pubtime_end_s", pubtimeEnd.toString())
-            }
-        }
+        val params = buildVideoSearchParameters(keyword, currentPage, size, order, duration, timeRange)
         // 未登录时只带 buvid3 的请求会被 B 站下发 v_voucher 风控并返回空结果，
         // 所以匿名搜索不带指纹 Cookie；已登录请求保持原有指纹逻辑。
         val anonymous = cookieHeader.isNullOrBlank() && sessData.isNullOrBlank()
@@ -365,12 +355,6 @@ class BiliClient(
         private const val KEY_TTL_MS = 10 * 60 * 1000L
         private const val CODE_RISK = -352
         private const val CODE_SIGN_EXPIRED = -403
-
-        const val SEARCH_ORDER_TOTALRANK = "totalrank"
-        const val SEARCH_ORDER_CLICK = "click"
-        const val SEARCH_ORDER_PUBDATE = "pubdate"
-        const val SEARCH_ORDER_DM = "dm"
-        const val SEARCH_ORDER_STOW = "stow"
 
         fun defaultHttpClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
