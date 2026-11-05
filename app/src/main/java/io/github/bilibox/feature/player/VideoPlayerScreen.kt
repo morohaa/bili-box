@@ -5,11 +5,9 @@ import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.graphics.Bitmap
 import android.media.AudioManager
 import android.os.Build
 import android.os.SystemClock
-import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -17,7 +15,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -25,7 +22,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -46,15 +42,11 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import io.github.bilibox.core.playback.ListenQueue
 import io.github.bilibox.core.playback.PlaybackSleepTimer
-import io.github.bilibox.core.playback.PlaybackSpeedBoost
 import io.github.bilibox.core.playback.SleepTimerMode
-import io.github.bilibox.core.playback.longPressPlaybackSpeed
 import io.github.bilibox.core.ui.component.playback.SleepTimerSheet
 import io.github.bilibox.core.ui.component.playback.SpeedPanel
 import io.github.bilibox.core.ui.component.playback.SpeedPanelMode
 import io.github.bilibox.core.ui.theme.Pink
-import io.github.bilibox.core.util.captureVideoFrame
-import io.github.bilibox.core.util.saveVideoFrame
 import io.github.bilibox.data.danmaku.Danmaku
 import io.github.bilibox.data.danmaku.DanmakuSettings
 import io.github.bilibox.feature.danmaku.DanmakuComposerDialog
@@ -67,28 +59,10 @@ import io.github.bilibox.feature.listen.ListenPlaybackEffect
 import io.github.bilibox.feature.listen.ListenScreen
 import io.github.bilibox.feature.listen.rememberListenCover
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-
-private data class PlayerGestureFeedbackState(
-    val side: PlayerGestureSide,
-    val level: Float
-)
 
 /** A selectable video stream quality shown in the fullscreen quality drawer. */
-
-private fun readScreenBrightness(activity: ComponentActivity): Float {
-    val override = activity.window.attributes.screenBrightness
-    if (override >= 0f) return override.coerceIn(0f, 1f)
-    val systemBrightness = Settings.System.getInt(
-        activity.contentResolver,
-        Settings.System.SCREEN_BRIGHTNESS,
-        128
-    )
-    return systemBrightness.coerceIn(0, 255) / 255f
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -162,21 +136,15 @@ internal fun VideoPlayerScreen(
     var orientationBeforeLock by remember(player) { mutableStateOf<Int?>(null) }
     var playerView by remember(player) { mutableStateOf<PlayerView?>(null) }
     var hasVideoFrame by remember(player) { mutableStateOf(false) }
-    var savingFrame by remember { mutableStateOf(false) }
-    val screenshotFlash = remember { Animatable(0f) }
-    var screenshotPreview by remember { mutableStateOf<Bitmap?>(null) }
-    var screenshotPreviewVisible by remember { mutableStateOf(false) }
-    var screenBrightness by remember(activity) {
-        mutableFloatStateOf(activity?.let(::readScreenBrightness) ?: .5f)
-    }
-    var volumeGestureRemainder by remember(player) { mutableFloatStateOf(0f) }
-    var gestureFeedback by remember(player) { mutableStateOf<PlayerGestureFeedbackState?>(null) }
-    var verticalGestureActive by remember(player) { mutableStateOf(false) }
-    // 长按画面: hold at 2x, restore the user's own speed on release.
-    var speedBoostActive by remember(player) { mutableStateOf(false) }
-    var speedBoostSpeed by remember(player) { mutableFloatStateOf(PlaybackSpeedBoost) }
-    var speedBeforeBoost by remember(player) { mutableFloatStateOf(1f) }
-    val captureScope = rememberCoroutineScope()
+    val screenScope = rememberCoroutineScope()
+    val gestures = rememberPlayerGestureController(
+        player = player,
+        activity = activity,
+        audioManager = audioManager,
+        screenLocked = screenLocked,
+        onSpeedChange = { speed = it },
+    )
+    val screenshot = rememberPlayerScreenshotController(playerView, hasVideoFrame, screenLocked, playbackError)
 
     // 听视频: not keyed by player, so it survives switching to the next local file.
     var listening by rememberSaveable { mutableStateOf(false) }
@@ -307,115 +275,9 @@ internal fun VideoPlayerScreen(
         }
     }
 
-    fun updateGestureFeedback(side: PlayerGestureSide) {
-        if (side == PlayerGestureSide.LEFT) {
-            val level = screenBrightness.coerceIn(0f, 1f)
-            gestureFeedback = PlayerGestureFeedbackState(side, level)
-        } else {
-            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-            val volume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            gestureFeedback = PlayerGestureFeedbackState(side, volume.toFloat() / maxVolume)
-        }
-    }
-
-    fun startVerticalGesture(side: PlayerGestureSide) {
-        // A held 2x gesture owns the finger; do not also drag brightness/volume.
-        if (speedBoostActive) return
-        verticalGestureActive = true
-        if (side == PlayerGestureSide.LEFT) {
-            screenBrightness = activity?.let(::readScreenBrightness) ?: screenBrightness
-        } else {
-            volumeGestureRemainder = 0f
-        }
-        updateGestureFeedback(side)
-    }
-
-    fun adjustFromVerticalGesture(side: PlayerGestureSide, deltaFraction: Float) {
-        if (speedBoostActive) return
-        if (side == PlayerGestureSide.LEFT) {
-            val newBrightness = (screenBrightness - deltaFraction).coerceIn(.02f, 1f)
-            screenBrightness = newBrightness
-            activity?.window?.let { setPlayerWindowBrightness(it, newBrightness) }
-        } else {
-            val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-            volumeGestureRemainder += -deltaFraction * maxVolume
-            val volumeSteps = volumeGestureRemainder.toInt()
-            if (volumeSteps != 0) {
-                val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-                audioManager.setStreamVolume(
-                    AudioManager.STREAM_MUSIC,
-                    (current + volumeSteps).coerceIn(0, maxVolume),
-                    0
-                )
-                volumeGestureRemainder -= volumeSteps
-            }
-        }
-        updateGestureFeedback(side)
-    }
-
-    fun startSpeedBoost() {
-        if (screenLocked || speedBoostActive) return
-        val current = player.playbackParameters.speed
-        val target = longPressPlaybackSpeed(current)
-        speedBeforeBoost = current
-        speedBoostSpeed = target
-        speedBoostActive = true
-        gestureFeedback = null
-        player.setPlaybackSpeed(target)
-        speed = target
-    }
-
-    fun endSpeedBoost() {
-        if (!speedBoostActive) return
-        speedBoostActive = false
-        // The screen may be going away mid-hold and the player already released.
-        runCatching { player.setPlaybackSpeed(speedBeforeBoost) }
-        speed = speedBeforeBoost
-    }
-
-    fun takeVideoScreenshot() {
-        if (savingFrame || screenLocked || !hasVideoFrame || playbackError != null) return
-        val frame = try {
-            playerView?.let(::captureVideoFrame)
-        } catch (_: Exception) {
-            null
-        }
-        if (frame == null) {
-            Toast.makeText(context, "暂时无法截取画面，请等待视频显示后重试", Toast.LENGTH_SHORT).show()
-            return
-        }
-        // Shutter flash over the video, then the captured frame slides in as a
-        // confirmation card instead of a plain toast.
-        val flash = captureScope.launch {
-            screenshotFlash.snapTo(.82f)
-            screenshotFlash.animateTo(0f, animationSpec = tween(360, easing = LinearEasing))
-        }
-        savingFrame = true
-        captureScope.launch {
-            var saved = false
-            try {
-                withContext(Dispatchers.IO) { saveVideoFrame(context, frame) }
-                saved = true
-                // Let the shutter flash finish first, then reveal the frame card.
-                flash.join()
-                screenshotPreview = frame
-                // Compose the card once while hidden so its scale-in transition runs.
-                withFrameNanos { }
-                screenshotPreviewVisible = true
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                Toast.makeText(context, "截帧保存失败，请检查存储空间或权限后重试", Toast.LENGTH_SHORT).show()
-            } finally {
-                savingFrame = false
-                if (!saved) frame.recycle()
-            }
-        }
-    }
-
     val screenshotPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
-            takeVideoScreenshot()
+            screenshot.takeScreenshot()
         } else {
             Toast.makeText(context, "需要存储权限才能保存视频画面", Toast.LENGTH_SHORT).show()
         }
@@ -459,12 +321,11 @@ internal fun VideoPlayerScreen(
     // used to reset. Playback speed deliberately carries over to the next file.
     var lastMediaKey by remember(player) { mutableStateOf(mediaKey) }
     // Leaving the screen mid-hold must not leave a shared player stuck at 2x.
-    val speedBoostActiveState = rememberUpdatedState(speedBoostActive)
-    val speedBeforeBoostState = rememberUpdatedState(speedBeforeBoost)
+    val speedBoostActiveState = rememberUpdatedState(gestures.speedBoostActive)
     DisposableEffect(player) {
         onDispose {
             if (speedBoostActiveState.value) {
-                runCatching { player.setPlaybackSpeed(speedBeforeBoostState.value) }
+                gestures.restoreSpeedBoostOnDispose()
             }
         }
     }
@@ -490,20 +351,10 @@ internal fun VideoPlayerScreen(
             controlsVisible = false
         }
     }
-    LaunchedEffect(gestureFeedback, verticalGestureActive) {
-        if (gestureFeedback != null && !verticalGestureActive) {
+    LaunchedEffect(gestures.feedback, gestures.verticalGestureActive) {
+        if (gestures.feedback != null && !gestures.verticalGestureActive) {
             delay(900)
-            gestureFeedback = null
-        }
-    }
-    LaunchedEffect(screenshotPreview) {
-        val frame = screenshotPreview ?: return@LaunchedEffect
-        delay(2_200)
-        screenshotPreviewVisible = false
-        delay(260)
-        if (screenshotPreview === frame) {
-            screenshotPreview = null
-            frame.recycle()
+            gestures.clearFeedback()
         }
     }
     BackHandler(enabled = !listenPageOpen) {
@@ -558,13 +409,13 @@ internal fun VideoPlayerScreen(
                     onToggleControls = { controlsVisible = !controlsVisible },
                     onTogglePlayback = { togglePlayback() },
                     verticalGesturesEnabled = !screenLocked,
-                    onVerticalGestureStart = { startVerticalGesture(it) },
-                    onVerticalSwipe = { side, delta -> adjustFromVerticalGesture(side, delta) },
-                    onVerticalGestureEnd = { verticalGestureActive = false },
+                    onVerticalGestureStart = { gestures.startVerticalGesture(it) },
+                    onVerticalSwipe = { side, delta -> gestures.adjustVerticalGesture(side, delta) },
+                    onVerticalGestureEnd = { gestures.endVerticalGesture() },
                     speedBoostEnabled = !screenLocked && !speedMenuExpanded &&
                         !playbackModeExpanded && !sleepTimerOpen && playbackError == null,
-                    onSpeedBoostStart = { startSpeedBoost() },
-                    onSpeedBoostEnd = { endSpeedBoost() },
+                    onSpeedBoostStart = { gestures.startSpeedBoost() },
+                    onSpeedBoostEnd = { gestures.endSpeedBoost() },
                     modifier = Modifier.fillMaxSize()
                 )
                 if (danmakuSupported && !listening && !listenPageOpen) {
@@ -730,7 +581,7 @@ internal fun VideoPlayerScreen(
                 if (fullScreen && controlsVisible && !speedMenuExpanded) {
                     PlayerSideTools(
                         locked = screenLocked,
-                        screenshotEnabled = hasVideoFrame && playbackError == null && !savingFrame,
+                        screenshotEnabled = hasVideoFrame && playbackError == null && !screenshot.saving,
                         onScreenshot = {
                             if (Build.VERSION.SDK_INT == 28 && context.checkSelfPermission(
                                     Manifest.permission.WRITE_EXTERNAL_STORAGE
@@ -738,7 +589,7 @@ internal fun VideoPlayerScreen(
                             ) {
                                 screenshotPermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                             } else {
-                                takeVideoScreenshot()
+                                screenshot.takeScreenshot()
                             }
                         },
                         onToggleLock = { toggleScreenLock() },
@@ -746,7 +597,7 @@ internal fun VideoPlayerScreen(
                             .navigationBarsPadding().padding(end = 10.dp).offset(y = (-36).dp)
                     )
                 }
-                gestureFeedback?.let { feedback ->
+                gestures.feedback?.let { feedback ->
                     PlayerGestureFeedback(
                         side = feedback.side,
                         level = feedback.level,
@@ -754,8 +605,8 @@ internal fun VideoPlayerScreen(
                     )
                 }
                 PlayerSpeedBoostIndicator(
-                    active = speedBoostActive,
-                    speed = speedBoostSpeed,
+                    active = gestures.speedBoostActive,
+                    speed = gestures.speedBoostSpeed,
                     // Keep the feedback near the top edge: centering it covered the
                     // part of the frame the user was watching while holding.
                     modifier = Modifier.align(Alignment.TopCenter)
@@ -797,17 +648,17 @@ internal fun VideoPlayerScreen(
 
                 // Save confirmation: a scaled thumbnail of the captured frame sits
                 // above the control bar, mirroring the reference player.
-                val previewFrame = screenshotPreview
+                val previewFrame = screenshot.previewFrame
                 if (previewFrame != null) {
                     ScreenshotPreviewCard(
                         frame = previewFrame,
-                        visible = screenshotPreviewVisible,
+                        visible = screenshot.previewVisible,
                         modifier = Modifier.align(Alignment.BottomStart)
                             .padding(start = 10.dp, bottom = if (fullScreen) 156.dp else 48.dp),
                     )
                 }
-                if (screenshotFlash.value > .001f) {
-                    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = screenshotFlash.value)))
+                if (screenshot.flash.value > .001f) {
+                    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = screenshot.flash.value)))
                 }
             }
 
@@ -827,7 +678,7 @@ internal fun VideoPlayerScreen(
                     duration = duration,
                     positionMs = if (scrubbing) scrubPosition.toLong() else position,
                     speed = speed,
-                    screenshotEnabled = hasVideoFrame && playbackError == null && !savingFrame,
+                    screenshotEnabled = hasVideoFrame && playbackError == null && !screenshot.saving,
                     sleepTimerActive = sleepTimer.active,
                     onOpenSpeedPanel = {
                         playbackModeExpanded = false
@@ -842,7 +693,7 @@ internal fun VideoPlayerScreen(
                         playbackModeExpanded = false
                         sleepTimerOpen = true
                     },
-                    onTakeScreenshot = { takeVideoScreenshot() },
+                    onTakeScreenshot = { screenshot.takeScreenshot() },
                     onSeekTo = { target ->
                         player.seekTo(target.coerceAtLeast(0L))
                         player.playWhenReady = true
@@ -890,7 +741,7 @@ internal fun VideoPlayerScreen(
                         if (!danmakuSending) {
                             danmakuSending = true
                             danmakuSendError = null
-                            captureScope.launch {
+                            screenScope.launch {
                                 try {
                                     send(text, player.currentPosition.coerceAtLeast(0L))
                                     danmakuComposerOpen = false
