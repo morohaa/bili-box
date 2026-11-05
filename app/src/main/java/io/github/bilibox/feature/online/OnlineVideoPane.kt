@@ -1,8 +1,11 @@
 package io.github.bilibox.feature.online
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.util.Size
+import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -40,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.model.VideoSummary
+import io.github.bilibox.core.ui.component.AppGlyphIcon
+import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.VideoMetaIcon
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlineDivider
@@ -86,6 +91,7 @@ internal fun OnlineVideoDetails(
     val avatar = normalizeImageUrl(owner?.face.orEmpty().ifBlank { creatorCard?.card?.face.orEmpty() })
     val stat = info?.stat
     val title = info?.title?.takeIf { it.isNotBlank() } ?: video.title
+    val bvId = info?.bvid?.ifBlank { video.bvid } ?: video.bvid
     val publishedAt = info?.pubdate?.takeIf { it > 0 } ?: video.publishTime
     val duration = info?.duration?.takeIf { it > 0 }?.let { formatPlaybackTime(it * 1_000L) }
         ?: video.duration
@@ -110,7 +116,7 @@ internal fun OnlineVideoDetails(
                 Text(
                     title, color = OnlineText, fontSize = 15.5.sp, lineHeight = 22.sp, letterSpacing = (-0.15).sp,
                     fontWeight = FontWeight.Medium,
-                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                    maxLines = if (expanded) Int.MAX_VALUE else 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(8.dp))
@@ -142,13 +148,30 @@ internal fun OnlineVideoDetails(
             }
             if (expanded) {
                 HorizontalDivider(Modifier.padding(top = 10.dp), color = OnlineDivider)
-                Text(
-                    info?.bvid?.ifBlank { video.bvid } ?: video.bvid,
-                    color = OnlineMuted,
-                    fontSize = 11.5.sp,
-                    lineHeight = 16.sp,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                Row(
+                    Modifier.padding(top = 2.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable(role = Role.Button) {
+                            val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                            if (manager != null) {
+                                manager.setPrimaryClip(ClipData.newPlainText("BV 号", bvId))
+                                Toast.makeText(context, "BV 号已复制", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        .semantics { contentDescription = "复制 BV 号 $bvId" }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        bvId,
+                        color = OnlineMuted,
+                        fontSize = 11.5.sp,
+                        lineHeight = 16.sp,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    AppGlyphIcon(AppIcon.COPY, OnlineMuted, Modifier.size(12.dp))
+                }
                 info?.desc?.takeIf { it.isNotBlank() }?.let { description ->
                     Text(
                         description,
