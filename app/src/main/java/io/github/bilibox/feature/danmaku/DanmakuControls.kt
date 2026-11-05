@@ -1,6 +1,5 @@
 package io.github.bilibox.feature.danmaku
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,11 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -68,6 +63,13 @@ import io.github.bilibox.data.danmaku.DanmakuSettings
 private val DanmakuPink = Color(0xFFFB7299)
 private val DanmakuSheet = Color(0xFF1B1E23)
 private val DanmakuSub = Color(0xFFB8BEC8)
+private val DanmakuIconSize = 24.dp
+private val DanmakuIconPadding = 7.dp
+private val DanmakuControlGap = 6.dp
+
+/** 开关 + 设置两个按钮加间距的总宽，用于把弹幕输入框对准屏幕中心。 */
+internal val DanmakuControlLeadingWidth =
+    (DanmakuIconSize + DanmakuIconPadding * 2) * 2 + DanmakuControlGap * 2
 
 /**
  * 全屏播放器底栏中间的弹幕控制组：开关、设置和发送入口。
@@ -87,76 +89,35 @@ internal fun DanmakuControlBar(
     Row(
         modifier.height(32.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(DanmakuControlGap),
     ) {
         Row(
             Modifier.height(30.dp).clip(RoundedCornerShape(8.dp))
-                .background(if (settings.enabled) DanmakuPink.copy(alpha = .18f) else Color.White.copy(alpha = .12f))
-                .border(
-                    width = 1.dp,
-                    color = if (settings.enabled) DanmakuPink.copy(alpha = .55f) else Color.Transparent,
-                    shape = RoundedCornerShape(8.dp),
-                )
                 .clickable(role = Role.Button, onClick = onToggle)
                 .semantics { contentDescription = if (settings.enabled) "关闭弹幕" else "开启弹幕" }
-                .padding(horizontal = 7.dp),
+                .padding(horizontal = DanmakuIconPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("弹", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(3.dp))
-            if (settings.enabled) {
-                Box(
-                    Modifier.size(13.dp).background(DanmakuPink, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "✓",
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        lineHeight = 8.sp,
-                    )
-                }
-            } else {
-                Box(
-                    Modifier.size(13.dp).border(1.dp, Color.White.copy(alpha = .5f), CircleShape),
-                )
-            }
+            DanmakuStateIcon(
+                enabled = settings.enabled,
+                tint = Color.White,
+                checkColor = DanmakuPink,
+                modifier = Modifier.size(DanmakuIconSize),
+            )
         }
 
         Row(
             Modifier.height(30.dp).clip(RoundedCornerShape(8.dp))
-                .background(Color.White.copy(alpha = .12f))
                 .clickable(role = Role.Button, onClick = onOpenSettings)
                 .semantics { contentDescription = "弹幕设置" }
-                .padding(horizontal = 7.dp),
+                .padding(horizontal = DanmakuIconPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("弹", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(3.dp))
-            Canvas(Modifier.size(13.dp)) {
-                val center = Offset(size.width / 2f, size.height / 2f)
-                val radius = size.minDimension / 2f
-                drawCircle(
-                    DanmakuPink,
-                    radius * .42f,
-                    center,
-                    style = Stroke(1.4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
-                )
-                repeat(8) { index ->
-                    val angle = Math.toRadians(index * 45.0)
-                    val cos = kotlin.math.cos(angle).toFloat()
-                    val sin = kotlin.math.sin(angle).toFloat()
-                    drawLine(
-                        DanmakuPink,
-                        Offset(center.x + cos * radius * .56f, center.y + sin * radius * .56f),
-                        Offset(center.x + cos * radius * .9f, center.y + sin * radius * .9f),
-                        strokeWidth = 1.8.dp.toPx(),
-                        cap = StrokeCap.Round,
-                    )
-                }
-                drawCircle(DanmakuPink, radius * .12f, center)
-            }
+            DanmakuSettingsIcon(
+                tint = Color.White,
+                gearColor = DanmakuPink,
+                modifier = Modifier.size(DanmakuIconSize),
+            )
         }
 
         Row(

@@ -14,12 +14,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import io.github.bilibox.data.danmaku.DanmakuSettings
 import io.github.bilibox.feature.danmaku.DanmakuControlBar
+import io.github.bilibox.feature.danmaku.DanmakuControlLeadingWidth
 
 /** 播放器底栏需要展示的播放状态。 */
 internal data class PlayerBottomBarState(
@@ -88,29 +91,28 @@ internal fun PlayerBottomBar(
             ) {
                 seekBar(Modifier.fillMaxWidth())
             }
-            Row(
-                Modifier.fillMaxWidth().height(46.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                PlayerBarIconButton(
-                    contentDescription = if (showPause) "暂停" else "播放",
-                    onClick = actions.onTogglePlayback,
-                ) {
-                    PlaybackIcon(showPause, Modifier.size(22.dp))
-                }
-                PlayerBarIconButton(
-                    contentDescription = "下一集",
-                    onClick = actions.onNextEpisode,
-                ) {
-                    NextEpisodeIcon(Modifier.size(18.dp))
-                }
-                PlaybackTimeLabel(
-                    position = if (state.scrubbing) state.scrubPosition.toLong() else state.position,
-                    duration = state.duration,
-                    modifier = Modifier.padding(start = 6.dp, end = 4.dp),
-                )
-                Spacer(Modifier.width(12.dp))
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            FullScreenControlRow(
+                modifier = Modifier.fillMaxWidth().height(46.dp),
+                left = {
+                    PlayerBarIconButton(
+                        contentDescription = if (showPause) "暂停" else "播放",
+                        onClick = actions.onTogglePlayback,
+                    ) {
+                        PlaybackIcon(showPause, Modifier.size(22.dp))
+                    }
+                    PlayerBarIconButton(
+                        contentDescription = "下一集",
+                        onClick = actions.onNextEpisode,
+                    ) {
+                        NextEpisodeIcon(Modifier.size(18.dp))
+                    }
+                    PlaybackTimeLabel(
+                        position = if (state.scrubbing) state.scrubPosition.toLong() else state.position,
+                        duration = state.duration,
+                        modifier = Modifier.padding(start = 6.dp, end = 4.dp),
+                    )
+                },
+                center = {
                     if (state.danmakuSupported) {
                         DanmakuControlBar(
                             settings = state.danmakuSettings,
@@ -123,16 +125,17 @@ internal fun PlayerBottomBar(
                             modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth(),
                         )
                     }
-                }
-                Spacer(Modifier.width(12.dp))
-                if (state.episodesAvailable) {
-                    PlayerBarAction("选集", contentDescription = "选集", onClick = actions.onEpisodes)
-                }
-                SpeedBarChip(speed = state.speed, onClick = actions.onSpeed)
-                if (state.qualityOptions.isNotEmpty()) {
-                    PlayerQualityChip(label = currentQualityLabel, onClick = actions.onQuality)
-                }
-            }
+                },
+                right = {
+                    if (state.episodesAvailable) {
+                        PlayerBarAction("选集", contentDescription = "选集", onClick = actions.onEpisodes)
+                    }
+                    SpeedBarChip(speed = state.speed, onClick = actions.onSpeed)
+                    if (state.qualityOptions.isNotEmpty()) {
+                        PlayerQualityChip(label = currentQualityLabel, onClick = actions.onQuality)
+                    }
+                },
+            )
         } else {
             Row(
                 Modifier.fillMaxWidth().height(40.dp),
@@ -164,6 +167,45 @@ internal fun PlayerBottomBar(
                     FullscreenIcon(fullScreen = false, modifier = Modifier.size(16.dp))
                 }
             }
+        }
+    }
+}
+
+/**
+ * 横屏底栏：左右两组贴边，中间弹幕组按输入框而不是整组居中。
+ * 弹幕组左侧是开关与设置图标，因此整组需要再向左让出这半个图标宽度。
+ */
+@Composable
+private fun FullScreenControlRow(
+    modifier: Modifier,
+    left: @Composable () -> Unit,
+    center: @Composable () -> Unit,
+    right: @Composable () -> Unit,
+) {
+    Layout(
+        content = {
+            Row(verticalAlignment = Alignment.CenterVertically) { left() }
+            Box { center() }
+            Row(verticalAlignment = Alignment.CenterVertically) { right() }
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val gap = 12.dp.roundToPx()
+        val height = constraints.maxHeight
+        val leftMeasured = measurables[0].measure(Constraints(maxHeight = height))
+        val rightMeasured = measurables[2].measure(Constraints(maxHeight = height))
+        val available = (constraints.maxWidth - leftMeasured.width - rightMeasured.width - gap * 2).coerceAtLeast(0)
+        val centerMeasured = measurables[1].measure(Constraints(maxWidth = available, maxHeight = height))
+        val width = constraints.maxWidth
+        val leading = DanmakuControlLeadingWidth.roundToPx()
+        val desiredX = width / 2 - (centerMeasured.width + leading) / 2
+        val minX = leftMeasured.width + gap
+        val maxX = (width - rightMeasured.width - gap - centerMeasured.width).coerceAtLeast(minX)
+        val centerX = desiredX.coerceIn(minX, maxX)
+        layout(width, height) {
+            leftMeasured.place(0, (height - leftMeasured.height) / 2)
+            rightMeasured.place(width - rightMeasured.width, (height - rightMeasured.height) / 2)
+            centerMeasured.place(centerX, (height - centerMeasured.height) / 2)
         }
     }
 }

@@ -1,7 +1,5 @@
 package io.github.bilibox.feature.player
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,7 +13,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.util.formatSpeedBadge
 import kotlin.math.abs
 
@@ -30,34 +27,16 @@ internal fun SpeedBarChip(
     Row(
         modifier.height(30.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(
-                if (active) OnlinePink.copy(alpha = .16f) else Color.White.copy(alpha = .10f)
-            )
-            .border(
-                1.dp,
-                if (active) OnlinePink.copy(alpha = .55f) else Color.White.copy(alpha = .10f),
-                RoundedCornerShape(8.dp)
-            )
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            "倍速",
-            color = if (active) OnlinePink else Color.White.copy(alpha = .92f),
-            fontSize = 12.sp,
+            if (active) formatSpeedBadge(speed) else "倍速",
+            color = Color.White,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1
         )
-        if (active) {
-            Spacer(Modifier.width(4.dp))
-            Text(
-                formatSpeedBadge(speed),
-                color = OnlinePink,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1
-            )
-        }
     }
 }

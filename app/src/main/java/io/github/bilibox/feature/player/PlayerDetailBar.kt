@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,6 +47,7 @@ import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.OnlineMuted
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.data.player.LightsOffMode
+import io.github.bilibox.feature.danmaku.DanmakuStateIcon
 
 /*
  * The operation bar between the video and the creator card.
@@ -60,7 +60,6 @@ import io.github.bilibox.data.player.LightsOffMode
 private val BarButtonBackground = Color(0xFFEAECEF)
 private val BarInactiveText = Color(0xFF61666D)
 private val BarActiveText = Color(0xFF18191C)
-private val BarBadgeOff = Color(0xFFC9CCD0)
 private val BarSourcePill = Color(0xFFF6F7F8)
 private val BarSourceStroke = Color(0xFFE3E5E7)
 private val DanmakuPillExpandedWidth = 116.dp
@@ -196,44 +195,20 @@ private fun DanmakuButton(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                AppGlyphIcon(AppIcon.DANMAKU, BarInactiveText, Modifier.size(16.dp), 1.8f)
+                Crossfade(
+                    targetState = enabled,
+                    animationSpec = tween(180),
+                    label = "弹幕开关图标",
+                ) { on ->
+                    DanmakuStateIcon(
+                        enabled = on,
+                        tint = BarInactiveText,
+                        checkColor = OnlinePink,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
             Spacer(Modifier.width(2.dp))
-        }
-        DanmakuBadge(
-            enabled = enabled,
-            modifier = Modifier.align(Alignment.BottomEnd)
-                .padding(end = 1.dp)
-                .offset(x = 3.dp, y = 3.dp),
-        )
-    }
-}
-
-@Composable
-private fun DanmakuBadge(enabled: Boolean, modifier: Modifier = Modifier) {
-    val badgeColor by animateColorAsState(
-        targetValue = if (enabled) OnlinePink else BarBadgeOff,
-        animationSpec = tween(220),
-        label = "弹幕角标颜色",
-    )
-    Box(
-        modifier.size(12.dp)
-            .background(badgeColor, CircleShape)
-            .border(1.5.dp, Color.White, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Crossfade(
-            targetState = enabled,
-            animationSpec = tween(180),
-            label = "弹幕角标图标",
-        ) { on ->
-            Text(
-                text = if (on) "✓" else "−",
-                color = Color.White,
-                fontSize = if (on) 7.sp else 9.sp,
-                lineHeight = 8.sp,
-                fontWeight = FontWeight.Bold,
-            )
         }
     }
 }

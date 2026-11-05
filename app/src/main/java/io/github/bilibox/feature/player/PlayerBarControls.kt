@@ -3,7 +3,6 @@ package io.github.bilibox.feature.player
 import android.util.Size
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -21,7 +20,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.util.formatPlaybackTime
 
 @Composable
@@ -74,8 +72,8 @@ internal fun PlayerBarAction(
     ) {
         Text(
             text,
-            color = Color.White.copy(alpha = .92f),
-            fontSize = 12.sp,
+            color = Color.White,
+            fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1
         )
@@ -119,8 +117,6 @@ internal fun PlayerVerticalScreenChip(
 internal fun PlayerQualityChip(label: String, onClick: () -> Unit) {
     Box(
         Modifier.height(30.dp).clip(RoundedCornerShape(8.dp))
-            .background(OnlinePink.copy(alpha = .18f))
-            .border(1.dp, OnlinePink.copy(alpha = .55f), RoundedCornerShape(8.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = "画质 ${label.ifBlank { "选择" }}" }
             .padding(horizontal = 9.dp),
@@ -128,8 +124,8 @@ internal fun PlayerQualityChip(label: String, onClick: () -> Unit) {
     ) {
         Text(
             label.ifBlank { "画质" },
-            color = OnlinePink,
-            fontSize = 12.sp,
+            color = Color.White,
+            fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1
         )
