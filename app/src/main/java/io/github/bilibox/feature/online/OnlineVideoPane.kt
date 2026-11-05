@@ -10,7 +10,6 @@ import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -41,7 +40,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.model.VideoSummary
-import io.github.bilibox.core.ui.component.RemoteCover
 import io.github.bilibox.core.ui.component.VideoMetaIcon
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlineDivider
@@ -93,83 +91,15 @@ internal fun OnlineVideoDetails(
         ?: video.duration
 
     Column(Modifier.fillMaxWidth().background(OnlineSurface)) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RemoteCover(
-                avatar,
-                Modifier.size(38.dp).border(1.dp, OnlineDivider, CircleShape).padding(1.dp),
-                shape = CircleShape
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    ownerName,
-                    color = OnlinePink,
-                    fontSize = 14.sp,
-                    lineHeight = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(2.dp))
-                val creatorStats = creatorCard?.let {
-                    "${formatCompactCount(it.card.fans)} 粉丝    ${it.archiveCount} 视频"
-                } ?: "哔哩哔哩 UP 主"
-                Text(
-                    creatorStats,
-                    color = OnlineMuted,
-                    fontSize = 11.5.sp,
-                    lineHeight = 16.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            // A compact visual button with the platform's expanded touch target.
-            Box(
-                Modifier.height(38.dp).widthIn(min = 72.dp)
-                    .semantics { contentDescription = if (following) "取消关注" else "关注 UP 主" }
-                    .clickable(role = Role.Button) { following = !following },
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    Modifier.height(28.dp)
-                        .background(if (following) OnlineDivider else OnlinePink, CircleShape)
-                        .padding(horizontal = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (!following) {
-                        Canvas(Modifier.size(14.dp)) {
-                            val inset = size.width * 5f / 24f
-                            drawLine(
-                                Color.White,
-                                Offset(center.x, inset),
-                                Offset(center.x, size.height - inset),
-                                1.4.dp.toPx(),
-                                StrokeCap.Round
-                            )
-                            drawLine(
-                                Color.White,
-                                Offset(inset, center.y),
-                                Offset(size.width - inset, center.y),
-                                1.4.dp.toPx(),
-                                StrokeCap.Round
-                            )
-                        }
-                    }
-                    Text(
-                        if (following) "已关注" else "关注",
-                        color = if (following) OnlineSecondary else Color.White,
-                        fontSize = 12.5.sp,
-                        lineHeight = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
+        OnlineCreatorCard(
+            name = ownerName,
+            avatar = avatar,
+            fans = creatorCard?.card?.fans,
+            archiveCount = creatorCard?.archiveCount,
+            level = creatorCard?.card?.levelInfo?.currentLevel,
+            following = following,
+            onToggleFollow = { following = !following },
+        )
 
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
             Row(

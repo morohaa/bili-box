@@ -82,6 +82,12 @@ data class UserCard(
     val name: String = "",
     val face: String = "",
     val fans: Long = 0,
+    @SerialName("level_info") val levelInfo: LevelInfo = LevelInfo(),
+)
+
+@Serializable
+data class LevelInfo(
+    @SerialName("current_level") val currentLevel: Int = 0,
 )
 
 @Serializable
