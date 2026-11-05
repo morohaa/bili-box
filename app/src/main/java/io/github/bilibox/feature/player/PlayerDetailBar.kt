@@ -8,14 +8,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -27,7 +25,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -40,12 +40,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.OnlineMuted
 import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.data.player.LightsOffMode
 
 /*
  * The operation bar between the video and the creator card.
@@ -61,8 +63,6 @@ private val BarActiveText = Color(0xFF18191C)
 private val BarBadgeOff = Color(0xFFC9CCD0)
 private val BarSourcePill = Color(0xFFF6F7F8)
 private val BarSourceStroke = Color(0xFFE3E5E7)
-private val LightsOffBackground = Color(0xFF0B0D10)
-private val LightsOffBulb = Color(0xFFFFD166)
 private val DanmakuPillExpandedWidth = 116.dp
 private val DanmakuPillCollapsedWidth = 30.dp
 private val DanmakuPillEasing = CubicBezierEasing(.25f, .46f, .45f, .94f)
@@ -77,7 +77,9 @@ internal fun PlayerDetailBar(
     danmakuEnabled: Boolean,
     onOpenDanmakuComposer: (() -> Unit)?,
     onToggleDanmaku: (() -> Unit)?,
+    lightsOffMode: LightsOffMode,
     onToggleLights: (() -> Unit)?,
+    onSelectLightsOffMode: ((LightsOffMode) -> Unit)?,
 ) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 14.dp).height(44.dp),
@@ -124,11 +126,11 @@ internal fun PlayerDetailBar(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 DanmakuButton(danmakuEnabled, onOpenDanmakuComposer, onToggleDanmaku)
-                if (onToggleLights != null) {
-                    CircleBarButton(
-                        icon = AppIcon.BULB,
-                        contentDescription = "关灯",
-                        onClick = onToggleLights,
+                if (onToggleLights != null && onSelectLightsOffMode != null) {
+                    LightsButton(
+                        mode = lightsOffMode,
+                        onToggle = onToggleLights,
+                        onSelectMode = onSelectLightsOffMode,
                     )
                 }
             }
@@ -237,20 +239,39 @@ private fun DanmakuBadge(enabled: Boolean, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun CircleBarButton(
-    icon: AppIcon,
-    contentDescription: String,
-    onClick: () -> Unit,
+private fun LightsButton(
+    mode: LightsOffMode,
+    onToggle: () -> Unit,
+    onSelectMode: (LightsOffMode) -> Unit,
 ) {
-    Box(
-        Modifier.size(30.dp)
-            .clip(CircleShape)
-            .background(BarButtonBackground)
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { this.contentDescription = contentDescription },
-        contentAlignment = Alignment.Center,
-    ) {
-        AppGlyphIcon(icon, BarInactiveText, Modifier.size(16.dp), 1.8f)
+    var menuOpen by remember { mutableStateOf(false) }
+    Box {
+        Box(
+            Modifier.size(30.dp)
+                .clip(CircleShape)
+                .background(BarButtonBackground)
+                .combinedClickable(
+                    onClickLabel = "关灯",
+                    role = Role.Button,
+                    onLongClickLabel = "选择关灯模式",
+                    onLongClick = { menuOpen = true },
+                    onClick = onToggle,
+                )
+                .semantics { contentDescription = "关灯，长按选择模式" },
+            contentAlignment = Alignment.Center,
+        ) {
+            AppGlyphIcon(AppIcon.BULB, BarInactiveText, Modifier.size(16.dp), 1.8f)
+        }
+        LightsOffModeMenu(
+            expanded = menuOpen,
+            selected = mode,
+            onDismiss = { menuOpen = false },
+            onSelect = { selected ->
+                menuOpen = false
+                onSelectMode(selected)
+            },
+            offset = DpOffset((-77).dp, 8.dp),
+        )
     }
 }
 
@@ -272,34 +293,6 @@ private fun SourcePill(label: String) {
             contentAlignment = Alignment.Center,
         ) {
             AppGlyphIcon(AppIcon.TV, OnlinePink, Modifier.size(13.dp), 1.7f)
-        }
-    }
-}
-
-/**
- * Covers the detail pane while lights are off so the video stays the only
- * bright element. Tapping anywhere brings the page back.
- */
-@Composable
-internal fun PlayerLightsOffOverlay(onDismiss: () -> Unit) {
-    Box(
-        Modifier.fillMaxSize()
-            .background(LightsOffBackground)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                role = Role.Button,
-                onClick = onDismiss,
-            )
-            .semantics { contentDescription = "恢复页面" },
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            AppGlyphIcon(AppIcon.BULB, LightsOffBulb, Modifier.size(30.dp), 1.6f)
-            Spacer(Modifier.height(12.dp))
-            Text("关灯模式", color = Color.White.copy(alpha = .9f), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(4.dp))
-            Text("轻触屏幕恢复", color = Color(0xFF9499A0), fontSize = 12.sp)
         }
     }
 }

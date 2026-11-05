@@ -2,6 +2,7 @@ package io.github.bilibox.feature.player
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.text.font.FontWeight
@@ -25,6 +27,7 @@ import io.github.bilibox.core.ui.component.playback.SpeedPanelMode
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.Pink
+import io.github.bilibox.data.player.LightsOffMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +44,9 @@ internal fun PlayerDetailsPane(
     onOpenDanmakuComposer: (() -> Unit)?,
     onToggleDanmaku: (() -> Unit)?,
     lightsOff: Boolean,
+    lightsOffMode: LightsOffMode,
     onToggleLights: (() -> Unit)?,
+    onSelectLightsOffMode: (LightsOffMode) -> Unit,
     playbackError: String?,
     onRetry: () -> Unit,
     commentMessage: String,
@@ -70,12 +75,19 @@ internal fun PlayerDetailsPane(
     val activePane = if (showDetailTabs) detailsTab else 0
     val detailScroll = rememberScrollState()
     LaunchedEffect(activePane) { detailScroll.scrollTo(0) }
+    val blurRadius by animateDpAsState(
+        targetValue = if (lightsOff) lightsOffMode.contentBlurRadius() else 0.dp,
+        animationSpec = tween(220),
+        label = "关灯模糊半径",
+    )
     Box(
         modifier.fillMaxWidth().background(detailsBackground)
             .navigationBarsPadding().clipToBounds()
     ) {
         Column(
-            Modifier.fillMaxSize().verticalScroll(detailScroll)
+            Modifier.fillMaxSize()
+                .verticalScroll(detailScroll, enabled = !lightsOff)
+                .then(if (blurRadius > 0.dp) Modifier.blur(blurRadius) else Modifier)
         ) {
             if (showDetailTabs) {
                 PlayerDetailBar(
@@ -87,7 +99,9 @@ internal fun PlayerDetailsPane(
                     danmakuEnabled = danmakuEnabled,
                     onOpenDanmakuComposer = onOpenDanmakuComposer,
                     onToggleDanmaku = onToggleDanmaku,
+                    lightsOffMode = lightsOffMode,
                     onToggleLights = onToggleLights,
+                    onSelectLightsOffMode = onSelectLightsOffMode,
                 )
                 HorizontalDivider(color = if (detailsBackground == Color.White) Color(0xFFE3E5E7) else Color.White.copy(alpha = .08f), thickness = 1.dp)
             }
@@ -170,8 +184,13 @@ internal fun PlayerDetailsPane(
             }
         }
 
-        if (lightsOff && onToggleLights != null) {
-            PlayerLightsOffOverlay(onToggleLights)
+        val exitLightsOff = onToggleLights
+        if (lightsOff && exitLightsOff != null) {
+            PlayerLightsOffOverlay(
+                mode = lightsOffMode,
+                onExit = exitLightsOff,
+                onSelectMode = onSelectLightsOffMode,
+            )
         }
     }
 }

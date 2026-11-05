@@ -49,6 +49,8 @@ import io.github.bilibox.core.ui.component.playback.SpeedPanelMode
 import io.github.bilibox.core.ui.theme.Pink
 import io.github.bilibox.data.danmaku.Danmaku
 import io.github.bilibox.data.danmaku.DanmakuSettings
+import io.github.bilibox.data.player.LightsOffMode
+import io.github.bilibox.data.player.LightsOffPreferences
 import io.github.bilibox.feature.danmaku.DanmakuComposerDialog
 import io.github.bilibox.feature.danmaku.DanmakuOverlay
 import io.github.bilibox.feature.danmaku.DanmakuSettingsSheet
@@ -125,7 +127,14 @@ internal fun VideoPlayerScreen(
     var qualityMenuExpanded by remember(player) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableIntStateOf(player.playbackState) }
     var detailsTab by remember(player) { mutableIntStateOf(0) }
+    val lightsOffPreferences = remember(context) { LightsOffPreferences(context) }
     var lightsOff by remember(player) { mutableStateOf(false) }
+    var lightsOffMode by remember(player) { mutableStateOf(lightsOffPreferences.load()) }
+    val selectLightsOffMode: (LightsOffMode) -> Unit = { mode ->
+        lightsOffMode = mode
+        lightsOffPreferences.save(mode)
+        lightsOff = true
+    }
     LaunchedEffect(fullScreen) { if (fullScreen) lightsOff = false }
     var playbackModeExpanded by remember(player) { mutableStateOf(false) }
     var sleepTimerOpen by remember(player) { mutableStateOf(false) }
@@ -691,7 +700,9 @@ internal fun VideoPlayerScreen(
                         null
                     },
                     lightsOff = lightsOff,
+                    lightsOffMode = lightsOffMode,
                     onToggleLights = { lightsOff = !lightsOff },
+                    onSelectLightsOffMode = selectLightsOffMode,
                     playbackError = playbackError,
                     onRetry = onRetry,
                     commentMessage = commentMessage,
