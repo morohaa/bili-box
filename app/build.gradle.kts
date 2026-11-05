@@ -60,7 +60,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
 
-// Retrofit guard: allow the existing architecture but prevent new 1000+ line files.
+// Hard limit for main Kotlin sources; CONTRIBUTING.md documents the recommended size.
 val kotlinFileLineLimit = 1000
 val checkKotlinFileSize = tasks.register("checkKotlinFileSize") {
     group = "verification"
