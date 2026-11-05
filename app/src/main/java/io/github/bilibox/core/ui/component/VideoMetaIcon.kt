@@ -52,6 +52,35 @@ internal fun VideoMetaIcon(kind: String, modifier: Modifier = Modifier, tint: Co
                 drawLine(tint, Offset(size.width * .43f, size.height * .62f), Offset(size.width * .62f, size.height * .62f), strokeWidth)
             }
 
+            "author" -> {
+                drawCircle(
+                    tint,
+                    size.minDimension * .155f,
+                    Offset(size.width * .5f, size.height * .32f),
+                    style = stroke
+                )
+                val shoulders = Path().apply {
+                    moveTo(size.width * .18f, size.height * .87f)
+                    cubicTo(
+                        size.width * .18f,
+                        size.height * .61f,
+                        size.width * .35f,
+                        size.height * .52f,
+                        size.width * .5f,
+                        size.height * .52f
+                    )
+                    cubicTo(
+                        size.width * .65f,
+                        size.height * .52f,
+                        size.width * .82f,
+                        size.height * .61f,
+                        size.width * .82f,
+                        size.height * .87f
+                    )
+                }
+                drawPath(shoulders, tint, style = stroke)
+            }
+
             "date" -> {
                 drawRoundRect(
                     tint,

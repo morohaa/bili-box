@@ -215,7 +215,8 @@ internal fun HomeScreen(
                         Column(
                             Modifier.fillMaxWidth().weight(1f)
                                 .verticalScroll(scrollState)
-                                .padding(horizontal = 16.dp)
+                                // 结果区比顶栏（16dp）更贴边，让视频卡片更宽、更满。
+                                .padding(horizontal = 10.dp)
                         ) {
                             when (val state = searchState) {
                                 SearchUiState.Idle -> Unit

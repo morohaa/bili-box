@@ -1,35 +1,32 @@
 package io.github.bilibox.feature.search
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.ui.component.EmptyCard
-import io.github.bilibox.core.ui.component.RemoteCover
-import io.github.bilibox.core.ui.component.VideoMetaIcon
 import io.github.bilibox.core.ui.theme.DarkInkSoft
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.Pink
-import io.github.bilibox.core.util.formatSearchDuration
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Composable
 internal fun SearchLoading(darkMode: Boolean = false) {
@@ -51,6 +48,10 @@ internal fun SearchError(message: String, darkMode: Boolean = false, onRetry: ()
     }
 }
 
+/**
+ * 搜索结果列表：卡片自身承载底色、圆角与阴影，列表不再画分隔线；
+ * 列表模式为左封面横卡，宫格模式为两列竖卡。
+ */
 @Composable
 internal fun SearchResults(
     state: SearchUiState.Success,
@@ -67,22 +68,9 @@ internal fun SearchResults(
         Spacer(Modifier.height(8.dp))
         EmptyCard("没有找到视频", "换个关键词再试试，或调整筛选条件。", darkMode)
     } else if (gridLayout) {
-        state.items.chunked(2).forEach { rowItems ->
-            Row(
-                Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                rowItems.forEach { video ->
-                    SearchGridCard(video, darkMode, Modifier.weight(1f)) { onVideoClick(video) }
-                }
-                if (rowItems.size == 1) Spacer(Modifier.weight(1f))
-            }
-        }
+        SearchGrid(state.items, darkMode, onVideoClick)
     } else {
-        state.items.forEach { video ->
-            SearchResultCard(video, darkMode, Modifier.offset(x = (-4).dp)) { onVideoClick(video) }
-            HorizontalDivider(color = if (darkMode) Color(0xFF30343A) else Color(0xFFDDE3E8), thickness = 1.dp)
-        }
+        SearchList(state.items, darkMode, onVideoClick)
     }
     Row(
         Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 20.dp),
@@ -100,6 +88,33 @@ internal fun SearchResults(
 }
 
 @Composable
+private fun SearchList(items: List<VideoSummary>, darkMode: Boolean, onVideoClick: (VideoSummary) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        items.forEachIndexed { index, video ->
+            if (index > 0) Spacer(Modifier.height(12.dp))
+            SearchResultCard(video, darkMode) { onVideoClick(video) }
+        }
+    }
+}
+
+@Composable
+private fun SearchGrid(items: List<VideoSummary>, darkMode: Boolean, onVideoClick: (VideoSummary) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        items.chunked(2).forEach { rowItems ->
+            Row(
+                Modifier.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                rowItems.forEach { video ->
+                    SearchGridCard(video, darkMode, Modifier.weight(1f)) { onVideoClick(video) }
+                }
+                if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
 private fun SearchResultBar(count: Int, darkMode: Boolean) {
     val muted = if (darkMode) Color(0xFF9BA3AE) else Muted
     val strong = if (darkMode) DarkInkSoft else Ink
@@ -112,132 +127,4 @@ private fun SearchResultBar(count: Int, darkMode: Boolean) {
         fontSize = 12.sp,
         modifier = Modifier.offset(x = (-2).dp).padding(top = 12.dp, bottom = 2.dp),
     )
-}
-
-@Composable
-private fun SearchResultCard(video: VideoSummary, darkMode: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Row(
-        modifier.fillMaxWidth().clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.Top
-    ) {
-        Box(
-            Modifier.width(144.dp).height(90.dp).clip(RoundedCornerShape(11.dp)),
-            contentAlignment = Alignment.BottomEnd,
-        ) {
-            RemoteCover(video.coverUrl, Modifier.fillMaxSize())
-            Text(
-                formatSearchDuration(video.duration),
-                color = Color.White,
-                fontSize = 10.sp,
-                lineHeight = 12.sp,
-                modifier = Modifier
-                    .padding(end = 5.dp, bottom = 5.dp)
-                    .background(Color.Black.copy(alpha = .68f), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        Box(Modifier.weight(1f).height(90.dp)) {
-            Text(
-                video.title,
-                color = if (darkMode) DarkInkSoft else Ink,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                lineHeight = 17.sp,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.align(Alignment.TopStart),
-            )
-            Column(Modifier.align(Alignment.BottomStart)) {
-                AuthorRow(video.author, darkMode)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    VideoMeta(icon = "play", value = video.playCount, darkMode = darkMode)
-                    VideoMeta(icon = "comment", value = video.commentCount.toString(), darkMode = darkMode)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchGridCard(video: VideoSummary, darkMode: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Column(modifier.clickable(onClick = onClick).padding(bottom = 12.dp)) {
-        Box(
-            Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.BottomEnd,
-        ) {
-            RemoteCover(video.coverUrl, Modifier.fillMaxSize(), RoundedCornerShape(10.dp))
-            Text(
-                formatSearchDuration(video.duration),
-                color = Color.White,
-                fontSize = 10.sp,
-                lineHeight = 12.sp,
-                modifier = Modifier
-                    .padding(end = 5.dp, bottom = 5.dp)
-                    .background(Color.Black.copy(alpha = .68f), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-            )
-        }
-        Spacer(Modifier.height(7.dp))
-        Text(
-            video.title,
-            color = if (darkMode) DarkInkSoft else Ink,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            lineHeight = 18.sp,
-            minLines = 2,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(6.dp))
-        AuthorRow(video.author, darkMode)
-        Spacer(Modifier.height(5.dp))
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            VideoMeta(icon = "play", value = video.playCount, darkMode = darkMode)
-            VideoMeta(icon = "comment", value = video.commentCount.toString(), darkMode = darkMode)
-        }
-    }
-}
-
-@Composable
-private fun AuthorRow(author: String, darkMode: Boolean) {
-    val muted = if (darkMode) Color(0xFF9BA3AE) else Muted
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.padding(start = 2.dp)
-                .size(width = 14.dp, height = 12.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(Color.Transparent)
-                .border(0.6.dp, muted, RoundedCornerShape(4.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("UP", color = muted, fontSize = 6.sp, lineHeight = 7.sp, fontWeight = FontWeight.Medium)
-        }
-        Spacer(Modifier.width(4.dp))
-        Text(author, color = muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun VideoMeta(icon: String, value: String, darkMode: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.wrapContentWidth()) {
-        VideoMetaIcon(kind = icon, modifier = Modifier.size(width = 16.dp, height = 13.dp), tint = if (darkMode) Color(0xFF9BA3AE) else Muted)
-        Spacer(Modifier.width(2.dp))
-        Text(value, color = if (darkMode) Color(0xFF9BA3AE) else Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-private fun formatPublishDate(timestampSeconds: Long): String {
-    if (timestampSeconds <= 0L) return "--"
-    return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(timestampSeconds * 1000L))
 }
