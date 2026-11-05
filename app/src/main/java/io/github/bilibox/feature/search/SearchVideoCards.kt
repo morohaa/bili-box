@@ -279,7 +279,7 @@ private fun VideoStat(
     iconSize: Dp,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        VideoMetaIcon(icon, Modifier.size(width = iconSize, height = iconSize * .9f), tint = color)
+        VideoMetaIcon(icon, Modifier.size(iconSize), tint = color)
         Spacer(Modifier.width(3.dp))
         Text(
             value,
