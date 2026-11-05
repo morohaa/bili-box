@@ -1,5 +1,6 @@
-package io.github.bilibox.data.danmaku
+package io.github.bilibox.feature.danmaku.layout
 
+import io.github.bilibox.data.danmaku.Danmaku
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

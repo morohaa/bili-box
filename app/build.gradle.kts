@@ -61,22 +61,24 @@ dependencies {
 }
 
 // Hard limit for main Kotlin sources; CONTRIBUTING.md documents the recommended size.
-val kotlinFileLineLimit = 1000
 val checkKotlinFileSize = tasks.register("checkKotlinFileSize") {
+    val kotlinFileLineLimit = 1000
+    val sourceFiles = fileTree("src/main/java") { include("**/*.kt") }
+    val moduleDirectory = layout.projectDirectory.asFile
     group = "verification"
     description = "Fails when a main Kotlin source file exceeds $kotlinFileLineLimit lines."
     doLast {
-        val offenders = fileTree("src/main/java") { include("**/*.kt") }.files
+        val offenders = sourceFiles.files
             .map { it to it.readLines().size }
             .filter { (_, lines) -> lines > kotlinFileLineLimit }
         if (offenders.isNotEmpty()) {
             throw GradleException(
                 "Kotlin files exceed $kotlinFileLineLimit lines:\n" +
                     offenders.joinToString("\n") { (file, lines) ->
-                        " - ${file.relativeTo(projectDir)}: $lines"
+                        " - ${file.relativeTo(moduleDirectory)}: $lines"
                     }
             )
         }
     }
 }
-tasks.named("check") { dependsOn(checkKotlinFileSize) }
+tasks.named("check") { dependsOn(checkKotlinFileSize, rootProject.tasks.named("checkArchitecture")) }

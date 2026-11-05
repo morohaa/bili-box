@@ -16,3 +16,20 @@ tasks.register<Exec>("ktlintFormat") {
     description = "Runs the pinned ktlint CLI and applies auto-formatting."
     commandLine("bash", "scripts/ktlint.sh", "format")
 }
+
+val pythonExecutable = providers.gradleProperty("pythonExecutable").orElse(
+    if (System.getProperty("os.name").startsWith("Windows")) "python" else "python3"
+).get()
+
+val checkArchitectureTests = tasks.register<Exec>("checkArchitectureTests") {
+    group = "verification"
+    description = "Tests the architecture checker, including KDoc-only references."
+    commandLine(pythonExecutable, "-B", "-m", "unittest", "discover", "-s", "scripts/tests")
+}
+
+tasks.register<Exec>("checkArchitecture") {
+    group = "verification"
+    description = "Checks main Kotlin package boundaries and feature dependency cycles."
+    dependsOn(checkArchitectureTests)
+    commandLine(pythonExecutable, "-B", "scripts/check_architecture.py")
+}

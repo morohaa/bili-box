@@ -48,12 +48,14 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 │   ├── data/
 │   │   ├── auth/                      # B 站通行证请求、会话加密存储
 │   │   ├── bili/                      # B 站接口、模型、播放源与 WBI 签名
-│   │   ├── danmaku/                   # 弹幕解析、轨道排布与显示偏好
+│   │   ├── danmaku/                   # 弹幕模型、解析与显示偏好持久化
 │   │   ├── localvideo/                # 本地视频扫描、缩略图、播放队列与进度
+│   │   ├── online/                    # 在线媒体下载与 MediaStore 持久化
 │   │   └── search/                    # 搜索历史存储与视频摘要转换
 │   └── feature/
 │       ├── auth/                      # 登录、扫码与极验 UI
 │       ├── danmaku/                   # 弹幕层与播放器弹幕控制
+│       │   └── layout/                # 弹幕轨道、速度、碰撞与显示时间排布
 │       ├── home/                      # 首页容器与搜索入口
 │       ├── library/                   # 本地视频库、文件夹与筛选
 │       ├── listen/                    # 听视频页面与播放状态绑定
@@ -67,7 +69,15 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 ├── design/
 │   ├── icon/                          # 应用图标矢量源与生成脚本
 │   └── prototypes/                    # 页面 HTML 设计稿（不参与构建）
-├── .github/workflows/android.yml      # CI：单元测试与 Debug 构建
+├── docs/architecture.md               # 依赖方向、播放关系与状态归属
+├── scripts/
+│   ├── ktlint.sh                      # 固定版本的 Kotlin 格式检查与修复
+│   ├── check_architecture.py          # 依赖边界与功能包循环检查
+│   └── tests/                         # 架构检查器回归测试
+├── .github/
+│   ├── ISSUE_TEMPLATE/                # 缺陷与功能建议模板
+│   ├── PULL_REQUEST_TEMPLATE.md        # 改动说明与验证清单
+│   └── workflows/android.yml          # CI：格式、架构、行数、测试与 Debug 构建
 ├── gradle/                            # 版本目录与 Gradle Wrapper
 ├── build.gradle.kts
 ├── settings.gradle.kts
@@ -80,6 +90,8 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 
 页面入口统一使用 `*Screen`，例如 `HomeScreen`、`LibraryScreen`、`ProfileScreen`；局部组件文件按职责命名，例如 `SearchResults.kt`、`SearchControls.kt`。`home` 组合搜索首页，`search` 提供结果、筛选与请求状态；跨功能导航和状态组装集中在 `app`，功能包不反向依赖应用组装层。
 
+依赖边界、播放器与听视频关系、状态生命周期见 [架构说明](docs/architecture.md)；参与协作前请阅读 [贡献指南](CONTRIBUTING.md)。
+
 ## 环境要求
 
 - macOS / Linux / Windows，已安装 Android Studio（推荐当前稳定版）。
@@ -87,8 +99,12 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 - 仓库自带 Gradle Wrapper，无需单独安装 Gradle。
 - Android SDK Platform 37、Build-Tools 及对应 Android SDK Platform-Tools。
 - 真机或 API 28 以上的模拟器。
+- 架构检查需要 Python 3.9+（仅标准库，无需安装 pip 依赖）。macOS / Linux 默认调用 `python3`，Windows 默认调用 `python`；可用 `-PpythonExecutable=/path/to/python` 指定解释器。
+- `ktlintCheck` / `ktlintFormat` 需要 Bash，以及 PATH 中的 `curl`、`find`、`sort`、`mkdir`、`mv`、`dirname` 和 `sha256sum` 或 `shasum`。首次运行需要联网下载并校验固定版本的 ktlint CLI，之后使用 `build/tools/` 缓存。
 
-如果命令行没有配置 `JAVA_HOME`，可以临时指定 Android Studio 自带的 JDK：
+Windows 请安装 Git for Windows，并使用 Git Bash 执行下方 Bash 示例，确认这些工具位于 PATH 中。若使用 PowerShell，可用 `.\gradlew.bat` 替代 `./gradlew`，但格式任务仍会调用 Bash，需要将 Git 的 `bin`、`usr/bin` 工具目录加入该终端的 PATH，避免误用 Windows 自带的 `find` / `sort`。JDK、SDK 路径请按本机安装位置配置。
+
+macOS 如果命令行没有配置 `JAVA_HOME`，可以临时指定 Android Studio 自带的 JDK：
 
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
@@ -125,6 +141,9 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 # 检查单文件行数上限
 ./gradlew checkKotlinFileSize
 
+# 检查依赖方向与功能包循环（同时运行检查器回归测试）
+./gradlew checkArchitecture
+
 # 运行 JVM 单元测试
 ./gradlew testDebugUnitTest
 
@@ -138,8 +157,9 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 - `app/src/test` 覆盖应用状态恢复、WBI 签名、搜索历史、播放缓存、弹幕 XML / 压缩解码与轨道排布等逻辑。
 - `app/src/androidTest` 覆盖播放器控件、手势、本地视频详情、听视频和弹幕设置弹层等 Compose 交互。
+- `scripts/tests` 覆盖反向依赖、功能包循环、别名 / 全限定引用、KDoc 与字符串模板等检查器行为；`checkArchitecture` 会自动运行这些测试。
 - 首次运行 Gradle 需要联网下载依赖；国内网络可自行配置 Maven 镜像，但不要把镜像的私有凭据提交到仓库。
-- GitHub Actions 会在 push / pull request 时执行 ktlint、文件行数检查、单元测试与 Debug 构建，见 `.github/workflows/android.yml`。
+- GitHub Actions 会在 push / pull request 时执行 ktlint、架构与文件行数检查、单元测试与 Debug 构建，见 `.github/workflows/android.yml`。设备测试需本地另行运行。
 
 ## 已知限制
 

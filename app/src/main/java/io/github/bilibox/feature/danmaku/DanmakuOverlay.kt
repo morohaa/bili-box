@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import io.github.bilibox.data.danmaku.Danmaku
 import io.github.bilibox.data.danmaku.DanmakuSettings
-import io.github.bilibox.data.danmaku.DanmakuTrackBuilder
+import io.github.bilibox.feature.danmaku.layout.DanmakuTrackBuilder
 import kotlinx.coroutines.delay
 
 /**

@@ -12,6 +12,7 @@ build/
 *.ap_
 *.dex
 *.class
+__pycache__/
 
 # --- IDE / local tooling ---
 .idea/

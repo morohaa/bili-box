@@ -1,4 +1,6 @@
-package io.github.bilibox.data.danmaku
+package io.github.bilibox.feature.danmaku.layout
+
+import io.github.bilibox.data.danmaku.Danmaku
 
 /**
  * 一条弹幕在时间轴上的排布结果。

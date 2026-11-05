@@ -31,5 +31,10 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Lint, file size, tests and debug build
-        run: ./gradlew ktlintCheck checkKotlinFileSize testDebugUnitTest assembleDebug --stacktrace
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Lint, architecture, file size, tests and debug build
+        run: ./gradlew ktlintCheck checkArchitecture checkKotlinFileSize testDebugUnitTest assembleDebug --stacktrace
