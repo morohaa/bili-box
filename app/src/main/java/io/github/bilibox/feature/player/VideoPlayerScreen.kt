@@ -123,6 +123,7 @@ internal fun VideoPlayerScreen(
     var scrubPosition by remember(player) { mutableFloatStateOf(0f) }
     var speed by remember(player) { mutableFloatStateOf(1f) }
     var speedMenuExpanded by remember(player) { mutableStateOf(false) }
+    var moreMenuExpanded by remember(player) { mutableStateOf(false) }
     var episodesExpanded by remember(player) { mutableStateOf(false) }
     var qualityMenuExpanded by remember(player) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableIntStateOf(player.playbackState) }
@@ -194,6 +195,7 @@ internal fun VideoPlayerScreen(
             Toast.makeText(context, "已切换为听视频，画面已关闭", Toast.LENGTH_SHORT).show()
         }
         speedMenuExpanded = false
+        moreMenuExpanded = false
         playbackModeExpanded = false
         listenPageOpen = true
     }
@@ -229,6 +231,7 @@ internal fun VideoPlayerScreen(
         // 横屏全屏时以方向为准，避免退出横屏后又回到竖屏全屏。
         if (fullScreen) verticalFullScreen = false
         speedMenuExpanded = false
+        moreMenuExpanded = false
         playbackModeExpanded = false
         sleepTimerOpen = false
         episodesExpanded = false
@@ -317,6 +320,16 @@ internal fun VideoPlayerScreen(
             Toast.makeText(context, "需要存储权限才能保存视频画面", Toast.LENGTH_SHORT).show()
         }
     }
+    val takeScreenshot: () -> Unit = {
+        if (Build.VERSION.SDK_INT == 28 && context.checkSelfPermission(
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            screenshotPermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            screenshot.takeScreenshot()
+        }
+    }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -371,6 +384,7 @@ internal fun VideoPlayerScreen(
         controlsVisible = true
         scrubbing = false
         speedMenuExpanded = false
+        moreMenuExpanded = false
         playbackModeExpanded = false
         sleepTimerOpen = false
         episodesExpanded = false
@@ -378,9 +392,10 @@ internal fun VideoPlayerScreen(
         duration = defaultDurationMs
         position = player.currentPosition.coerceAtLeast(0L)
     }
-    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded, verticalFullScreen) {
+    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, moreMenuExpanded, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded, verticalFullScreen) {
         if (controlsVisible && (isPlaying || screenLocked) && !scrubbing &&
-            !speedMenuExpanded && !playbackModeExpanded && !sleepTimerOpen && !episodesExpanded && !qualityMenuExpanded
+            !speedMenuExpanded && !moreMenuExpanded && !playbackModeExpanded && !sleepTimerOpen &&
+            !episodesExpanded && !qualityMenuExpanded
         ) {
             delay(4_000)
             controlsVisible = false
@@ -402,6 +417,7 @@ internal fun VideoPlayerScreen(
             episodesExpanded -> episodesExpanded = false
             playbackModeExpanded -> playbackModeExpanded = false
             sleepTimerOpen -> sleepTimerOpen = false
+            moreMenuExpanded -> moreMenuExpanded = false
             speedMenuExpanded -> speedMenuExpanded = false
             verticalFullScreen -> verticalFullScreen = false
             else -> navigateBack()
@@ -603,10 +619,24 @@ internal fun VideoPlayerScreen(
                         listening = listening,
                         showListenButton = listenInfo != null,
                         speed = speed,
+                        moreMenuExpanded = moreMenuExpanded,
+                        sleepTimerActive = sleepTimer.active,
+                        screenshotEnabled = hasVideoFrame && playbackError == null && !screenshot.saving,
                         onBack = { navigateBack() },
                         onListenClick = { enterListen() },
                         onListenPositioned = { listenOrigin = it },
-                        onSpeedClick = { speedMenuExpanded = true },
+                        onMoreMenuExpandedChange = { moreMenuExpanded = it },
+                        onSpeedClick = {
+                            moreMenuExpanded = false
+                            speedMenuExpanded = true
+                        },
+                        onSleepTimerClick = {
+                            moreMenuExpanded = false
+                            speedMenuExpanded = false
+                            playbackModeExpanded = false
+                            sleepTimerOpen = true
+                        },
+                        onScreenshotClick = takeScreenshot,
                         modifier = Modifier.align(Alignment.TopStart),
                     )
                 }
@@ -616,16 +646,7 @@ internal fun VideoPlayerScreen(
                     PlayerSideTools(
                         locked = screenLocked,
                         screenshotEnabled = hasVideoFrame && playbackError == null && !screenshot.saving,
-                        onScreenshot = {
-                            if (Build.VERSION.SDK_INT == 28 && context.checkSelfPermission(
-                                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-                                ) != PackageManager.PERMISSION_GRANTED
-                            ) {
-                                screenshotPermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                            } else {
-                                screenshot.takeScreenshot()
-                            }
-                        },
+                        onScreenshot = takeScreenshot,
                         onToggleLock = { toggleScreenLock() },
                         modifier = Modifier.align(Alignment.CenterEnd).displayCutoutPadding()
                             .navigationBarsPadding().padding(end = 10.dp).offset(y = (-36).dp)
@@ -742,7 +763,7 @@ internal fun VideoPlayerScreen(
                         playbackModeExpanded = false
                         sleepTimerOpen = true
                     },
-                    onTakeScreenshot = { screenshot.takeScreenshot() },
+                    onTakeScreenshot = takeScreenshot,
                     onSeekTo = { target ->
                         player.seekTo(target.coerceAtLeast(0L))
                         player.playWhenReady = true

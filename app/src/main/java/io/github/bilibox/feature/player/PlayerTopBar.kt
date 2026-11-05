@@ -25,10 +25,16 @@ internal fun PlayerTopBar(
     listening: Boolean,
     showListenButton: Boolean,
     speed: Float,
+    moreMenuExpanded: Boolean,
+    sleepTimerActive: Boolean,
+    screenshotEnabled: Boolean,
     onBack: () -> Unit,
     onListenClick: () -> Unit,
     onListenPositioned: (Offset) -> Unit,
+    onMoreMenuExpandedChange: (Boolean) -> Unit,
     onSpeedClick: () -> Unit,
+    onSleepTimerClick: () -> Unit,
+    onScreenshotClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -79,7 +85,16 @@ internal fun PlayerTopBar(
             Spacer(Modifier.width(4.dp))
         }
         if (!fullScreen) {
-            SpeedBarChip(speed = speed, onClick = onSpeedClick)
+            PlayerMoreButton(
+                expanded = moreMenuExpanded,
+                onExpandedChange = onMoreMenuExpandedChange,
+                speed = speed,
+                sleepTimerActive = sleepTimerActive,
+                screenshotEnabled = screenshotEnabled,
+                onSpeedClick = onSpeedClick,
+                onSleepTimerClick = onSleepTimerClick,
+                onScreenshotClick = onScreenshotClick,
+            )
         }
     }
 }
