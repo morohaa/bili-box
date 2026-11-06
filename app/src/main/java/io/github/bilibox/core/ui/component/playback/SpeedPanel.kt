@@ -1,13 +1,14 @@
 package io.github.bilibox.core.ui.component.playback
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,8 +33,9 @@ import kotlin.math.abs
 /*
  * 播放倍速面板。
  *
- * 设计参考了「小电视在刻度轨道上奔跑」的方案：连续的 0.05x 刻度、蓝粉渐变的进度轨、
- * 跑动节奏与当前倍速绑定的小电视，以及一句随速度变化的心情文案。
+ * 横屏使用与选集、清晰度一致的侧边面板；竖屏仍保留底部倍速卡片。
+ * 内容设计参考了「小电视在刻度轨道上奔跑」的方案：连续的 0.05x 刻度、
+ * 蓝粉渐变的进度轨、跑动节奏与当前倍速绑定的小电视，以及一句随速度变化的心情文案。
  */
 
 internal enum class SpeedPanelMode { Drawer, Sheet }
@@ -80,94 +82,85 @@ internal fun SpeedPanel(
         onSpeedChange(next)
     }
 
-    // The drawer is edge-to-edge: no outer margins, square corners on the
-    // screen edges. Only the modal sheet keeps its rounded top.
-    val shape = if (mode == SpeedPanelMode.Sheet) {
-        RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
-    } else {
-        RoundedCornerShape(0.dp)
-    }
-    val panelBrush = Brush.verticalGradient(
-        listOf(Color(0xF91C1E29), Color(0xFC0C0D13))
-    )
-    val scrimSource = remember { MutableInteractionSource() }
-
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val panelWidth = (maxWidth * 0.50f).coerceIn(340.dp, 440.dp)
-        // Short landscape windows (and split-screen) get a tighter rhythm so
-        // the header and the presets always fit without scrolling.
-        val compact = maxHeight < 340.dp
-        Box(
-            Modifier.fillMaxSize()
-                .background(Color.Black.copy(alpha = if (mode == SpeedPanelMode.Sheet) .46f else .30f))
-                .clickable(
-                    interactionSource = scrimSource,
-                    indication = null,
-                    onClick = onDismiss
-                )
-                .semantics { contentDescription = "关闭倍速面板" }
-        )
-        val placement = when (mode) {
-            SpeedPanelMode.Drawer ->
-                Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .width(panelWidth)
-
-            SpeedPanelMode.Sheet ->
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-        }
-        Column(
-            placement
-                .clip(shape)
-                .background(panelBrush)
-                .then(
-                    if (mode == SpeedPanelMode.Drawer) {
-                        // A hairline instead of a full border, so the panel
-                        // separates from the video without drawing a seam
-                        // against the top / right / bottom screen edges.
-                        Modifier.drawBehind {
-                            drawLine(
-                                color = Color.White.copy(alpha = .10f),
-                                start = Offset.Zero,
-                                end = Offset(0f, size.height),
-                                strokeWidth = 1.dp.toPx()
-                            )
-                        }
-                    } else {
-                        Modifier
-                    }
-                )
-                .pointerInput(Unit) { detectTapGestures { } },
-            verticalArrangement = Arrangement.Center
-        ) {
-            if (mode == SpeedPanelMode.Sheet) {
-                Box(
-                    Modifier.align(Alignment.CenterHorizontally)
-                        .padding(top = 9.dp)
-                        .width(38.dp)
-                        .height(4.dp)
-                        .background(Color.White.copy(alpha = .18f), CircleShape)
+    when (mode) {
+        SpeedPanelMode.Drawer -> BoxWithConstraints(Modifier.fillMaxSize()) {
+            // The unified header and body padding eat into the old height, so
+            // short landscape windows get the tighter rail before scrolling.
+            val compact = maxHeight < 380.dp
+            PlayerSidePanel(
+                title = "播放倍速",
+                onDismiss = onDismiss,
+                closeDescription = "收起倍速面板",
+                scrimDescription = "关闭倍速面板",
+            ) {
+                SpeedPanelContent(
+                    speed = current,
+                    compact = compact,
+                    onDismiss = onDismiss,
+                    onScrub = { fraction ->
+                        emit(PlaybackSpeedMin + fraction * (PlaybackSpeedMax - PlaybackSpeedMin))
+                    },
+                    onStep = { direction -> emit(current + direction * PlaybackSpeedStep) },
+                    onPreset = { value -> emit(value) },
+                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                    showClose = false,
+                    horizontalPadding = 0.dp,
+                    verticalPadding = 0.dp,
                 )
             }
-            SpeedPanelContent(
-                speed = current,
-                compact = compact,
-                onDismiss = onDismiss,
-                onScrub = { fraction ->
-                    emit(PlaybackSpeedMin + fraction * (PlaybackSpeedMax - PlaybackSpeedMin))
-                },
-                onStep = { direction -> emit(current + direction * PlaybackSpeedStep) },
-                onPreset = { value ->
-                    emit(value)
-                    // A modal sheet hands the stage back to the video once the
-                    // user has made a choice; the side drawer is a live control
-                    // and stays open so the runner can be watched.
-                    if (mode == SpeedPanelMode.Sheet) onDismiss()
-                },
+        }
+
+        SpeedPanelMode.Sheet -> {
+            val shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
+            val panelBrush = Brush.verticalGradient(
+                listOf(Color(0xF91C1E29), Color(0xFC0C0D13))
             )
+            val scrimSource = remember { MutableInteractionSource() }
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val compact = maxHeight < 340.dp
+                Box(
+                    Modifier.fillMaxSize()
+                        .background(Color.Black.copy(alpha = .46f))
+                        .clickable(
+                            interactionSource = scrimSource,
+                            indication = null,
+                            onClick = onDismiss
+                        )
+                        .semantics { contentDescription = "关闭倍速面板" }
+                )
+                Column(
+                    Modifier.align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .clip(shape)
+                        .background(panelBrush)
+                        .pointerInput(Unit) { detectTapGestures { } },
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        Modifier.align(Alignment.CenterHorizontally)
+                            .padding(top = 9.dp)
+                            .width(38.dp)
+                            .height(4.dp)
+                            .background(Color.White.copy(alpha = .18f), CircleShape)
+                    )
+                    SpeedPanelContent(
+                        speed = current,
+                        compact = compact,
+                        onDismiss = onDismiss,
+                        onScrub = { fraction ->
+                            emit(PlaybackSpeedMin + fraction * (PlaybackSpeedMax - PlaybackSpeedMin))
+                        },
+                        onStep = { direction -> emit(current + direction * PlaybackSpeedStep) },
+                        onPreset = { value ->
+                            emit(value)
+                            // A modal sheet hands the stage back to the video once the
+                            // user has made a choice; the side drawer is a live control
+                            // and stays open so the runner can be watched.
+                            onDismiss()
+                        },
+                    )
+                }
+            }
         }
     }
 }

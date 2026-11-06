@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.playback.PlaybackSpeedBoost
@@ -43,23 +44,32 @@ internal fun SpeedPanelContent(
     onScrub: (Float) -> Unit,
     onStep: (Int) -> Unit,
     onPreset: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    showClose: Boolean = true,
+    horizontalPadding: Dp = 22.dp,
+    verticalPadding: Dp = if (compact) 12.dp else 16.dp,
 ) {
+    // The side drawer already supplies the shared 24dp body inset, so the rail
+    // can run edge to edge there; the sheet keeps its own 12dp breathing room.
+    val railPadding = if (horizontalPadding > 0.dp) 12.dp else 0.dp
     Column(
-        Modifier.fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(vertical = if (compact) 12.dp else 16.dp)
+        modifier.fillMaxWidth()
+            .then(if (showClose) Modifier.navigationBarsPadding() else Modifier)
+            .padding(vertical = verticalPadding)
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 22.dp),
+            Modifier.fillMaxWidth().padding(horizontal = horizontalPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
             SpeedMoodChip(speedMood(speed))
-            Spacer(Modifier.weight(1f))
-            SpeedCloseButton(onDismiss)
+            if (showClose) {
+                Spacer(Modifier.weight(1f))
+                SpeedCloseButton(onDismiss)
+            }
         }
         Spacer(Modifier.height(6.dp))
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 22.dp),
+            Modifier.fillMaxWidth().padding(horizontal = horizontalPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.Bottom) {
@@ -95,7 +105,7 @@ internal fun SpeedPanelContent(
             )
         }
         Spacer(Modifier.height(2.dp))
-        Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = railPadding)) {
             SpeedRail(
                 speed = speed,
                 trackHeight = if (compact) 112.dp else 132.dp,
@@ -103,7 +113,7 @@ internal fun SpeedPanelContent(
             )
         }
         Spacer(Modifier.height(6.dp))
-        Box(Modifier.fillMaxWidth().padding(horizontal = 22.dp)) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = horizontalPadding)) {
             SpeedPresetRow(speed = speed, onPreset = onPreset)
         }
         if (!compact) {

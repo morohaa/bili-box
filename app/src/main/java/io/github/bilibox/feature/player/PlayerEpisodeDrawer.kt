@@ -11,8 +11,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -20,21 +18,19 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.EqualizerBars
+import io.github.bilibox.core.ui.component.playback.PlayerSidePanel
 import io.github.bilibox.core.ui.theme.Pink
 import io.github.bilibox.core.util.formatVideoDuration
 import io.github.bilibox.data.localvideo.LocalVideo
@@ -85,38 +81,20 @@ internal fun LocalVideoEpisodes(
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = playlist.indexOfFirst { it.uri == currentVideo.uri }.coerceAtLeast(0)
     )
-    Box(Modifier.fillMaxSize()) {
-        Box(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = .35f))
-                .clickable(onClick = onDismiss).semantics { contentDescription = "关闭选集" }
-        )
-        Column(
-            Modifier.align(Alignment.CenterEnd).width(360.dp).fillMaxHeight()
-                .background(Color(0xF2121318))
-                .border(1.dp, Color.White.copy(alpha = .08f), RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp))
-                .pointerInput(Unit) { detectTapGestures(onTap = {}) }
-                .navigationBarsPadding()
+    PlayerSidePanel(
+        title = "分集",
+        titleBadge = "(${playlist.size}P)",
+        onDismiss = onDismiss,
+        closeDescription = "收起选集",
+        scrimDescription = "关闭选集",
+    ) {
+        LazyColumn(
+            Modifier.fillMaxWidth().weight(1f).selectableGroup(),
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp).height(56.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("分集(${playlist.size}P)", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = "收起选集" }) {
-                    Text("×", color = Color.White.copy(alpha = .72f), fontSize = 24.sp)
-                }
-            }
-            HorizontalDivider(color = Color.White.copy(alpha = .08f))
-            LazyColumn(
-                Modifier.weight(1f).selectableGroup(),
-                state = listState,
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                itemsIndexed(playlist, key = { _, item -> item.uri.toString() }) { index, item ->
-                    LocalEpisodeRow(index, item, item.uri == currentVideo.uri) { onVideoSelected(item) }
-                }
+            itemsIndexed(playlist, key = { _, item -> item.uri.toString() }) { index, item ->
+                LocalEpisodeRow(index, item, item.uri == currentVideo.uri) { onVideoSelected(item) }
             }
         }
     }
