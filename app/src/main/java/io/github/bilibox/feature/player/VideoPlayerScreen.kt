@@ -66,7 +66,7 @@ import kotlinx.coroutines.launch
 
 /** A selectable video stream quality shown in the fullscreen quality drawer. */
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun VideoPlayerScreen(
     player: ExoPlayer,
@@ -243,12 +243,29 @@ internal fun VideoPlayerScreen(
                 isAppearanceLightStatusBars = false
                 isAppearanceLightNavigationBars = !fullScreen && !verticalFullScreen && detailsBackground == Color.White
                 systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                if (fullScreen || verticalFullScreen) {
+                if (fullScreen) {
                     hide(WindowInsetsCompat.Type.systemBars())
+                } else if (verticalFullScreen) {
+                    // 竖屏全屏显示状态栏、隐藏底部导航栏；状态栏会随控件
+                    // 自动显隐，顶部安全区用稳定 inset 保持高度不变。
+                    show(WindowInsetsCompat.Type.statusBars())
+                    hide(WindowInsetsCompat.Type.navigationBars())
                 } else {
                     show(WindowInsetsCompat.Type.systemBars())
                 }
             }
+        }
+    }
+
+    LaunchedEffect(activity, verticalFullScreen, controlsVisible, screenLocked) {
+        if (!verticalFullScreen) return@LaunchedEffect
+        val controller = activity?.let {
+            WindowCompat.getInsetsController(it.window, it.window.decorView)
+        } ?: return@LaunchedEffect
+        if (controlsVisible && !screenLocked) {
+            controller.show(WindowInsetsCompat.Type.statusBars())
+        } else {
+            controller.hide(WindowInsetsCompat.Type.statusBars())
         }
     }
 
@@ -440,7 +457,17 @@ internal fun VideoPlayerScreen(
     Box(Modifier.fillMaxSize().onGloballyPositioned { screenRootOffset = it.positionInRoot() }) {
         Column(
             Modifier.fillMaxSize().background(Color.Black)
-                .then(if (fullScreen || verticalFullScreen) Modifier else Modifier.statusBarsPadding())
+                .then(
+                    when {
+                        fullScreen -> Modifier
+
+                        // 状态栏会随控件隐藏，但顶部安全区始终保持同一高度，
+                        // 避免控件显隐时视频画面上下跳动。
+                        verticalFullScreen -> Modifier.windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
+
+                        else -> Modifier.statusBarsPadding()
+                    }
+                )
         ) {
             Box(
                 (if (fullScreen || verticalFullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f))
@@ -456,8 +483,9 @@ internal fun VideoPlayerScreen(
                         playerView = it
                     },
                     modifier = Modifier.fillMaxSize().then(
-                        // 竖屏时把画面略抬高到屏幕黄金观看区，而不是压在正中。
-                        if (verticalFullScreen) Modifier.offset(y = (-40).dp) else Modifier
+                        // 竖屏全屏保留状态栏后画面会整体下移，这里额外上移，
+                        // 让视频落在更舒适的观看区域。
+                        if (verticalFullScreen) Modifier.offset(y = (-88).dp) else Modifier
                     )
                 )
                 PlayerTouchSurface(
