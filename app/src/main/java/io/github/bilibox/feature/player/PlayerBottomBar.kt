@@ -193,7 +193,7 @@ internal fun PlayerBottomBar(
                         onClick = actions.onToggleOrientation,
                         modifier = Modifier.size(40.dp).semantics { contentDescription = "切换横屏" },
                     ) {
-                        FullscreenIcon(fullScreen = false, modifier = Modifier.size(16.dp))
+                        FullscreenIcon(modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -225,7 +225,7 @@ internal fun PlayerBottomBar(
                     onClick = actions.onToggleOrientation,
                     modifier = Modifier.size(40.dp).semantics { contentDescription = "切换横屏" },
                 ) {
-                    FullscreenIcon(fullScreen = false, modifier = Modifier.size(16.dp))
+                    FullscreenIcon(modifier = Modifier.size(16.dp))
                 }
             }
         }

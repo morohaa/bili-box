@@ -9,7 +9,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import io.github.bilibox.R
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.OnlineText
 
@@ -70,42 +72,14 @@ internal fun TelevisionSeekThumb() {
 }
 
 @Composable
-internal fun FullscreenIcon(fullScreen: Boolean, modifier: Modifier = Modifier.size(24.dp)) {
-    Canvas(modifier) {
-        val u = size.width / 24f
-        val corners = Path().apply {
-            if (fullScreen) {
-                moveTo(2f * u, 8f * u)
-                lineTo(8f * u, 8f * u)
-                lineTo(8f * u, 2f * u)
-                moveTo(16f * u, 2f * u)
-                lineTo(16f * u, 8f * u)
-                lineTo(22f * u, 8f * u)
-                moveTo(22f * u, 16f * u)
-                lineTo(16f * u, 16f * u)
-                lineTo(16f * u, 22f * u)
-                moveTo(8f * u, 22f * u)
-                lineTo(8f * u, 16f * u)
-                lineTo(2f * u, 16f * u)
-            } else {
-                moveTo(4f * u, 9f * u)
-                lineTo(4f * u, 5f * u)
-                quadraticTo(4f * u, 4f * u, 5f * u, 4f * u)
-                lineTo(9f * u, 4f * u)
-                moveTo(20f * u, 9f * u)
-                lineTo(20f * u, 5f * u)
-                quadraticTo(20f * u, 4f * u, 19f * u, 4f * u)
-                lineTo(15f * u, 4f * u)
-                moveTo(4f * u, 15f * u)
-                lineTo(4f * u, 19f * u)
-                quadraticTo(4f * u, 20f * u, 5f * u, 20f * u)
-                lineTo(9f * u, 20f * u)
-                moveTo(20f * u, 15f * u)
-                lineTo(20f * u, 19f * u)
-                quadraticTo(20f * u, 20f * u, 19f * u, 20f * u)
-                lineTo(15f * u, 20f * u)
-            }
-        }
-        drawPath(corners, Color.White.copy(alpha = .9f), style = Stroke(2.1f * u, cap = StrokeCap.Round, join = StrokeJoin.Round))
-    }
+internal fun FullscreenIcon(
+    modifier: Modifier = Modifier.size(16.dp),
+    tint: Color = Color.White.copy(alpha = .9f),
+) {
+    Icon(
+        painter = painterResource(R.drawable.ic_player_fullscreen),
+        contentDescription = null,
+        tint = tint,
+        modifier = modifier,
+    )
 }
