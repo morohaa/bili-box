@@ -31,9 +31,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -58,6 +56,7 @@ import io.github.bilibox.core.util.formatPlaybackTime
 import io.github.bilibox.data.bili.Page
 import io.github.bilibox.data.bili.UserCardData
 import io.github.bilibox.data.bili.VideoInfo
+import io.github.bilibox.feature.player.LocalPlayerDetailActions
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -74,15 +73,13 @@ internal fun OnlineVideoDetails(
     onAutoPlayNextChange: (Boolean) -> Unit,
     onPageSelected: (Int) -> Unit,
     onOpenEpisodes: () -> Unit,
-    cacheLabel: String,
-    cacheSelected: Boolean,
-    onCache: () -> Unit,
 ) {
     var following by rememberSaveable(video.bvid) { mutableStateOf(false) }
     var liked by rememberSaveable(video.bvid) { mutableStateOf(false) }
     var coined by rememberSaveable(video.bvid) { mutableStateOf(false) }
     var saved by rememberSaveable(video.bvid) { mutableStateOf(false) }
     var expanded by rememberSaveable(video.bvid) { mutableStateOf(false) }
+    val playerActions = LocalPlayerDetailActions.current
 
     val owner = info?.owner
     val ownerName = owner?.name?.takeIf { it.isNotBlank() }
@@ -184,22 +181,44 @@ internal fun OnlineVideoDetails(
             }
         }
 
-        Row(
-            Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 14.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            OnlineAction("like", "点赞", formatOptionalCount(stat?.like ?: 0L), liked) {
-                liked = !liked
-            }
-            OnlineAction("coin", "投币", formatOptionalCount(stat?.coin ?: 0L), coined) { coined = !coined }
-            OnlineAction("favorite", "收藏", formatOptionalCount(stat?.favorite ?: 0L), saved) { saved = !saved }
-            OnlineAction("cache", "缓存", cacheLabel, cacheSelected, onCache)
-            OnlineAction("share", "分享", "", false) {
-                val intent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, "$title https://www.bilibili.com/video/${video.bvid}")
+        Column(Modifier.fillMaxWidth().background(OnlineSurface)) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                OnlineAction(
+                    kind = "like",
+                    label = "点赞",
+                    value = formatOptionalCount((stat?.like ?: 0L) + if (liked) 1L else 0L),
+                    selected = liked,
+                ) { liked = !liked }
+                OnlineAction(
+                    kind = "coin",
+                    label = "投币",
+                    value = formatOptionalCount((stat?.coin ?: 0L) + if (coined) 1L else 0L),
+                    selected = coined,
+                ) { coined = !coined }
+                OnlineAction(
+                    kind = "favorite",
+                    label = "收藏",
+                    value = formatOptionalCount((stat?.favorite ?: 0L) + if (saved) 1L else 0L),
+                    selected = saved,
+                ) { saved = !saved }
+                OnlineAction(kind = "screenshot", label = "截图", value = "", selected = false) {
+                    val actions = playerActions
+                    if (actions != null && actions.screenshotEnabled) {
+                        actions.takeScreenshot()
+                    } else {
+                        Toast.makeText(context, "暂时无法截图，请等待视频画面显示", Toast.LENGTH_SHORT).show()
+                    }
                 }
-                context.startActivity(Intent.createChooser(intent, "分享视频"))
+                OnlineAction(kind = "share", label = "分享", value = "", selected = false) {
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, "$title https://www.bilibili.com/video/${video.bvid}")
+                    }
+                    context.startActivity(Intent.createChooser(intent, "分享视频"))
+                }
             }
         }
         info?.pages?.takeIf { it.size > 1 }?.let { pages ->
@@ -334,13 +353,18 @@ internal fun RowScope.OnlineAction(
 ) {
     val scope = rememberCoroutineScope()
     val iconScale = remember { Animatable(1f) }
-    val tint by animateColorAsState(
+    val iconTint by animateColorAsState(
         targetValue = if (selected) OnlinePink else OnlineSecondary,
         animationSpec = tween(180),
-        label = "$kind 按钮颜色"
+        label = "$kind 图标颜色"
+    )
+    val textTint by animateColorAsState(
+        targetValue = if (selected) OnlinePink else OnlineMuted,
+        animationSpec = tween(180),
+        label = "$kind 文字颜色"
     )
     Column(
-        Modifier.weight(1f).semantics { contentDescription = "$label $value" }
+        Modifier.weight(1f)
             .clickable(role = Role.Button) {
                 onClick()
                 scope.launch {
@@ -357,24 +381,26 @@ internal fun RowScope.OnlineAction(
                         }
                     )
                 }
-            }.padding(vertical = 4.dp),
+            }
+            .semantics(mergeDescendants = true) {
+                contentDescription = if (value.isBlank()) label else "$label $value"
+            }
+            .padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-            OnlineActionIcon(
-                kind,
-                tint,
-                Modifier.size(22.dp).graphicsLayer {
-                    scaleX = iconScale.value
-                    scaleY = iconScale.value
-                }
-            )
-        }
-        Spacer(Modifier.height(4.dp))
+        OnlineActionIcon(
+            kind,
+            iconTint,
+            Modifier.size(24.dp).graphicsLayer {
+                scaleX = iconScale.value
+                scaleY = iconScale.value
+            }
+        )
+        Spacer(Modifier.height(6.dp))
         Text(
             value.ifBlank { label },
-            color = tint,
-            fontSize = 11.5.sp,
+            color = textTint,
+            fontSize = 12.sp,
             lineHeight = 14.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -388,46 +414,6 @@ internal fun OnlineMetric(kind: String, value: String) {
         VideoMetaIcon(kind, Modifier.size(14.dp), OnlineMuted)
         Spacer(Modifier.width(4.dp))
         Text(value, color = OnlineMuted, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 1)
-    }
-}
-
-@Composable
-internal fun OnlineActionIcon(kind: String, tint: Color, modifier: Modifier = Modifier) {
-    // Use the reference's 24-unit vector shapes to keep all five icons consistent.
-    val path = remember(kind) {
-        val data = when (kind) {
-            "like" -> "M14.6 3.4c-.6-.4-1.4-.2-1.8.4l-3.2 5.4c-.2.3-.5.5-.9.5H5.5C4.1 9.7 3 10.8 3 12.2v6.3C3 19.9 4.1 21 5.5 21h11.3c1.2 0 2.2-.8 2.5-1.9l1.6-6.8c.4-1.6-.8-3.1-2.5-3.1h-3.6l.8-3.8c.2-.8-.2-1.6-1-2zM7 19H5.5c-.3 0-.5-.2-.5-.5v-6.3c0-.3.2-.5.5-.5H7V19z"
-            "favorite" -> "M12 2.8c.4 0 .8.2 1 .6l2.4 4.9 5.4.8c.9.1 1.2 1.2.6 1.8l-3.9 3.8.9 5.4c.2.9-.8 1.5-1.6 1.1L12 18.7l-4.8 2.5c-.8.4-1.8-.2-1.6-1.1l.9-5.4-3.9-3.8c-.6-.6-.3-1.7.6-1.8l5.4-.8 2.4-4.9c.2-.4.6-.6 1-.6z"
-            "cache" -> "M12 3v11m0 0 4-4m-4 4-4-4M5 18v2h14v-2"
-            "share" -> "M13.8 4.2c0-.9 1.1-1.3 1.7-.7l6.2 6.2c.4.4.4 1 0 1.4l-6.2 6.2c-.6.6-1.7.2-1.7-.7v-3.1c-4.8 0-8.2 1.5-10.3 4.7-.4.6-1.4.2-1.3-.5 1.1-6.5 5.2-9.8 11.6-10.2V4.2z"
-            else -> ""
-        }
-        PathParser().parsePathString(data).toPath()
-    }
-    Canvas(modifier) {
-        scale(size.width / 24f, size.height / 24f, pivot = Offset.Zero) {
-            if (kind == "coin") {
-                drawCircle(tint, 9.2f, Offset(12f, 12f), style = Stroke(2f))
-                drawPath(
-                    Path().apply {
-                        moveTo(8.5f, 9.2f)
-                        lineTo(15.5f, 9.2f)
-                        moveTo(10f, 9.2f)
-                        lineTo(10f, 15.5f)
-                        moveTo(14f, 9.2f)
-                        lineTo(14f, 15.5f)
-                        moveTo(7.8f, 12.2f)
-                        lineTo(16.2f, 12.2f)
-                    },
-                    tint,
-                    style = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                )
-            } else if (kind == "cache") {
-                drawPath(path, tint, style = Stroke(1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-            } else {
-                drawPath(path, tint)
-            }
-        }
     }
 }
 

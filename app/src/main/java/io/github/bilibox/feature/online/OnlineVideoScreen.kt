@@ -504,7 +504,6 @@ internal fun OnlineVideoScreen(video: VideoSummary, session: BiliSession?, onBac
         OnlineVideoCacheStatus.SAVED -> "已缓存"
         OnlineVideoCacheStatus.IDLE -> ""
     }
-    val cacheSelected = cacheStatus != OnlineVideoCacheStatus.IDLE
     val onCache: () -> Unit = {
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P && context.checkSelfPermission(
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
@@ -685,9 +684,6 @@ internal fun OnlineVideoScreen(video: VideoSummary, session: BiliSession?, onBac
                     onAutoPlayNextChange = { autoPlayNext = it },
                     onPageSelected = { selectedPage = it },
                     onOpenEpisodes = { episodesSheetVisible = true },
-                    cacheLabel = cacheLabel,
-                    cacheSelected = cacheSelected,
-                    onCache = onCache,
                 )
             }
         }
