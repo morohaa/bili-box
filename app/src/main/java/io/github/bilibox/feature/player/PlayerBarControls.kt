@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.util.formatPlaybackTime
 
 @Composable
@@ -38,6 +39,33 @@ internal fun PlaybackTimeLabel(
         letterSpacing = 0.sp,
         maxLines = 1
     )
+}
+
+/**
+ * 控件隐藏后贴在视频底边的迷你进度条，只绘制已播放部分。
+ * 不绘制轨道，避免在黑色画面上出现一条多余的灰线。
+ */
+@Composable
+internal fun MiniPlaybackProgress(
+    position: Long,
+    duration: Long,
+    modifier: Modifier = Modifier,
+) {
+    val fraction = if (duration > 0L) {
+        (position.toFloat() / duration).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    Canvas(modifier.height(2.dp)) {
+        if (fraction <= 0f) return@Canvas
+        drawLine(
+            color = OnlinePink,
+            start = Offset(0f, center.y),
+            end = Offset(size.width * fraction, center.y),
+            strokeWidth = size.height,
+            cap = StrokeCap.Butt
+        )
+    }
 }
 
 @Composable

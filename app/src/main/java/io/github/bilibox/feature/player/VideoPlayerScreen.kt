@@ -684,6 +684,13 @@ internal fun VideoPlayerScreen(
                         modifier = Modifier.align(Alignment.TopStart),
                     )
                 }
+                if (!showChrome && !fullScreen && !verticalFullScreen && duration > 0L) {
+                    MiniPlaybackProgress(
+                        position = position,
+                        duration = duration,
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                    )
+                }
                 // Locking the screen must keep the unlock affordance reachable, so
                 // this follows the raw chrome state rather than showChrome.
                 if (fullScreen && controlsVisible && !speedMenuExpanded) {
