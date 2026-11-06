@@ -630,6 +630,10 @@ internal fun OnlineVideoScreen(video: VideoSummary, session: BiliSession?, onBac
         onNextEpisode = nextPage?.let { page -> { advanceToPart(page.page) } },
         qualityOptions = qualityOptions,
         selectedQuality = effectiveQuality,
+        autoPlayNext = autoPlayNext,
+        onAutoPlayNextChange = { autoPlayNext = it },
+        cacheLabel = cacheLabel,
+        onCache = onCache,
         onQualitySelected = { qn ->
             if (qn == actualQn) {
                 // Already streaming at this quality; just keep the requested value in sync.

@@ -1,8 +1,13 @@
 package io.github.bilibox.feature.player
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -26,6 +31,32 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/**
+ * 截图入口需要兼容 API 28 的存储权限：权限流程集中在这里，播放器页面只拿一个
+ * 可直接调用的动作，避免每次重新组织 launcher 和权限判断。
+ */
+@Composable
+internal fun rememberPlayerScreenshotAction(screenshot: PlayerScreenshotController): () -> Unit {
+    val context = LocalContext.current
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            screenshot.takeScreenshot()
+        } else {
+            Toast.makeText(context, "需要存储权限才能保存视频画面", Toast.LENGTH_SHORT).show()
+        }
+    }
+    return {
+        if (Build.VERSION.SDK_INT == 28 && context.checkSelfPermission(
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            screenshot.takeScreenshot()
+        }
+    }
+}
 
 @Stable
 internal class PlayerScreenshotController internal constructor(

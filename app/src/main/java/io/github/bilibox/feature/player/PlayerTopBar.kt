@@ -24,17 +24,11 @@ internal fun PlayerTopBar(
     title: String,
     listening: Boolean,
     showListenButton: Boolean,
-    speed: Float,
-    moreMenuExpanded: Boolean,
-    sleepTimerActive: Boolean,
-    screenshotEnabled: Boolean,
+    settingsOpen: Boolean,
     onBack: () -> Unit,
     onListenClick: () -> Unit,
     onListenPositioned: (Offset) -> Unit,
-    onMoreMenuExpandedChange: (Boolean) -> Unit,
-    onSpeedClick: () -> Unit,
-    onSleepTimerClick: () -> Unit,
-    onScreenshotClick: () -> Unit,
+    onMoreClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -86,14 +80,8 @@ internal fun PlayerTopBar(
         }
         if (!fullScreen) {
             PlayerMoreButton(
-                expanded = moreMenuExpanded,
-                onExpandedChange = onMoreMenuExpandedChange,
-                speed = speed,
-                sleepTimerActive = sleepTimerActive,
-                screenshotEnabled = screenshotEnabled,
-                onSpeedClick = onSpeedClick,
-                onSleepTimerClick = onSleepTimerClick,
-                onScreenshotClick = onScreenshotClick,
+                expanded = settingsOpen,
+                onClick = onMoreClick,
             )
         }
     }

@@ -36,6 +36,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.media3.common.Player
 import io.github.bilibox.core.ui.theme.OnlinePink
 
 @Composable
@@ -84,6 +85,31 @@ internal fun ScreenshotPreviewCard(
                 }
             }
         }
+    }
+}
+
+/** Keeps the screen's playback flags in sync while the player survives queue switches. */
+@Composable
+internal fun PlayerPlaybackStateObserver(
+    player: Player,
+    onFirstFrame: () -> Unit,
+    onMediaItemTransition: () -> Unit,
+    onPlayWhenReadyChange: (Boolean) -> Unit,
+    onPlaybackStateChange: (Int) -> Unit,
+) {
+    val latestFirstFrame by rememberUpdatedState(onFirstFrame)
+    val latestMediaTransition by rememberUpdatedState(onMediaItemTransition)
+    val latestReady by rememberUpdatedState(onPlayWhenReadyChange)
+    val latestState by rememberUpdatedState(onPlaybackStateChange)
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onRenderedFirstFrame() = latestFirstFrame()
+            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) = latestMediaTransition()
+            override fun onPlayWhenReadyChanged(ready: Boolean, reason: Int) = latestReady(ready)
+            override fun onPlaybackStateChanged(state: Int) = latestState(state)
+        }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
     }
 }
 

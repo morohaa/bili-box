@@ -198,6 +198,22 @@ internal fun LocalVideoScreen(
                 },
             )
         },
+        autoPlayNext = queueMode != LocalQueueMode.STOP_AFTER,
+        onAutoPlayNextChange = { enabled ->
+            queueMode = if (enabled) LocalQueueMode.LIST_LOOP else LocalQueueMode.STOP_AFTER
+        },
+        loopMode = when (queueMode) {
+            LocalQueueMode.SINGLE_LOOP -> PlayerLoopMode.SINGLE_LOOP
+            LocalQueueMode.STOP_AFTER -> PlayerLoopMode.NONE
+            LocalQueueMode.LIST_LOOP, LocalQueueMode.SHUFFLE -> PlayerLoopMode.LIST_LOOP
+        },
+        onLoopModeChange = { mode ->
+            queueMode = when (mode) {
+                PlayerLoopMode.SINGLE_LOOP -> LocalQueueMode.SINGLE_LOOP
+                PlayerLoopMode.LIST_LOOP -> LocalQueueMode.LIST_LOOP
+                PlayerLoopMode.NONE -> LocalQueueMode.STOP_AFTER
+            }
+        },
         details = { duration ->
             LocalVideoIntro(
                 video = video,

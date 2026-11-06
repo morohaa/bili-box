@@ -1,24 +1,17 @@
 package io.github.bilibox.feature.player
 
-import android.Manifest
 import android.content.Context
 import android.content.pm.ActivityInfo
-import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.media.AudioManager
-import android.os.Build
 import android.os.SystemClock
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -26,11 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +31,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -101,6 +95,13 @@ internal fun VideoPlayerScreen(
     sourcePill: Boolean = false,
     extraDetailPane: (@Composable (duration: Long) -> Unit)? = null,
     playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
+    // 播放设置卡片的偏好：在线视频由外层持有自动连播，本地队列持有循环模式。
+    autoPlayNext: Boolean? = null,
+    onAutoPlayNextChange: ((Boolean) -> Unit)? = null,
+    loopMode: PlayerLoopMode? = null,
+    onLoopModeChange: ((PlayerLoopMode) -> Unit)? = null,
+    cacheLabel: String? = null,
+    onCache: (() -> Unit)? = null,
     listenInfo: ListenInfo? = null,
     listenQueue: ListenQueue? = null,
     // One object instead of separate params: see ListenControls.
@@ -124,7 +125,14 @@ internal fun VideoPlayerScreen(
     var scrubPosition by remember(player) { mutableFloatStateOf(0f) }
     var speed by remember(player) { mutableFloatStateOf(1f) }
     var speedMenuExpanded by remember(player) { mutableStateOf(false) }
-    var moreMenuExpanded by remember(player) { mutableStateOf(false) }
+    var settingsSheetOpen by remember(player) { mutableStateOf(false) }
+    var localAutoPlayNext by rememberSaveable(player) { mutableStateOf(false) }
+    var localLoopMode by rememberSaveable(player) { mutableStateOf(PlayerLoopMode.NONE) }
+    var subtitleEnabled by rememberSaveable(player) { mutableStateOf(true) }
+    var mirrorEnabled by rememberSaveable(player) { mutableStateOf(false) }
+    val density = LocalDensity.current
+    // 卡片顶边要贴在视频下沿，用视频 Box 在根布局里的底边定位。
+    var videoBottom by remember { mutableStateOf(0.dp) }
     var episodesExpanded by remember(player) { mutableStateOf(false) }
     var qualityMenuExpanded by remember(player) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableIntStateOf(player.playbackState) }
@@ -196,7 +204,7 @@ internal fun VideoPlayerScreen(
             Toast.makeText(context, "已切换为听视频，画面已关闭", Toast.LENGTH_SHORT).show()
         }
         speedMenuExpanded = false
-        moreMenuExpanded = false
+        settingsSheetOpen = false
         playbackModeExpanded = false
         listenPageOpen = true
     }
@@ -232,7 +240,7 @@ internal fun VideoPlayerScreen(
         // 横屏全屏时以方向为准，避免退出横屏后又回到竖屏全屏。
         if (fullScreen) verticalFullScreen = false
         speedMenuExpanded = false
-        moreMenuExpanded = false
+        settingsSheetOpen = false
         playbackModeExpanded = false
         sleepTimerOpen = false
         episodesExpanded = false
@@ -331,46 +339,23 @@ internal fun VideoPlayerScreen(
         }
     }
 
-    val screenshotPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            screenshot.takeScreenshot()
-        } else {
-            Toast.makeText(context, "需要存储权限才能保存视频画面", Toast.LENGTH_SHORT).show()
-        }
-    }
-    val takeScreenshot: () -> Unit = {
-        if (Build.VERSION.SDK_INT == 28 && context.checkSelfPermission(
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            screenshotPermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        } else {
-            screenshot.takeScreenshot()
-        }
-    }
+    val takeScreenshot = rememberPlayerScreenshotAction(screenshot)
 
-    DisposableEffect(player) {
-        val listener = object : Player.Listener {
-            override fun onRenderedFirstFrame() {
-                hasVideoFrame = true
-            }
-
-            // A queue can switch files on the same player; wait for the new first frame.
-            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
-                hasVideoFrame = false
-            }
-            override fun onPlayWhenReadyChanged(ready: Boolean, reason: Int) {
-                playWhenReady = ready
-            }
-            override fun onPlaybackStateChanged(state: Int) {
-                playbackState = state
-                if (state == Player.STATE_IDLE) hasVideoFrame = false
-            }
-        }
-        player.addListener(listener)
-        onDispose {
-            player.removeListener(listener)
-        }
+    PlayerPlaybackStateObserver(
+        player = player,
+        onFirstFrame = { hasVideoFrame = true },
+        // A queue can switch files on the same player; wait for the new first frame.
+        onMediaItemTransition = { hasVideoFrame = false },
+        onPlayWhenReadyChange = { playWhenReady = it },
+        onPlaybackStateChange = {
+            playbackState = it
+            if (it == Player.STATE_IDLE) hasVideoFrame = false
+        },
+    )
+    LaunchedEffect(player, subtitleEnabled) {
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !subtitleEnabled)
+            .build()
     }
     val latestDefaultDuration by rememberUpdatedState(defaultDurationMs)
     LaunchedEffect(player) {
@@ -402,7 +387,7 @@ internal fun VideoPlayerScreen(
         controlsVisible = true
         scrubbing = false
         speedMenuExpanded = false
-        moreMenuExpanded = false
+        settingsSheetOpen = false
         playbackModeExpanded = false
         sleepTimerOpen = false
         episodesExpanded = false
@@ -410,9 +395,9 @@ internal fun VideoPlayerScreen(
         duration = defaultDurationMs
         position = player.currentPosition.coerceAtLeast(0L)
     }
-    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, moreMenuExpanded, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded, verticalFullScreen) {
+    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, settingsSheetOpen, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded, verticalFullScreen) {
         if (controlsVisible && (isPlaying || screenLocked) && !scrubbing &&
-            !speedMenuExpanded && !moreMenuExpanded && !playbackModeExpanded && !sleepTimerOpen &&
+            !speedMenuExpanded && !settingsSheetOpen && !playbackModeExpanded && !sleepTimerOpen &&
             !episodesExpanded && !qualityMenuExpanded
         ) {
             delay(4_000)
@@ -435,7 +420,7 @@ internal fun VideoPlayerScreen(
             episodesExpanded -> episodesExpanded = false
             playbackModeExpanded -> playbackModeExpanded = false
             sleepTimerOpen -> sleepTimerOpen = false
-            moreMenuExpanded -> moreMenuExpanded = false
+            settingsSheetOpen -> settingsSheetOpen = false
             speedMenuExpanded -> speedMenuExpanded = false
             verticalFullScreen -> verticalFullScreen = false
             else -> navigateBack()
@@ -454,7 +439,11 @@ internal fun VideoPlayerScreen(
 
         SleepTimerMode.OFF -> 0L
     }
-
+    val settingsQualityLabel = qualityOptions.firstOrNull { it.qn == selectedQuality }?.label
+        ?: qualityOptions.maxByOrNull { it.qn }?.label
+        ?: "自动"
+    val settingsAutoPlayNext = autoPlayNext ?: localAutoPlayNext
+    val settingsLoopMode = loopMode ?: localLoopMode
     Box(Modifier.fillMaxSize().onGloballyPositioned { screenRootOffset = it.positionInRoot() }) {
         Column(
             Modifier.fillMaxSize().background(Color.Black)
@@ -472,7 +461,12 @@ internal fun VideoPlayerScreen(
         ) {
             Box(
                 (if (fullScreen || verticalFullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-                    .background(Color.Black),
+                    .background(Color.Black)
+                    .onGloballyPositioned { coordinates ->
+                        videoBottom = with(density) {
+                            (coordinates.positionInRoot().y + coordinates.size.height).toDp()
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 AndroidView(
@@ -487,6 +481,8 @@ internal fun VideoPlayerScreen(
                         // 竖屏全屏保留状态栏后画面会整体下移，这里额外上移，
                         // 让视频落在更舒适的观看区域。
                         if (verticalFullScreen) Modifier.offset(y = (-88).dp) else Modifier
+                    ).then(
+                        if (mirrorEnabled) Modifier.graphicsLayer { scaleX = -1f } else Modifier
                     )
                 )
                 PlayerTouchSurface(
@@ -663,25 +659,22 @@ internal fun VideoPlayerScreen(
                         title = title,
                         listening = listening,
                         showListenButton = listenInfo != null,
-                        speed = speed,
-                        moreMenuExpanded = moreMenuExpanded,
-                        sleepTimerActive = sleepTimer.active,
-                        screenshotEnabled = hasVideoFrame && playbackError == null && !screenshot.saving,
+                        settingsOpen = settingsSheetOpen,
                         onBack = { navigateBack() },
                         onListenClick = { enterListen() },
                         onListenPositioned = { listenOrigin = it },
-                        onMoreMenuExpandedChange = { moreMenuExpanded = it },
-                        onSpeedClick = {
-                            moreMenuExpanded = false
-                            speedMenuExpanded = true
+                        onMoreClick = {
+                            // 竖屏全屏时先回到普通竖屏，等视频重新排好版再展开卡片。
+                            if (verticalFullScreen) {
+                                verticalFullScreen = false
+                                screenScope.launch {
+                                    withFrameNanos { }
+                                    settingsSheetOpen = true
+                                }
+                            } else {
+                                settingsSheetOpen = true
+                            }
                         },
-                        onSleepTimerClick = {
-                            moreMenuExpanded = false
-                            speedMenuExpanded = false
-                            playbackModeExpanded = false
-                            sleepTimerOpen = true
-                        },
-                        onScreenshotClick = takeScreenshot,
                         modifier = Modifier.align(Alignment.TopStart),
                     )
                 }
@@ -852,6 +845,52 @@ internal fun VideoPlayerScreen(
                     onDismissPlaybackMode = { playbackModeExpanded = false },
                 )
             }
+        }
+        // 播放设置卡片从视频下沿铺到屏幕底部；它是整个播放器的兄弟节点，
+        // 才能盖住详情区而不被视频 Box 裁切。
+        if (!fullScreen && !verticalFullScreen) {
+            PlayerPlaybackSettingsHost(
+                visible = settingsSheetOpen,
+                topInset = videoBottom,
+                state = PlayerSettingsState(
+                    speed = speed,
+                    autoPlayNext = settingsAutoPlayNext,
+                    loopMode = settingsLoopMode,
+                    backgroundAudio = listening,
+                    qualityLabel = settingsQualityLabel,
+                    subtitleEnabled = subtitleEnabled,
+                    mirrorEnabled = mirrorEnabled,
+                    cacheLabel = cacheLabel.orEmpty(),
+                ),
+                qualityAvailable = qualityOptions.isNotEmpty(),
+                danmakuAvailable = danmakuSupported,
+                moreSettingsAvailable = playbackModeSheet != null,
+                onDismiss = { settingsSheetOpen = false },
+                onSpeed = { speedMenuExpanded = true },
+                onSleepTimer = { sleepTimerOpen = true },
+                onQuality = { qualityMenuExpanded = true },
+                onDanmakuSettings = { danmakuSettingsOpen = true },
+                onMoreSettings = { playbackModeExpanded = true },
+                onBackgroundAudioChange = { if (it) enterListen() else restoreVideo() },
+                onAutoPlayNextChange = { onAutoPlayNextChange?.invoke(it) ?: run { localAutoPlayNext = it } },
+                onLoopModeChange = { onLoopModeChange?.invoke(it) ?: run { localLoopMode = it } },
+                onSubtitleChange = { subtitleEnabled = it },
+                onMirrorChange = { mirrorEnabled = it },
+                onCache = onCache,
+                onUnavailable = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() },
+            )
+        }
+        // 竖屏的画质选择使用底部弹层；横屏仍沿用侧边抽屉。
+        if (!fullScreen && !verticalFullScreen && qualityMenuExpanded && qualityOptions.isNotEmpty()) {
+            PlayerQualitySheet(
+                options = qualityOptions,
+                selectedQuality = selectedQuality,
+                onDismiss = { qualityMenuExpanded = false },
+                onQualitySelected = { qn ->
+                    onQualitySelected?.invoke(qn)
+                    qualityMenuExpanded = false
+                },
+            )
         }
         // The timer lives on the player, so it keeps counting while the sheet is
         // closed and the queue switches files. It is a sibling of the player

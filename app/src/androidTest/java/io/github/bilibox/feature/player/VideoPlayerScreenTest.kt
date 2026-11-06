@@ -92,6 +92,7 @@ class VideoPlayerScreenTest {
         compose.runOnIdle { assertEquals(1, retries) }
         compose.onNodeWithText("正在获取视频流…").assertExists()
         assertSame(initialSurface, findPlayerView())
+        compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("倍速").performClick()
         compose.onNodeWithText("1.5x").performClick()
         compose.onNodeWithText("评论", useUnmergedTree = true).performClick()
@@ -169,6 +170,54 @@ class VideoPlayerScreenTest {
         compose.waitForIdle()
         compose.onNodeWithText("搜索视频简介").assertExists()
         compose.onNodeWithContentDescription("竖屏").assertExists()
+    }
+
+    @Test
+    fun portraitMoreOpensSettingsCardAnchoredBelowVideo() {
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            VideoPlayerScreen(
+                player = player,
+                title = "搜索视频",
+                sourceLabel = "哔哩哔哩",
+                commentMessage = "暂不支持查看在线评论",
+                onBack = {},
+                onRetry = {},
+                details = { Text("搜索视频简介") }
+            )
+        }
+
+        compose.onNodeWithContentDescription("更多").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("自动连播").assertExists()
+        compose.onNodeWithText("循环播放").assertExists()
+        compose.onNodeWithText("后台听视频").assertExists()
+        compose.onNodeWithText("画质").assertExists()
+        compose.onNodeWithText("弹幕设置").assertExists()
+        compose.onNodeWithText("字幕").assertExists()
+        compose.onNodeWithText("镜像翻转").assertExists()
+        compose.onNodeWithText("更多播放设置").assertExists()
+        compose.onNodeWithText("稍后再看").assertExists()
+        compose.onNodeWithText("缓存").assertExists()
+        compose.onNodeWithText("小窗播放").assertExists()
+        compose.onNodeWithText("定时关闭").assertExists()
+
+        // 卡片顶边必须贴在视频画面下沿，并一直铺到屏幕底部。
+        val video = compose.onNodeWithTag("player-touch-surface").fetchSemanticsNode().boundsInRoot
+        val sheet = compose.onNodeWithTag("player-settings-sheet").fetchSemanticsNode().boundsInRoot
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        assertEquals(video.bottom, sheet.top, 1f)
+        assertEquals(root.bottom, sheet.bottom, 1f)
+
+        compose.onNodeWithContentDescription("单集循环").performClick()
+        compose.onNodeWithContentDescription("镜像翻转").performClick()
+        compose.onNodeWithContentDescription("关闭播放设置").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("自动连播").assertDoesNotExist()
+        // 关掉卡片后视频仍可正常操作。
+        compose.onNodeWithContentDescription("更多").assertExists()
     }
 
     @Test
