@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.sp
  *
  * 选集、倍速和清晰度共用同一套尺寸、表面、标题栏与关闭按钮，只有面板内部的
  * 具体内容不同。参考 docs 中的 player-panels.html：右侧贴边、380dp 宽、
- * 48dp 标题栏、24dp 左右与底部留白；标题与内容之间用 1dp 分割线区分，不放顶部留白。
+ * 48dp 标题栏、16dp 左右与 24dp 底部留白；标题与内容之间用 1dp 分割线区分，不放顶部留白。
  */
 
 internal val PlayerSidePanelWidth = 380.dp
@@ -98,7 +98,7 @@ internal fun PlayerSidePanel(
             Column(
                 Modifier.fillMaxWidth()
                     .weight(1f)
-                    .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
                 content = content,
             )
         }

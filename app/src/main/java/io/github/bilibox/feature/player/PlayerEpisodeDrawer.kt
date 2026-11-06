@@ -112,7 +112,7 @@ internal fun LocalEpisodeRow(index: Int, item: LocalVideo, selected: Boolean, on
     ) {
         if (selected) EqualizerBars()
         Text(
-            "P${index + 1} ${item.name}${if (selected) " (当前播放)" else ""}",
+            if (selected) item.name else "P${index + 1} ${item.name}",
             color = if (selected) Pink else Color.White,
             fontSize = 12.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,

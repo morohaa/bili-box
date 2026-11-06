@@ -73,8 +73,9 @@ internal fun OnlineEpisodeRow(page: Page, selected: Boolean, onClick: () -> Unit
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selected) EqualizerBars()
+        val label = page.part.ifBlank { "第 ${page.page} 部分" }
         Text(
-            "P${page.page} ${page.part.ifBlank { "第 ${page.page} 部分" }}${if (selected) " (当前播放)" else ""}",
+            if (selected) label else "P${page.page} $label",
             color = if (selected) OnlinePink else Color.White,
             fontSize = 12.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
