@@ -622,7 +622,7 @@ internal fun PlayerQualitySheet(
                 .padding(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 18.dp)
         ) {
             Text(
-                "清晰度与音质",
+                "画质",
                 color = SettingsInk,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,

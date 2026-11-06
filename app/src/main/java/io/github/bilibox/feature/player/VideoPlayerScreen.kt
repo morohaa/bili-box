@@ -723,7 +723,14 @@ internal fun VideoPlayerScreen(
                 )
                 val episodeContent = episodes
                 if (fullScreen && !screenLocked && episodeContent != null) {
-                    PlayerDrawerVisibility(visible = episodesExpanded) {
+                    PlayerSidePanelHost(
+                        visible = episodesExpanded,
+                        onDismiss = {
+                            episodesExpanded = false
+                            controlsVisible = true
+                        },
+                        scrimDescription = "关闭选集",
+                    ) {
                         episodeContent.invoke {
                             episodesExpanded = false
                             controlsVisible = true
@@ -731,7 +738,11 @@ internal fun VideoPlayerScreen(
                     }
                 }
                 if (fullScreen && !screenLocked) {
-                    PlayerDrawerVisibility(visible = speedMenuExpanded) {
+                    PlayerSidePanelHost(
+                        visible = speedMenuExpanded,
+                        onDismiss = { speedMenuExpanded = false },
+                        scrimDescription = "关闭倍速面板",
+                    ) {
                         SpeedPanel(
                             speed = speed,
                             mode = SpeedPanelMode.Drawer,
@@ -743,7 +754,11 @@ internal fun VideoPlayerScreen(
                             remainingMs = (duration - position).coerceAtLeast(0L),
                         )
                     }
-                    PlayerDrawerVisibility(visible = qualityMenuExpanded) {
+                    PlayerSidePanelHost(
+                        visible = qualityMenuExpanded,
+                        onDismiss = { qualityMenuExpanded = false },
+                        scrimDescription = "关闭清晰度选择",
+                    ) {
                         PlaybackQualityDrawer(
                             options = qualityOptions,
                             selectedQuality = selectedQuality,

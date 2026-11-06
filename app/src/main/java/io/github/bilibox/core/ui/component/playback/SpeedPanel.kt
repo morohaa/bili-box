@@ -92,7 +92,6 @@ internal fun SpeedPanel(
                 title = "倍速",
                 onDismiss = onDismiss,
                 closeDescription = "收起倍速面板",
-                scrimDescription = "关闭倍速面板",
                 contentPadding = PaddingValues(start = 0.dp, end = 0.dp, bottom = 12.dp),
             ) {
                 SpeedPanelContent(

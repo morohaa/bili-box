@@ -21,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.playback.PlayerSidePanel
-import io.github.bilibox.core.ui.component.playback.PlayerSidePanelMuted
 import io.github.bilibox.core.ui.theme.OnlinePink
 
 @Composable
@@ -32,17 +31,11 @@ internal fun PlaybackQualityDrawer(
     onQualitySelected: (Int) -> Unit,
 ) {
     PlayerSidePanel(
-        title = "清晰度与音质",
+        title = "画质",
         onDismiss = onDismiss,
         closeDescription = "收起清晰度选择",
-        scrimDescription = "关闭清晰度选择",
     ) {
-        Text(
-            "切换后保持当前播放进度",
-            color = PlayerSidePanelMuted,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(bottom = 14.dp)
-        )
+        Spacer(Modifier.height(16.dp))
         Column(
             Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).selectableGroup(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -50,7 +43,8 @@ internal fun PlaybackQualityDrawer(
             options.forEach { option ->
                 val selected = option.qn == selectedQuality
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                    Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                        .clip(RoundedCornerShape(12.dp))
                         .background(
                             if (selected) {
                                 OnlinePink.copy(alpha = .16f)
@@ -69,40 +63,33 @@ internal fun PlaybackQualityDrawer(
                             onClick = { onQualitySelected(option.qn) }
                         )
                         .semantics { contentDescription = "选择清晰度 ${option.label}" }
-                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                        .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                option.label,
-                                color = if (selected) OnlinePink else Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            option.badge?.let { badge ->
-                                Spacer(Modifier.width(6.dp))
-                                Box(
-                                    Modifier.clip(RoundedCornerShape(4.dp))
-                                        .background(OnlinePink.copy(alpha = .22f))
-                                        .padding(horizontal = 5.dp, vertical = 1.dp)
-                                ) {
-                                    Text(
-                                        badge,
-                                        color = OnlinePink,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
+                    Row(
+                        Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            option.label,
+                            color = if (selected) OnlinePink else Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        option.badge?.let { badge ->
+                            Spacer(Modifier.width(6.dp))
+                            Box(
+                                Modifier.clip(RoundedCornerShape(4.dp))
+                                    .background(OnlinePink.copy(alpha = .22f))
+                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                            ) {
+                                Text(
+                                    badge,
+                                    color = OnlinePink,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
-                        }
-                        if (option.description.isNotBlank()) {
-                            Text(
-                                option.description,
-                                color = Color.White.copy(alpha = .45f),
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(top = 1.dp)
-                            )
                         }
                     }
                     if (selected) {

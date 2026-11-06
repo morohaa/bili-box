@@ -414,11 +414,11 @@ class VideoPlayerScreenTest {
         compose.runOnIdle { assertEquals(1, nextEpisodes) }
         compose.onNodeWithText("1080P").assertExists()
         compose.onNodeWithContentDescription("画质 1080P").performClick()
-        compose.onNodeWithText("清晰度与音质").assertExists()
+        compose.onNodeWithText("画质").assertExists()
         compose.onNodeWithContentDescription("选择清晰度 720P").performClick()
         compose.runOnIdle { assertEquals(64, pickedQuality) }
         compose.waitForIdle()
-        compose.onNodeWithText("清晰度与音质").assertDoesNotExist()
+        compose.onNodeWithText("画质").assertDoesNotExist()
     }
 
     @Test

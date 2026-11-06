@@ -45,7 +45,6 @@ internal fun OnlineVideoEpisodes(
         titleBadge = "(${pages.size}P)",
         onDismiss = onDismiss,
         closeDescription = "收起选集",
-        scrimDescription = "关闭选集",
     ) {
         LazyColumn(
             Modifier.fillMaxWidth().weight(1f).selectableGroup(),

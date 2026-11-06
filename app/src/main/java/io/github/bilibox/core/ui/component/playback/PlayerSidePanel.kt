@@ -4,13 +4,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,27 +49,14 @@ internal fun PlayerSidePanel(
     title: String,
     onDismiss: () -> Unit,
     closeDescription: String,
-    scrimDescription: String,
     modifier: Modifier = Modifier,
     titleBadge: String? = null,
-    scrimAlpha: Float = .30f,
     contentPadding: PaddingValues = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val scrimInteraction = remember { MutableInteractionSource() }
     BoxWithConstraints(modifier.fillMaxSize()) {
         // Match the reference's min(380px, 100%) so split-screen windows stay usable.
         val panelWidth = minOf(maxWidth, PlayerSidePanelWidth)
-        Box(
-            Modifier.fillMaxSize()
-                .background(Color.Black.copy(alpha = scrimAlpha))
-                .clickable(
-                    interactionSource = scrimInteraction,
-                    indication = null,
-                    onClick = onDismiss,
-                )
-                .semantics { contentDescription = scrimDescription }
-        )
         Column(
             Modifier.align(Alignment.CenterEnd)
                 .fillMaxHeight()
