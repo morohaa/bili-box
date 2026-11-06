@@ -23,6 +23,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -92,6 +93,48 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("1.5x").performClick()
         compose.onNodeWithText("评论", useUnmergedTree = true).performClick()
         compose.onNodeWithText("暂不支持查看在线评论").assertExists()
+    }
+
+    @Test
+    fun verticalFullScreenDanmakuInputSitsBelowProgressAndToggles() {
+        var settings by mutableStateOf(DanmakuSettings())
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            VideoPlayerScreen(
+                player = player,
+                title = "搜索视频",
+                sourceLabel = "哔哩哔哩",
+                commentMessage = "暂不支持查看在线评论",
+                onBack = {},
+                onRetry = {},
+                danmakuSupported = true,
+                danmakuSettings = settings,
+                onDanmakuSettingsChange = { settings = it },
+                onSendDanmaku = { _, _ -> Result.success(Unit) },
+                details = { Text("搜索视频简介") },
+            )
+        }
+
+        // 普通竖屏保持原来的单行控制条，只有竖屏全屏才展开输入行。
+        compose.onNodeWithTag("portrait-danmaku-input").assertDoesNotExist()
+        compose.onNodeWithContentDescription("播放进度").assertExists()
+        compose.onNodeWithContentDescription("竖屏").performClick()
+        compose.waitForIdle()
+
+        val progress = compose.onNodeWithContentDescription("播放进度").fetchSemanticsNode().boundsInRoot
+        val input = compose.onNodeWithTag("portrait-danmaku-input").fetchSemanticsNode().boundsInRoot
+        assertTrue("进度条应位于弹幕输入行上方", progress.bottom <= input.top)
+
+        compose.onNodeWithTag("portrait-danmaku-toggle").performClick()
+        compose.runOnIdle { assertFalse(settings.enabled) }
+        compose.onNodeWithText("已关闭弹幕").assertExists()
+        compose.onNodeWithTag("portrait-danmaku-toggle").performClick()
+        compose.runOnIdle { assertTrue(settings.enabled) }
+        compose.onNodeWithTag("portrait-danmaku-input").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("发送弹幕").assertExists()
     }
 
     @Test

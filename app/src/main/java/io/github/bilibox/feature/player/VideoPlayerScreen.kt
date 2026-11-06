@@ -427,6 +427,7 @@ internal fun VideoPlayerScreen(
     // The speed panel takes the whole stage: hide the chrome behind it so the
     // runner and the ruler are the only things competing for attention.
     val showChrome = controlsVisible && !screenLocked && !(fullScreen && speedMenuExpanded)
+    val verticalDanmakuBar = verticalFullScreen && danmakuSupported
     val sleepTimerRemainingMs = when (sleepTimer.mode) {
         SleepTimerMode.TIME -> (sleepTimer.endAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
 
@@ -508,7 +509,13 @@ internal fun VideoPlayerScreen(
                         onExtend = { sleepTimer.extend(10, sleepTimerRemainingMs) },
                         onDismiss = { sleepTimer.dismissWarning() },
                         modifier = Modifier.align(Alignment.BottomCenter)
-                            .padding(bottom = if (fullScreen) 150.dp else 72.dp),
+                            .padding(
+                                bottom = when {
+                                    fullScreen -> 150.dp
+                                    verticalDanmakuBar -> 124.dp
+                                    else -> 72.dp
+                                }
+                            ),
                     )
                 }
                 if (showChrome) {
@@ -525,7 +532,14 @@ internal fun VideoPlayerScreen(
                             )
                     )
                     Box(
-                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(if (fullScreen) 150.dp else 64.dp)
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                            .height(
+                                when {
+                                    fullScreen -> 150.dp
+                                    verticalDanmakuBar -> 116.dp
+                                    else -> 64.dp
+                                }
+                            )
                             .background(
                                 Brush.verticalGradient(
                                     listOf(
@@ -606,6 +620,8 @@ internal fun VideoPlayerScreen(
                                 if (fullScreen) {
                                     Modifier
                                         .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 6.dp)
+                                } else if (verticalDanmakuBar) {
+                                    Modifier.padding(start = 6.dp, end = 6.dp, bottom = 12.dp)
                                 } else {
                                     Modifier.padding(horizontal = 6.dp)
                                 }
@@ -709,7 +725,14 @@ internal fun VideoPlayerScreen(
                         frame = previewFrame,
                         visible = screenshot.previewVisible,
                         modifier = Modifier.align(Alignment.BottomStart)
-                            .padding(start = 10.dp, bottom = if (fullScreen) 156.dp else 48.dp),
+                            .padding(
+                                start = 10.dp,
+                                bottom = when {
+                                    fullScreen -> 156.dp
+                                    verticalDanmakuBar -> 100.dp
+                                    else -> 48.dp
+                                }
+                            ),
                     )
                 }
                 if (screenshot.flash.value > .001f) {

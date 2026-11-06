@@ -1,28 +1,42 @@
 package io.github.bilibox.feature.player
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
+import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.data.danmaku.DanmakuSettings
 import io.github.bilibox.feature.danmaku.DanmakuControlBar
 import io.github.bilibox.feature.danmaku.DanmakuControlLeadingWidth
+import io.github.bilibox.feature.danmaku.DanmakuStateIcon
 
 /** 播放器底栏需要展示的播放状态。 */
 internal data class PlayerBottomBarState(
@@ -136,6 +150,53 @@ internal fun PlayerBottomBar(
                     }
                 },
             )
+        } else if (state.verticalFullScreen && state.danmakuSupported) {
+            // 竖屏全屏：进度独立成行，底行只保留弹幕输入与右侧出口。
+            Column {
+                Row(
+                    Modifier.fillMaxWidth().height(32.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PlayerBarIconButton(
+                        contentDescription = if (showPause) "暂停" else "播放",
+                        onClick = actions.onTogglePlayback,
+                    ) {
+                        PlaybackIcon(showPause, Modifier.size(18.dp))
+                    }
+                    seekBar(Modifier.weight(1f))
+                    PlaybackTimeLabel(
+                        position = if (state.scrubbing) state.scrubPosition.toLong() else state.position,
+                        duration = state.duration,
+                        modifier = Modifier.padding(start = 8.dp, end = 2.dp),
+                    )
+                }
+                Row(
+                    Modifier.fillMaxWidth().height(42.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Spacer(Modifier.width(12.dp))
+                    PortraitDanmakuInput(
+                        settings = state.danmakuSettings,
+                        loading = state.danmakuLoading,
+                        error = state.danmakuError,
+                        canSend = state.canSendDanmaku,
+                        onSend = actions.onDanmakuSend,
+                        onToggle = actions.onDanmakuToggle,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    PlayerVerticalScreenChip(
+                        active = state.verticalFullScreen,
+                        onClick = actions.onToggleVerticalFullScreen,
+                    )
+                    IconButton(
+                        onClick = actions.onToggleOrientation,
+                        modifier = Modifier.size(40.dp).semantics { contentDescription = "切换横屏" },
+                    ) {
+                        FullscreenIcon(fullScreen = false, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
         } else {
             Row(
                 Modifier.fillMaxWidth().height(40.dp),
@@ -167,6 +228,76 @@ internal fun PlayerBottomBar(
                     FullscreenIcon(fullScreen = false, modifier = Modifier.size(16.dp))
                 }
             }
+        }
+    }
+}
+
+/**
+ * 竖屏弹幕输入胶囊：点击左侧打开输入弹层，右侧图标只负责开关弹幕。
+ * 关闭时整体降为深灰，和设计稿的禁用态一致；开启时的对勾使用 B 站粉。
+ */
+@Composable
+private fun PortraitDanmakuInput(
+    settings: DanmakuSettings,
+    loading: Boolean,
+    error: String?,
+    canSend: Boolean,
+    onSend: () -> Unit,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val enabled = settings.enabled
+    val hint = when {
+        !enabled -> "已关闭弹幕"
+        loading -> "弹幕加载中…"
+        error != null -> "弹幕加载失败"
+        else -> "发个友善的弹幕见证当下…"
+    }
+    Row(
+        modifier.height(34.dp).clip(RoundedCornerShape(17.dp))
+            .background(if (enabled) Color(0xFF3B3B3B) else Color(0xFF222222)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.weight(1f).fillMaxHeight()
+                .clickable(enabled = enabled, role = Role.Button, onClick = onSend)
+                .testTag("portrait-danmaku-input")
+                .semantics {
+                    contentDescription = when {
+                        !enabled -> "弹幕已关闭"
+                        canSend -> "发送弹幕"
+                        else -> "登录后发送弹幕"
+                    }
+                }
+                .padding(start = 15.dp, end = 10.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Text(
+                hint,
+                color = if (enabled) Color(0xFF9B9B9B) else Color(0xFF555555),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box(
+            Modifier.width(1.dp).height(16.dp)
+                .background(Color.White.copy(alpha = if (enabled) .2f else .08f))
+        )
+        Box(
+            Modifier.width(34.dp).fillMaxHeight()
+                .clickable(role = Role.Button, onClick = onToggle)
+                .testTag("portrait-danmaku-toggle")
+                .semantics { contentDescription = if (enabled) "关闭弹幕" else "开启弹幕" },
+            contentAlignment = Alignment.Center,
+        ) {
+            DanmakuStateIcon(
+                enabled = enabled,
+                tint = if (enabled) Color.White else Color.White.copy(alpha = .72f),
+                checkColor = OnlinePink,
+                modifier = Modifier.size(24.dp),
+            )
         }
     }
 }

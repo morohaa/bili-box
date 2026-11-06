@@ -43,7 +43,11 @@ internal fun DanmakuOverlay(
     settings: DanmakuSettings,
     modifier: Modifier = Modifier,
 ) {
-    if (!settings.enabled || items.isEmpty()) return
+    // Keep the measured layouts and tracks alive while danmaku are hidden.
+    // Otherwise every off→on toggle has to remeasure every comment on the main
+    // thread before the switch icon can settle, which reads as input lag on
+    // long videos.
+    if (items.isEmpty()) return
 
     val localDensity = LocalDensity.current
     val density = localDensity.density
@@ -109,6 +113,7 @@ internal fun DanmakuOverlay(
         }
 
         Canvas(Modifier.fillMaxSize()) {
+            if (!settings.enabled) return@Canvas
             val now = positionMs
             tracks.forEach { track ->
                 if (!track.isVisibleAt(now)) return@forEach
