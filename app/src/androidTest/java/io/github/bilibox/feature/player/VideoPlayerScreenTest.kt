@@ -17,14 +17,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.ExoPlayer
@@ -166,6 +169,48 @@ class VideoPlayerScreenTest {
         compose.waitForIdle()
         compose.onNodeWithText("搜索视频简介").assertExists()
         compose.onNodeWithContentDescription("竖屏").assertExists()
+    }
+
+    @Test
+    fun hiddenChromeKeepsDimmedFullscreenEntryAtVideoBottom() {
+        var density = 1f
+        compose.setContent {
+            density = LocalDensity.current.density
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            VideoPlayerScreen(
+                player = player,
+                title = "搜索视频",
+                defaultDurationMs = 60_000,
+                sourceLabel = "哔哩哔哩",
+                commentMessage = "暂不支持查看在线评论",
+                onBack = {},
+                onRetry = {},
+                details = { Text("搜索视频简介") }
+            )
+        }
+
+        // 控件显示时全屏入口只在底栏，视频画面上不重复出现。
+        compose.onNodeWithContentDescription("竖屏").assertExists()
+        compose.onNodeWithTag("mini-fullscreen").assertDoesNotExist()
+
+        // 单击画面进入沉浸播放：底栏消失，但右下角仍保留变淡的全屏入口。
+        compose.onNodeWithTag("player-touch-surface").performClick()
+        compose.waitUntil(3_000) {
+            compose.onAllNodesWithTag("mini-fullscreen").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithContentDescription("竖屏").assertDoesNotExist()
+
+        val entry = compose.onNodeWithTag("mini-fullscreen")
+            .assertHasClickAction()
+            .fetchSemanticsNode().boundsInRoot
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "全屏入口应贴在画面右侧",
+            entry.right >= root.right - 48.dp.value * density
+        )
+        assertTrue("全屏入口应留在视频画面内", entry.bottom < root.height * .75f)
     }
 
     @Test

@@ -31,6 +31,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -500,7 +501,7 @@ internal fun VideoPlayerScreen(
                         !playbackModeExpanded && !sleepTimerOpen && playbackError == null,
                     onSpeedBoostStart = { gestures.startSpeedBoost() },
                     onSpeedBoostEnd = { gestures.endSpeedBoost() },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize().testTag("player-touch-surface")
                 )
                 if (danmakuSupported && !listening && !listenPageOpen) {
                     DanmakuOverlay(
@@ -689,6 +690,15 @@ internal fun VideoPlayerScreen(
                         position = position,
                         duration = duration,
                         modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                    )
+                }
+                // 控件隐藏后的沉浸播放保留一个变淡的全屏入口，不必先唤出底栏。
+                // 位置对齐底栏的横屏按钮，控件显隐时图标不会跳动。
+                if (!showChrome && !fullScreen && !verticalFullScreen && !listening) {
+                    MiniFullscreenButton(
+                        onClick = { toggleOrientation() },
+                        modifier = Modifier.align(Alignment.BottomEnd)
+                            .padding(end = 6.dp),
                     )
                 }
                 // Locking the screen must keep the unlock affordance reachable, so

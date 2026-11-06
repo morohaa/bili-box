@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -82,6 +83,22 @@ class PlayerToolsTest {
         compose.onNodeWithContentDescription("截取视频画面").assertExists()
         compose.onNodeWithTag("video-touch").performTouchInput { doubleClick(center) }
         compose.runOnIdle { assertEquals(2, playbackToggles) }
+    }
+
+    @Test
+    fun miniFullscreenButtonStaysTappableWhileDimmed() {
+        var taps = 0
+        compose.setContent {
+            Box(Modifier.size(160.dp, 90.dp), contentAlignment = Alignment.BottomEnd) {
+                MiniFullscreenButton(onClick = { taps++ })
+            }
+        }
+        compose.onNodeWithTag("mini-fullscreen")
+            .assertExists()
+            .assertHasClickAction()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("切换横屏")))
+            .performClick()
+        compose.runOnIdle { assertEquals(1, taps) }
     }
 
     @Test

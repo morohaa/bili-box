@@ -11,9 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -64,6 +66,30 @@ internal fun MiniPlaybackProgress(
             end = Offset(size.width * fraction, center.y),
             strokeWidth = size.height,
             cap = StrokeCap.Butt
+        )
+    }
+}
+
+/**
+ * 控件隐藏后仍留在视频右下角的全屏入口：图标调淡，避免和画面抢注意力，
+ * 位置和底栏的横屏按钮对齐，点一下就进入横屏全屏。
+ */
+@Composable
+internal fun MiniFullscreenButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier.size(40.dp)
+            .clip(CircleShape)
+            .clickable(role = Role.Button, onClick = onClick)
+            .testTag("mini-fullscreen")
+            .semantics { contentDescription = "切换横屏" },
+        contentAlignment = Alignment.Center,
+    ) {
+        FullscreenIcon(
+            fullScreen = false,
+            modifier = Modifier.size(16.dp).alpha(.6f),
         )
     }
 }
