@@ -173,7 +173,8 @@ internal fun PlayerDetailsPane(
                 speed = speed,
                 mode = SpeedPanelMode.Sheet,
                 onDismiss = onDismissSpeedSheet,
-                onSpeedChange = onSpeedChange
+                onSpeedChange = onSpeedChange,
+                remainingMs = (duration - positionMs).coerceAtLeast(0L),
             )
         }
 

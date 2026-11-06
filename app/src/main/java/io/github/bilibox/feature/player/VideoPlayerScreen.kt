@@ -739,7 +739,8 @@ internal fun VideoPlayerScreen(
                             onSpeedChange = {
                                 player.setPlaybackSpeed(it)
                                 speed = it
-                            }
+                            },
+                            remainingMs = (duration - position).coerceAtLeast(0L),
                         )
                     }
                     PlayerDrawerVisibility(visible = qualityMenuExpanded) {

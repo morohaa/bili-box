@@ -5,7 +5,7 @@ import kotlin.math.roundToInt
 internal const val PlaybackSpeedMin = 0.5f
 internal const val PlaybackSpeedMax = 3f
 internal const val PlaybackSpeedStep = 0.05f
-internal val PlaybackSpeedPresets = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f, 3f)
+internal val PlaybackSpeedPresets = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f, 2.5f, 3f)
 
 /** Temporary speed used while the video area is held down. */
 internal const val PlaybackSpeedBoost = 2f

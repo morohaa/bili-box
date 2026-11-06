@@ -44,30 +44,33 @@ internal fun SpeedPanelContent(
     onScrub: (Float) -> Unit,
     onStep: (Int) -> Unit,
     onPreset: (Float) -> Unit,
+    remainingMs: Long? = null,
     modifier: Modifier = Modifier,
     showClose: Boolean = true,
+    moodInline: Boolean = false,
     horizontalPadding: Dp = 22.dp,
+    railHorizontalPadding: Dp = 12.dp,
     verticalPadding: Dp = if (compact) 12.dp else 16.dp,
 ) {
-    // The side drawer already supplies the shared 24dp body inset, so the rail
-    // can run edge to edge there; the sheet keeps its own 12dp breathing room.
-    val railPadding = if (horizontalPadding > 0.dp) 12.dp else 0.dp
+    val timeFoldMs = remainingMs?.takeIf { it > 0L }
     Column(
         modifier.fillMaxWidth()
             .then(if (showClose) Modifier.navigationBarsPadding() else Modifier)
             .padding(vertical = verticalPadding)
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = horizontalPadding),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SpeedMoodChip(speedMood(speed))
-            if (showClose) {
-                Spacer(Modifier.weight(1f))
-                SpeedCloseButton(onDismiss)
+        if (!moodInline) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = horizontalPadding),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SpeedMoodChip(speedMood(speed))
+                if (showClose) {
+                    Spacer(Modifier.weight(1f))
+                    SpeedCloseButton(onDismiss)
+                }
             }
+            Spacer(Modifier.height(6.dp))
         }
-        Spacer(Modifier.height(6.dp))
         Row(
             Modifier.fillMaxWidth().padding(horizontal = horizontalPadding),
             verticalAlignment = Alignment.CenterVertically
@@ -89,6 +92,10 @@ internal fun SpeedPanelContent(
                     modifier = Modifier.padding(start = 2.dp, bottom = 6.dp)
                 )
             }
+            if (moodInline) {
+                Spacer(Modifier.width(10.dp))
+                SpeedMoodChip(speedMood(speed))
+            }
             Spacer(Modifier.weight(1f))
             SpeedStepButton(
                 symbol = "−",
@@ -105,18 +112,30 @@ internal fun SpeedPanelContent(
             )
         }
         Spacer(Modifier.height(2.dp))
-        Box(Modifier.fillMaxWidth().padding(horizontal = railPadding)) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = railHorizontalPadding)) {
             SpeedRail(
                 speed = speed,
-                trackHeight = if (compact) 112.dp else 132.dp,
+                trackHeight = when {
+                    timeFoldMs != null -> 104.dp
+                    compact -> 112.dp
+                    else -> 132.dp
+                },
                 onScrubFraction = onScrub
             )
         }
         Spacer(Modifier.height(6.dp))
         Box(Modifier.fillMaxWidth().padding(horizontal = horizontalPadding)) {
-            SpeedPresetRow(speed = speed, onPreset = onPreset)
+            SpeedPresetGrid(speed = speed, onPreset = onPreset)
         }
-        if (!compact) {
+        if (timeFoldMs != null) {
+            Spacer(Modifier.height(8.dp))
+            SpeedTimeFoldCard(
+                remainingMs = timeFoldMs,
+                speed = speed,
+                modifier = Modifier.padding(horizontal = horizontalPadding),
+            )
+        }
+        if (!compact && timeFoldMs == null) {
             Spacer(Modifier.height(10.dp))
             Text(
                 "长按画面 · 临时 ${formatSpeedBadge(PlaybackSpeedBoost)} 播放",
@@ -129,9 +148,9 @@ internal fun SpeedPanelContent(
 }
 
 @Composable
-internal fun SpeedMoodChip(mood: String) {
+internal fun SpeedMoodChip(mood: String, modifier: Modifier = Modifier) {
     Row(
-        Modifier.clip(CircleShape)
+        modifier.clip(CircleShape)
             .background(OnlinePink.copy(alpha = .13f))
             .border(1.dp, OnlinePink.copy(alpha = .22f), CircleShape)
             .padding(horizontal = 8.dp, vertical = 3.dp),
@@ -218,50 +237,73 @@ internal fun SpeedStepButton(
 }
 
 @Composable
-internal fun SpeedPresetRow(
+internal fun SpeedPresetGrid(
     speed: Float,
     onPreset: (Float) -> Unit,
 ) {
-    Row(
+    Column(
         Modifier.fillMaxWidth().selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        PlaybackSpeedPresets.forEach { option ->
-            val selected = abs(speed - option) < 0.001f
-            Box(
-                Modifier.weight(1f)
-                    .height(32.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        if (selected) {
-                            OnlinePink.copy(alpha = .20f)
-                        } else {
-                            Color.White.copy(alpha = .06f)
-                        }
-                    )
-                    .border(
-                        1.dp,
-                        if (selected) OnlinePink else Color.Transparent,
-                        RoundedCornerShape(10.dp)
-                    )
-                    .selectable(
-                        selected = selected,
-                        role = Role.RadioButton,
-                        onClick = { onPreset(option) }
-                    )
-                    .semantics {
-                        contentDescription = "选择倍速 ${formatSpeedBadge(option)}"
-                    },
-                contentAlignment = Alignment.Center
+        PlaybackSpeedPresets.chunked(4).forEach { rowOptions ->
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                Text(
-                    formatSpeedBadge(option),
-                    color = if (selected) OnlinePink else Color.White.copy(alpha = .74f),
-                    fontSize = 10.5.sp,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    maxLines = 1
-                )
+                rowOptions.forEach { option ->
+                    SpeedPresetButton(
+                        option = option,
+                        selected = abs(speed - option) < 0.001f,
+                        onPreset = onPreset,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                repeat(4 - rowOptions.size) {
+                    Spacer(Modifier.weight(1f))
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun SpeedPresetButton(
+    option: Float,
+    selected: Boolean,
+    onPreset: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier.height(32.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                if (selected) {
+                    OnlinePink.copy(alpha = .20f)
+                } else {
+                    Color.White.copy(alpha = .06f)
+                }
+            )
+            .border(
+                1.dp,
+                if (selected) OnlinePink else Color.Transparent,
+                RoundedCornerShape(10.dp)
+            )
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = { onPreset(option) }
+            )
+            .semantics {
+                contentDescription = "选择倍速 ${formatSpeedBadge(option)}"
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            formatSpeedBadge(option),
+            color = if (selected) OnlinePink else Color.White.copy(alpha = .74f),
+            fontSize = 10.5.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 1
+        )
     }
 }

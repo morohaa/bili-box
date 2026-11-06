@@ -55,6 +55,7 @@ internal fun PlayerSidePanel(
     modifier: Modifier = Modifier,
     titleBadge: String? = null,
     scrimAlpha: Float = .30f,
+    contentPadding: PaddingValues = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scrimInteraction = remember { MutableInteractionSource() }
@@ -98,7 +99,7 @@ internal fun PlayerSidePanel(
             Column(
                 Modifier.fillMaxWidth()
                     .weight(1f)
-                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
+                    .padding(contentPadding),
                 content = content,
             )
         }

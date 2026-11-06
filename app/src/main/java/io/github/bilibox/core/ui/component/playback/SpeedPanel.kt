@@ -66,6 +66,7 @@ internal fun SpeedPanel(
     mode: SpeedPanelMode,
     onDismiss: () -> Unit,
     onSpeedChange: (Float) -> Unit,
+    remainingMs: Long? = null,
 ) {
     val current = quantizePlaybackSpeed(speed)
     val haptics = LocalHapticFeedback.current
@@ -88,10 +89,11 @@ internal fun SpeedPanel(
             // short landscape windows get the tighter rail before scrolling.
             val compact = maxHeight < 380.dp
             PlayerSidePanel(
-                title = "播放倍速",
+                title = "倍速",
                 onDismiss = onDismiss,
                 closeDescription = "收起倍速面板",
                 scrimDescription = "关闭倍速面板",
+                contentPadding = PaddingValues(start = 0.dp, end = 0.dp, bottom = 12.dp),
             ) {
                 SpeedPanelContent(
                     speed = current,
@@ -102,9 +104,12 @@ internal fun SpeedPanel(
                     },
                     onStep = { direction -> emit(current + direction * PlaybackSpeedStep) },
                     onPreset = { value -> emit(value) },
+                    remainingMs = remainingMs,
                     modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
                     showClose = false,
-                    horizontalPadding = 0.dp,
+                    moodInline = true,
+                    horizontalPadding = 16.dp,
+                    railHorizontalPadding = 0.dp,
                     verticalPadding = 0.dp,
                 )
             }
@@ -151,6 +156,7 @@ internal fun SpeedPanel(
                             emit(PlaybackSpeedMin + fraction * (PlaybackSpeedMax - PlaybackSpeedMin))
                         },
                         onStep = { direction -> emit(current + direction * PlaybackSpeedStep) },
+                        remainingMs = remainingMs,
                         onPreset = { value ->
                             emit(value)
                             // A modal sheet hands the stage back to the video once the

@@ -660,6 +660,7 @@ internal fun ListenScreen(
                 mode = SpeedPanelMode.Sheet,
                 onDismiss = { speedOpen = false },
                 onSpeedChange = onSpeedChange,
+                remainingMs = (durationMs - positionMs).coerceAtLeast(0L),
             )
         }
         AnimatedVisibility(
