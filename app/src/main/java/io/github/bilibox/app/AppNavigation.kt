@@ -32,7 +32,17 @@ internal enum class AppTab { HOME, LIBRARY, PROFILE }
 @Composable
 internal fun AppNavigation(appState: BiliBoxAppState, darkMode: Boolean, onToggleDarkMode: () -> Unit) {
     appState.selectedVideo?.let { video ->
-        OnlineVideoScreen(video, appState.session, appState::closeOnlineVideo)
+        OnlineVideoScreen(
+            video = video,
+            session = appState.session,
+            onBack = appState::closeOnlineVideo,
+            onViewCache = {
+                // Cached MP4s are published to Movies/BiliBox, so the local
+                // video library is the natural "view cache" destination.
+                appState.closeOnlineVideo()
+                appState.selectTab(AppTab.LIBRARY.ordinal)
+            },
+        )
         return
     }
 

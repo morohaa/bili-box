@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -102,6 +103,11 @@ internal fun VideoPlayerScreen(
     onLoopModeChange: ((PlayerLoopMode) -> Unit)? = null,
     cacheLabel: String? = null,
     onCache: (() -> Unit)? = null,
+    // 缓存面板与播放设置卡片共用视频下沿作为顶边；可见状态由在线视频页持有，
+    // 这样返回键、权限申请和播放器内的弹层关闭顺序都由同一处控制。
+    cacheSheetVisible: Boolean = false,
+    onCacheSheetVisibleChange: (Boolean) -> Unit = {},
+    cacheSheet: (@Composable (visible: Boolean, topInset: Dp, onDismiss: () -> Unit) -> Unit)? = null,
     listenInfo: ListenInfo? = null,
     listenQueue: ListenQueue? = null,
     // One object instead of separate params: see ListenControls.
@@ -236,57 +242,27 @@ internal fun VideoPlayerScreen(
             if (barsBehavior != null) controller?.systemBarsBehavior = barsBehavior
         }
     }
-    LaunchedEffect(activity, fullScreen, verticalFullScreen) {
-        // 横屏全屏时以方向为准，避免退出横屏后又回到竖屏全屏。
-        if (fullScreen) verticalFullScreen = false
-        speedMenuExpanded = false
-        settingsSheetOpen = false
-        playbackModeExpanded = false
-        sleepTimerOpen = false
-        episodesExpanded = false
-        qualityMenuExpanded = false
-        danmakuSettingsOpen = false
-        if (!fullScreen) screenLocked = false
-        activity?.let {
-            WindowCompat.getInsetsController(it.window, it.window.decorView).apply {
-                isAppearanceLightStatusBars = false
-                isAppearanceLightNavigationBars = !fullScreen && !verticalFullScreen && detailsBackground == Color.White
-                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                if (fullScreen) {
-                    hide(WindowInsetsCompat.Type.systemBars())
-                } else if (verticalFullScreen) {
-                    // 竖屏全屏显示状态栏、隐藏底部导航栏；状态栏会随控件
-                    // 自动显隐，顶部安全区用稳定 inset 保持高度不变。
-                    show(WindowInsetsCompat.Type.statusBars())
-                    hide(WindowInsetsCompat.Type.navigationBars())
-                } else {
-                    show(WindowInsetsCompat.Type.systemBars())
-                }
-            }
-        }
-    }
-
-    LaunchedEffect(activity, verticalFullScreen, controlsVisible, screenLocked) {
-        if (!verticalFullScreen) return@LaunchedEffect
-        val controller = activity?.let {
-            WindowCompat.getInsetsController(it.window, it.window.decorView)
-        } ?: return@LaunchedEffect
-        if (controlsVisible && !screenLocked) {
-            controller.show(WindowInsetsCompat.Type.statusBars())
-        } else {
-            controller.hide(WindowInsetsCompat.Type.statusBars())
-        }
-    }
-
-    // Runs after the effect above, so the dark 听视频 page keeps light nav icons
-    // even when opening it rotates the screen back to portrait.
-    val listenVisible by remember { derivedStateOf { listenReveal.value > 0f } }
-    LaunchedEffect(activity, fullScreen, verticalFullScreen, listenVisible) {
-        activity?.let {
-            WindowCompat.getInsetsController(it.window, it.window.decorView).isAppearanceLightNavigationBars =
-                !listenVisible && !fullScreen && !verticalFullScreen && detailsBackground == Color.White
-        }
-    }
+    val listenVisible = rememberListenVisible(listenReveal)
+    PlayerSystemBarsEffects(
+        activity = activity,
+        fullScreen = fullScreen,
+        verticalFullScreen = verticalFullScreen,
+        controlsVisible = controlsVisible,
+        screenLocked = screenLocked,
+        listenVisible = listenVisible,
+        detailsBackground = detailsBackground,
+        onResetOverlays = {
+            speedMenuExpanded = false
+            settingsSheetOpen = false
+            playbackModeExpanded = false
+            sleepTimerOpen = false
+            episodesExpanded = false
+            qualityMenuExpanded = false
+            danmakuSettingsOpen = false
+        },
+        onVerticalFullScreenChange = { verticalFullScreen = it },
+        onScreenLockedChange = { screenLocked = it },
+    )
 
     fun toggleOrientation() {
         controlsVisible = true
@@ -392,13 +368,14 @@ internal fun VideoPlayerScreen(
         sleepTimerOpen = false
         episodesExpanded = false
         qualityMenuExpanded = false
+        onCacheSheetVisibleChange(false)
         duration = defaultDurationMs
         position = player.currentPosition.coerceAtLeast(0L)
     }
-    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, settingsSheetOpen, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded, verticalFullScreen) {
+    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, settingsSheetOpen, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded, cacheSheetVisible, verticalFullScreen) {
         if (controlsVisible && (isPlaying || screenLocked) && !scrubbing &&
             !speedMenuExpanded && !settingsSheetOpen && !playbackModeExpanded && !sleepTimerOpen &&
-            !episodesExpanded && !qualityMenuExpanded
+            !episodesExpanded && !qualityMenuExpanded && !cacheSheetVisible
         ) {
             delay(4_000)
             controlsVisible = false
@@ -413,6 +390,7 @@ internal fun VideoPlayerScreen(
     BackHandler(enabled = !listenPageOpen) {
         when {
             screenLocked -> controlsVisible = true
+            cacheSheetVisible -> onCacheSheetVisibleChange(false)
             danmakuComposerOpen -> if (!danmakuSending) danmakuComposerOpen = false
             danmakuSettingsOpen -> danmakuSettingsOpen = false
             episodeOverlayDismiss != null -> episodeOverlayDismiss()
@@ -895,6 +873,19 @@ internal fun VideoPlayerScreen(
                 onCache = onCache,
                 onUnavailable = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() },
             )
+        }
+        // 缓存面板也贴在视频下沿；内容在 feature/online 中，播放器只提供
+        // 量好的 topInset，避免 feature/player 反向依赖在线视频包。
+        if (!fullScreen && !verticalFullScreen) {
+            cacheSheet?.invoke(cacheSheetVisible, videoBottom) {
+                onCacheSheetVisibleChange(false)
+            }
+        }
+        // 旋转进入全屏时关闭缓存面板，避免面板停留在已不存在的视频下沿。
+        LaunchedEffect(fullScreen, verticalFullScreen) {
+            if ((fullScreen || verticalFullScreen) && cacheSheetVisible) {
+                onCacheSheetVisibleChange(false)
+            }
         }
         // 竖屏的画质选择使用底部弹层；横屏仍沿用侧边抽屉。
         if (!fullScreen && !verticalFullScreen && qualityMenuExpanded && qualityOptions.isNotEmpty()) {

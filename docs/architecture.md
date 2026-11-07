@@ -44,7 +44,7 @@ data         → core
 
 共享模型放在 `core/model`，不夹带接口客户端或页面状态。UI 文案与图标由 UI 层映射，接口参数和响应转换放在数据层。
 
-两种“缓存”职责不同：`feature/online/EpisodePlayCache` 是播放会话内的相邻分 P 地址预取与短期内存复用；`data/online/OnlineVideoCacheStore` 下载媒体并通过 MediaStore 发布到设备视频库。前者随会话重建，后者产出持久文件，不应因为同名 Cache 合并。
+三种“缓存”职责不同：`feature/online/EpisodePlayCache` 是播放会话内的相邻分 P 地址预取与短期内存复用；`feature/online/OnlineCacheController` 维护缓存面板的两路并发队列、视频/音频双轨状态、取消与重试；`data/online/OnlineVideoCacheStore` 负责真实下载（视频 MP4 + DASH 音频）、进度回调、取消清理与 MediaStore 发布，`OnlineCacheIndex` 持久化每个分 P 的双轨文件。前两者随会话重建，后者产出持久文件，不应因为同名 Cache 合并。
 
 ## 自动边界检查
 

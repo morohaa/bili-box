@@ -51,10 +51,13 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private enum class OnlineVideoCacheStatus { IDLE, DOWNLOADING, SAVED }
-
 @Composable
-internal fun OnlineVideoScreen(video: VideoSummary, session: BiliSession?, onBack: () -> Unit) {
+internal fun OnlineVideoScreen(
+    video: VideoSummary,
+    session: BiliSession?,
+    onBack: () -> Unit,
+    onViewCache: () -> Unit = {},
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val client = remember(video.bvid, session?.cookie) {
@@ -91,8 +94,31 @@ internal fun OnlineVideoScreen(video: VideoSummary, session: BiliSession?, onBac
     var autoPlayNext by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(true) }
     var episodesInGridView by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(false) }
     var creatorCard by remember(video.bvid, session?.cookie) { mutableStateOf<UserCardData?>(null) }
-    var cacheStatus by remember(video.bvid, selectedPage, session?.cookie) { mutableStateOf(OnlineVideoCacheStatus.IDLE) }
-    val cacheStore = remember(context) { OnlineVideoCacheStore(context) }
+    // Cache sheet data + queue. The controller lives for the whole video screen
+    // so downloads keep running after the sheet is dismissed.
+    val cacheDownloader = remember(context, client, session?.cookie) {
+        OnlineVideoCacheStore(context, client, session?.cookie)
+    }
+    val cacheController = remember(cacheDownloader, video.bvid, scope) {
+        OnlineCacheController(
+            bvid = video.bvid,
+            videoTitle = video.title,
+            downloader = cacheDownloader,
+            scope = scope,
+            notify = { message -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show() },
+        )
+    }
+    var cacheSheetVisible by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
+    DisposableEffect(cacheController) {
+        onDispose { cacheController.dispose() }
+    }
+    LaunchedEffect(videoInfo, playbackCid, video.title) {
+        cacheController.syncEpisodes(
+            pages = videoInfo?.pages.orEmpty(),
+            fallbackCid = playbackCid.takeIf { it > 0L } ?: videoInfo?.cid ?: 0L,
+            fallbackTitle = video.title,
+        )
+    }
     // Cache entries belong to one quality, so do not reuse 1080P urls after a quality change.
     val episodePlayCache = remember(video.bvid, session?.cookie, selectedQn) { EpisodePlayCache() }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
@@ -462,58 +488,31 @@ internal fun OnlineVideoScreen(video: VideoSummary, session: BiliSession?, onBac
     LaunchedEffect(playbackData) {
         playbackData?.quality?.takeIf { it > 0 }?.let { actualQn = it }
     }
-    fun beginCacheDownload() {
-        if (cacheStatus == OnlineVideoCacheStatus.DOWNLOADING) return
-        if (cacheStatus == OnlineVideoCacheStatus.SAVED) {
-            Toast.makeText(context, "当前分 P 已缓存", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val cid = playbackCid
-        if (cid <= 0L) {
-            Toast.makeText(context, "播放地址尚未准备好，请稍后重试", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val cacheTitle = videoInfo?.title?.takeIf { it.isNotBlank() } ?: video.title
-        val updateCacheStatus: (OnlineVideoCacheStatus) -> Unit = { cacheStatus = it }
-        scope.launch {
-            updateCacheStatus(OnlineVideoCacheStatus.DOWNLOADING)
-            try {
-                cacheStore.cache(client, video.bvid, cid, selectedQn, cacheTitle, session?.cookie)
-                updateCacheStatus(OnlineVideoCacheStatus.SAVED)
-                Toast.makeText(context, "已缓存到 Movies/BiliBox", Toast.LENGTH_SHORT).show()
-            } catch (cancelled: CancellationException) {
-                updateCacheStatus(OnlineVideoCacheStatus.IDLE)
-                throw cancelled
-            } catch (error: Exception) {
-                updateCacheStatus(OnlineVideoCacheStatus.IDLE)
-                Toast.makeText(context, "缓存失败：${error.message ?: "请稍后重试"}", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
     val cachePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            beginCacheDownload()
+            cacheSheetVisible = true
         } else {
             Toast.makeText(context, "需要存储权限才能缓存视频", Toast.LENGTH_SHORT).show()
         }
     }
-    val cacheLabel = when (cacheStatus) {
-        OnlineVideoCacheStatus.DOWNLOADING -> "缓存中"
-        OnlineVideoCacheStatus.SAVED -> "已缓存"
-        OnlineVideoCacheStatus.IDLE -> ""
-    }
-    val onCache: () -> Unit = {
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P && context.checkSelfPermission(
+    val openCacheSheet: () -> Unit = {
+        if (cacheController.episodes.isEmpty()) {
+            Toast.makeText(context, "分集信息加载中，请稍后再试", Toast.LENGTH_SHORT).show()
+        } else if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P && context.checkSelfPermission(
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             cachePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         } else {
-            beginCacheDownload()
+            cacheSheetVisible = true
         }
     }
+    val cacheLabel = cacheController.episodes
+        .firstOrNull { it.page == selectedPage }
+        ?.let { if (it.video is OnlineCacheTrackState.Done) "已缓存" else "" }
+        .orEmpty()
     val episodePages = videoInfo?.pages?.takeIf { it.size > 1 }
     val latestEpisodePages by rememberUpdatedState(episodePages)
     val latestAutoPlayNext by rememberUpdatedState(autoPlayNext)
@@ -593,6 +592,12 @@ internal fun OnlineVideoScreen(video: VideoSummary, session: BiliSession?, onBac
     val effectiveQuality = actualQn.takeIf { qn -> qn > 0 && qualityOptions.any { it.qn == qn } }
         ?: qualityOptions.firstOrNull { it.qn == selectedQn }?.qn
         ?: qualityOptions.maxByOrNull { it.qn }?.qn
+    LaunchedEffect(qualityOptions, effectiveQuality, selectedQn) {
+        cacheController.updateVideoQualities(
+            qns = qualityOptions.map { it.qn },
+            selectedQn = effectiveQuality ?: selectedQn,
+        )
+    }
     val nextPage = videoInfo?.pages?.let { pages ->
         val currentIndex = pages.indexOfFirst { it.page == selectedPage }
         if (currentIndex >= 0) pages.getOrNull(currentIndex + 1) else null
@@ -632,7 +637,19 @@ internal fun OnlineVideoScreen(video: VideoSummary, session: BiliSession?, onBac
         autoPlayNext = autoPlayNext,
         onAutoPlayNextChange = { autoPlayNext = it },
         cacheLabel = cacheLabel,
-        onCache = onCache,
+        onCache = openCacheSheet,
+        cacheSheetVisible = cacheSheetVisible,
+        onCacheSheetVisibleChange = { cacheSheetVisible = it },
+        cacheSheet = { visible, topInset, onDismiss ->
+            OnlineCacheSheetHost(
+                visible = visible,
+                topInset = topInset,
+                onDismiss = onDismiss,
+                controller = cacheController,
+                playingPage = selectedPage,
+                onViewCache = onViewCache,
+            )
+        },
         onQualitySelected = { qn ->
             if (qn == actualQn) {
                 // Already streaming at this quality; just keep the requested value in sync.
