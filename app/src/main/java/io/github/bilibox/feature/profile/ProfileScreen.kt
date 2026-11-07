@@ -89,6 +89,7 @@ private val NavigationBarClearance = 82.dp
 @Composable
 internal fun ProfileScreen(
     session: BiliSession?,
+    defaultAvatar: Int,
     darkMode: Boolean = false,
     onToggleDarkMode: () -> Unit = {},
     onOpenThemeAppearance: () -> Unit = {},
@@ -248,7 +249,7 @@ internal fun ProfileScreen(
         }
 
         val header: @Composable () -> Unit = {
-            ProfileHeader(session, avatar, darkMode, onToggleDarkMode, bannerHeight)
+            ProfileHeader(session, avatar, defaultAvatar, darkMode, onToggleDarkMode, bannerHeight)
         }
 
         if (compact) {

@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -27,6 +28,7 @@ import io.github.bilibox.feature.library.LibraryScreen
 import io.github.bilibox.feature.online.OnlineVideoScreen
 import io.github.bilibox.feature.player.LocalVideoScreen
 import io.github.bilibox.feature.profile.ProfileScreen
+import io.github.bilibox.feature.profile.randomGhostAvatar
 
 internal enum class AppTab { HOME, LIBRARY, PROFILE }
 
@@ -39,6 +41,10 @@ internal fun AppNavigation(
     onAppearanceChange: (AppearanceSettings) -> Unit,
     onToggleDarkMode: () -> Unit,
 ) {
+    // 未登录默认头像在一次应用运行内固定：放在根组合里记住，切页、退后台、转屏都不会换脸，
+    // 只有完全退出后重新启动（没有可恢复的保存状态）才会重新随机。
+    val defaultAvatar = rememberSaveable { randomGhostAvatar() }
+
     if (appState.appearanceOpen) {
         AppearanceScreen(
             appearance = appearance,
@@ -90,6 +96,7 @@ internal fun AppNavigation(
 
                 AppTab.PROFILE -> ProfileScreen(
                     session = appState.session,
+                    defaultAvatar = defaultAvatar,
                     darkMode = darkMode,
                     onToggleDarkMode = onToggleDarkMode,
                     onOpenThemeAppearance = appState::openAppearance,

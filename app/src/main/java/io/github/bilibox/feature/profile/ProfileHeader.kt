@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
@@ -67,6 +68,7 @@ internal fun profileBannerHeight(availableWidth: Dp, availableHeight: Dp): Dp = 
 internal fun ProfileHeader(
     session: BiliSession?,
     avatar: ImageBitmap?,
+    defaultAvatar: Int,
     darkMode: Boolean,
     onToggleDarkMode: () -> Unit,
     bannerHeight: Dp,
@@ -82,6 +84,7 @@ internal fun ProfileHeader(
         ProfileAvatar(
             session = session,
             avatar = avatar,
+            defaultAvatar = defaultAvatar,
             ring = background,
             darkMode = darkMode,
             modifier = Modifier.align(Alignment.TopStart).offset(x = 20.dp, y = bannerHeight - 45.dp),
@@ -169,6 +172,7 @@ internal fun Banner(avatar: ImageBitmap?, darkMode: Boolean, modifier: Modifier 
 internal fun ProfileAvatar(
     session: BiliSession?,
     avatar: ImageBitmap?,
+    defaultAvatar: Int,
     ring: Color,
     darkMode: Boolean,
     modifier: Modifier = Modifier,
@@ -185,9 +189,16 @@ internal fun ProfileAvatar(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
+        } else if (session == null) {
+            Image(
+                painter = painterResource(defaultAvatar),
+                contentDescription = "默认头像",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
         } else {
             Text(
-                text = session?.username?.take(1) ?: "B",
+                text = session.username.take(1),
                 color = LocalAccentColor.current,
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
