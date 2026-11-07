@@ -688,7 +688,7 @@ internal fun VideoPlayerScreen(
                     PlayerGestureFeedback(
                         side = feedback.side,
                         level = feedback.level,
-                        modifier = Modifier.align(Alignment.Center)
+                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp)
                     )
                 }
                 PlayerSpeedBoostIndicator(

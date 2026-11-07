@@ -1,5 +1,6 @@
 package io.github.bilibox.feature.player
 
+import android.content.res.Configuration
 import android.view.Window
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -24,9 +25,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -34,15 +37,18 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.util.formatSpeedBadge
+import kotlin.math.roundToInt
 import kotlinx.coroutines.withTimeoutOrNull
 
 internal enum class PlayerGestureSide { LEFT, RIGHT }
@@ -226,66 +232,147 @@ internal fun PlayerGestureFeedback(
     level: Float,
     modifier: Modifier = Modifier,
 ) {
-    val percentage = (level.coerceIn(0f, 1f) * 100).toInt()
+    val safeLevel = level.coerceIn(0f, 1f)
+    val percentage = (safeLevel * 100f).roundToInt()
+    val muted = side == PlayerGestureSide.RIGHT && safeLevel < .005f
+    val compact = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
+    val pillShape = RoundedCornerShape(percent = 50)
+
+    val pillWidth = if (compact) 200.dp else 240.dp
+    val pillHeight = if (compact) 48.dp else 56.dp
+    val horizontalPadding = if (compact) 18.dp else 22.dp
+    val iconSize = if (compact) 22.dp else 24.dp
+    val iconGap = if (compact) 7.dp else 8.dp
+    val trackHeight = if (compact) 3.5.dp else 4.dp
+    val textGap = if (compact) 10.dp else 12.dp
+    val percentSize = if (compact) 14.sp else 16.sp
+    val percentMinWidth = if (compact) 36.dp else 42.dp
+    val shadowElevation = if (compact) 12.dp else 14.dp
+
     Row(
-        modifier.width(200.dp).height(58.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black.copy(alpha = .36f))
+        modifier.width(pillWidth).height(pillHeight)
+            .shadow(shadowElevation, pillShape)
+            .clip(pillShape)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xF2202125),
+                        Color(0xF6111215),
+                    )
+                )
+            )
+            .border(1.dp, Color.White.copy(alpha = .06f), pillShape)
             .semantics {
                 contentDescription = if (side == PlayerGestureSide.LEFT) "亮度调节" else "音量调节"
                 stateDescription = "$percentage%"
             }
-            .padding(horizontal = 22.dp),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            .padding(horizontal = horizontalPadding),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Canvas(Modifier.size(36.dp)) {
-            val scale = size.minDimension / 32f
-            val white = Color.White
-            val stroke = Stroke(width = 2.2f * scale, cap = StrokeCap.Round, join = StrokeJoin.Round)
-            if (side == PlayerGestureSide.LEFT) {
-                val center = Offset(size.width / 2f, size.height / 2f)
-                drawCircle(white, radius = 5.5f * scale, center = center, style = stroke)
-                for (angle in 0 until 8) {
-                    val radians = Math.toRadians(angle * 45.0)
-                    val inner = 10f * scale
-                    val outer = 13f * scale
-                    drawLine(
-                        white,
-                        Offset(center.x + kotlin.math.cos(radians).toFloat() * inner, center.y + kotlin.math.sin(radians).toFloat() * inner),
-                        Offset(center.x + kotlin.math.cos(radians).toFloat() * outer, center.y + kotlin.math.sin(radians).toFloat() * outer),
-                        strokeWidth = 2.2f * scale,
-                        cap = StrokeCap.Round
-                    )
-                }
+        PlayerGestureGlyph(
+            side = side,
+            muted = muted,
+            modifier = Modifier.size(iconSize),
+        )
+        Spacer(Modifier.width(iconGap))
+        Box(
+            Modifier.weight(1f).height(trackHeight)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(Color.White.copy(alpha = .22f))
+        ) {
+            Box(
+                Modifier.fillMaxWidth(safeLevel).fillMaxHeight()
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(OnlinePink)
+            )
+        }
+        Spacer(Modifier.width(textGap))
+        Text(
+            text = "$percentage%",
+            color = Color.White,
+            fontSize = percentSize,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = .1.sp,
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.widthIn(min = percentMinWidth),
+        )
+    }
+}
+
+@Composable
+private fun PlayerGestureGlyph(
+    side: PlayerGestureSide,
+    muted: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier) {
+        val u = size.minDimension / 24f
+        val white = Color.White
+        val stroke = Stroke(width = 1.9f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        if (side == PlayerGestureSide.LEFT) {
+            val center = Offset(size.width / 2f, size.height / 2f)
+            drawCircle(white, radius = 4.2f * u, center = center, style = stroke)
+            for (angle in 0 until 8) {
+                val radians = Math.toRadians(angle * 45.0)
+                val cos = kotlin.math.cos(radians).toFloat()
+                val sin = kotlin.math.sin(radians).toFloat()
+                drawLine(
+                    white,
+                    Offset(center.x + cos * 7.8f * u, center.y + sin * 7.8f * u),
+                    Offset(center.x + cos * 9.8f * u, center.y + sin * 9.8f * u),
+                    strokeWidth = 1.9f * u,
+                    cap = StrokeCap.Round,
+                )
+            }
+        } else {
+            drawPath(
+                Path().apply {
+                    moveTo(11f * u, 4.8f * u)
+                    lineTo(6.6f * u, 8.6f * u)
+                    lineTo(3.4f * u, 8.6f * u)
+                    lineTo(3.4f * u, 15.4f * u)
+                    lineTo(6.6f * u, 15.4f * u)
+                    lineTo(11f * u, 19.2f * u)
+                    close()
+                },
+                white,
+                style = stroke,
+            )
+            if (muted) {
+                drawLine(
+                    white,
+                    Offset(15.4f * u, 9.4f * u),
+                    Offset(20.6f * u, 14.6f * u),
+                    1.9f * u,
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    white,
+                    Offset(20.6f * u, 9.4f * u),
+                    Offset(15.4f * u, 14.6f * u),
+                    1.9f * u,
+                    StrokeCap.Round,
+                )
             } else {
                 drawPath(
                     Path().apply {
-                        moveTo(3f * scale, 12f * scale)
-                        lineTo(9f * scale, 12f * scale)
-                        lineTo(18f * scale, 5f * scale)
-                        lineTo(18f * scale, 27f * scale)
-                        lineTo(9f * scale, 20f * scale)
-                        lineTo(3f * scale, 20f * scale)
-                        close()
+                        moveTo(15.1f * u, 9.2f * u)
+                        cubicTo(17.2f * u, 10.6f * u, 17.2f * u, 13.4f * u, 15.1f * u, 14.8f * u)
                     },
                     white,
-                    style = stroke
+                    style = stroke,
                 )
                 drawPath(
                     Path().apply {
-                        moveTo(21f * scale, 11f * scale)
-                        quadraticTo(27f * scale, 16f * scale, 21f * scale, 21f * scale)
-                        moveTo(23f * scale, 7f * scale)
-                        cubicTo(32f * scale, 12f * scale, 32f * scale, 20f * scale, 23f * scale, 25f * scale)
+                        moveTo(18f * u, 6.5f * u)
+                        cubicTo(22.2f * u, 10.2f * u, 22.2f * u, 13.8f * u, 18f * u, 17.5f * u)
                     },
                     white,
-                    style = stroke
+                    style = stroke,
                 )
             }
-        }
-        Spacer(Modifier.width(20.dp))
-        Box(Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = .32f))) {
-            Box(Modifier.fillMaxWidth(level.coerceIn(0f, 1f)).fillMaxHeight().background(Color(0xFFFF6699)))
         }
     }
 }

@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>B站移动端播放器 · 音量/亮度 OSD 重设计</title>
+<style>
+    /* ============ 基础重置 ============ */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+        --bili-pink: #FB7299;
+        --osd-white: #FFFFFF;
+        --osd-radius: 24px;
+    }
+    html, body {
+        width: 100%;
+        height: 100%;
+        background: #000;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+        overflow: hidden;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* ============ 视频画面 ============ */
+    .video-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: url('https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=1080&auto=format&fit=crop') center/cover no-repeat;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* 左右点击感应区 */
+    .click-zone-left, .click-zone-right {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        width: 50%;
+        z-index: 10;
+    }
+    .click-zone-left { left: 0; }
+    .click-zone-right { right: 0; }
+
+    /* ============ 弹幕 ============ */
+    .danmaku-layer {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 5;
+    }
+    .danmaku {
+        position: absolute;
+        color: #fff;
+        font-size: 16px;
+        font-weight: bold;
+        text-shadow: 1px 1px 2px rgba(0,0,0,.8);
+        white-space: nowrap;
+        animation: moveDanmaku 8s linear forwards;
+    }
+    @keyframes moveDanmaku {
+        from { transform: translateX(100vw); }
+        to { transform: translateX(-100%); }
+    }
+
+    /* ============ 顶部信息栏 ============ */
+    .top-bar {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%;
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        background: linear-gradient(to bottom, rgba(0,0,0,.55), transparent);
+        color: #fff;
+        z-index: 10;
+        pointer-events: none;
+    }
+    .top-bar svg { width: 24px; height: 24px; fill: #fff; }
+    .top-bar .title {
+        margin-left: 12px;
+        font-size: 15px;
+        opacity: .9;
+    }
+
+    /* ============ 中央 OSD 容器 ============ */
+    .toast-container {
+        position: absolute;
+        inset: 0;
+        z-index: 20;
+        pointer-events: none;
+    }
+    /* ?preview=both：并排展示两条 OSD，方便设计走查与截图 */
+    .toast-container.preview-both {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 14px;
+    }
+
+    /* ---------- OSD 胶囊外壳 ---------- */
+    .bili-mobile-widget {
+        position: relative;
+        display: flex;
+        align-items: center;
+        width: 200px;
+        height: 48px;
+        padding: 0 18px;
+        border-radius: var(--osd-radius);
+        color: var(--osd-white);
+
+        /* 中性深灰玻璃：高不透明度压住视频里的红调 */
+        background: linear-gradient(180deg, rgba(32, 33, 37, .95), rgba(17, 18, 21, .97));
+        -webkit-backdrop-filter: blur(20px) saturate(1.15);
+        backdrop-filter: blur(20px) saturate(1.15);
+        border: 1px solid rgba(255, 255, 255, .06);
+        box-shadow:
+            0 12px 28px -8px rgba(0, 0, 0, .55),
+            0 2px 8px rgba(0, 0, 0, .20),
+            inset 0 1px 0 rgba(255, 255, 255, .06);
+
+        /* 居中悬浮，避免两个隐藏节点互相占位 */
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        margin: 0;
+
+        /* 出现 / 收起 */
+        opacity: 0;
+        visibility: hidden;
+        transform: translate(-50%, calc(-50% + 12px)) scale(.97);
+        transition:
+            opacity .24s ease,
+            transform .34s cubic-bezier(.22, 1, .36, 1),
+            visibility 0s linear .34s;
+        will-change: transform, opacity;
+    }
+    .bili-mobile-widget.show {
+        opacity: 1;
+        visibility: visible;
+        transform: translate(-50%, -50%) scale(1);
+        pointer-events: auto;
+        transition:
+            opacity .24s ease,
+            transform .34s cubic-bezier(.22, 1, .36, 1),
+            visibility 0s;
+    }
+
+    /* 预览模式下让两条 OSD 作为正常流排列 */
+    .toast-container.preview-both .bili-mobile-widget {
+        position: static;
+        transform: none;
+    }
+    .toast-container.preview-both .bili-mobile-widget.show {
+        transform: translateY(0) scale(1);
+    }
+
+    /* 不支持毛玻璃时退回不透明底色 */
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .bili-mobile-widget {
+            background: linear-gradient(180deg, rgba(32, 33, 37, .99), rgba(17, 18, 21, .99));
+        }
+    }
+
+    /* ---------- 左侧图标 ---------- */
+    .bili-icon {
+        width: 22px;
+        height: 22px;
+        flex: 0 0 22px;
+        margin-right: 7px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+    }
+    .bili-icon svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+    .bili-icon .icon-muted { display: none; }
+    .bili-icon.is-muted .icon-muted { display: block; }
+
+    /* ---------- 滑动条 ---------- */
+    .bili-slider-container {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 40px;
+        display: flex;
+        align-items: center;
+    }
+    /* 轨道底槽 */
+    .bili-slider-track {
+        position: relative;
+        width: 100%;
+        height: 3.5px;
+        border-radius: 99px;
+        background: rgba(255, 255, 255, .22);
+        box-shadow: inset 0 1px 1px rgba(0, 0, 0, .20);
+        pointer-events: none;
+    }
+    /* 粉色进度 */
+    .bili-slider-fill {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: var(--progress, 50%);
+        border-radius: inherit;
+        background: var(--bili-pink);
+        box-shadow: 0 0 12px rgba(251, 114, 153, .28);
+        transition: box-shadow .2s ease;
+    }
+    /* 拖动时才会出现的小圆点，静止态保持参考图的无滑块设计 */
+    .bili-slider-knob {
+        position: absolute;
+        top: 50%;
+        left: var(--progress, 50%);
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 0 0 4px rgba(251, 114, 153, .22), 0 1px 3px rgba(0, 0, 0, .35);
+        transform: translate(-50%, -50%) scale(.35);
+        opacity: 0;
+        transition: transform .16s ease, opacity .16s ease;
+        pointer-events: none;
+    }
+    /* 原生 input 透明铺满，保留可点按 / 拖动 / 键盘操作 */
+    .bili-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 100%;
+        height: 40px;
+        margin: 0;
+        background: transparent;
+        outline: none;
+        opacity: 0;
+        cursor: pointer;
+        z-index: 2;
+        touch-action: none;
+    }
+    .bili-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 1px;
+        height: 40px;
+        background: transparent;
+        border: none;
+    }
+    .bili-slider::-moz-range-thumb {
+        width: 1px;
+        height: 40px;
+        background: transparent;
+        border: none;
+    }
+    /* 键盘聚焦时，让轨道有可见反馈 */
+    .bili-slider-container:focus-within .bili-slider-track {
+        box-shadow:
+            0 0 0 3px rgba(251, 114, 153, .28),
+            inset 0 1px 1px rgba(0, 0, 0, .20);
+    }
+    /* 正在调整 */
+    .bili-mobile-widget.is-adjusting .bili-slider-fill {
+        box-shadow: 0 0 16px rgba(251, 114, 153, .48);
+    }
+    .bili-mobile-widget.is-adjusting .bili-slider-knob {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    /* ---------- 百分比 ---------- */
+    .bili-percentage {
+        flex: 0 0 auto;
+        min-width: 36px;
+        margin-left: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        line-height: 1;
+        letter-spacing: .1px;
+        text-align: right;
+        color: var(--osd-white);
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum";
+    }
+
+    /* ---------- 音量图标静音态 ---------- */
+    .bili-icon.is-muted .icon-volume { display: none; }
+
+    /* ============ 底部播放控制条 ============ */
+    .bottom-bar {
+        position: absolute;
+        bottom: 0; left: 0;
+        width: 100%;
+        padding: 16px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+        background: linear-gradient(to top, rgba(0,0,0,.78), transparent);
+        color: #fff;
+        z-index: 10;
+    }
+    .progress-track {
+        height: 3px;
+        background: rgba(255,255,255,.3);
+        border-radius: 2px;
+        position: relative;
+        margin-bottom: 12px;
+    }
+    .progress-fill {
+        position: absolute;
+        left: 0; top: 0;
+        height: 100%;
+        width: 35%;
+        background: var(--bili-pink);
+        border-radius: 2px;
+    }
+    .progress-fill::after {
+        content: '';
+        position: absolute;
+        right: -4px; top: -3px;
+        width: 9px; height: 9px;
+        border-radius: 50%;
+        background: #fff;
+    }
+    .controls-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        opacity: .8;
+    }
+
+    /* ============ 小屏适配 ============ */
+    @media (prefers-reduced-motion: reduce) {
+        .bili-mobile-widget,
+        .bili-slider-fill,
+        .bili-slider-knob { transition: none; }
+        .danmaku { animation-duration: 0s; opacity: 0; }
+    }
+</style>
+</head>
+<body>
+
+<div class="video-container">
+    <!-- 弹幕层 -->
+    <div class="danmaku-layer" id="danmakuLayer"></div>
+
+    <!-- 左右点击感应区 -->
+    <div class="click-zone-left" id="clickLeft"></div>
+    <div class="click-zone-right" id="clickRight"></div>
+
+    <!-- 顶部 -->
+    <div class="top-bar">
+        <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        <div class="title">【4K】沉浸式体验绝美风景</div>
+    </div>
+
+    <!-- 中间 OSD：亮度 / 音量 -->
+    <div class="toast-container">
+        <!-- 亮度 -->
+        <div class="bili-mobile-widget" id="brightnessWidget" role="group" aria-label="亮度调节" aria-hidden="true">
+            <div class="bili-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+                    <circle cx="12" cy="12" r="4.2"/>
+                    <path d="M12 2.2v2M12 19.8v2M2.2 12h2M19.8 12h2M5.1 5.1l1.4 1.4M17.5 17.5l1.4 1.4M5.1 18.9l1.4-1.4M17.5 6.5l1.4-1.4"/>
+                </svg>
+            </div>
+            <div class="bili-slider-container" id="brightnessContainer" style="--progress: 92%">
+                <div class="bili-slider-track">
+                    <div class="bili-slider-fill"></div>
+                    <div class="bili-slider-knob"></div>
+                </div>
+                <input type="range" id="brightnessSlider" class="bili-slider" min="0" max="100" value="92" aria-label="亮度">
+            </div>
+            <div class="bili-percentage" id="brightnessText">92%</div>
+        </div>
+
+        <!-- 音量 -->
+        <div class="bili-mobile-widget" id="volumeWidget" role="group" aria-label="音量调节" aria-hidden="true">
+            <div class="bili-icon" id="volumeIcon" aria-hidden="true">
+                <svg class="icon-volume" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4.8 6.6 8.6H3.4v6.8h3.2L11 19.2V4.8Z"/>
+                    <path d="M15.1 9.2a4.1 4.1 0 0 1 0 5.6"/>
+                    <path d="M18 6.5a7.9 7.9 0 0 1 0 11"/>
+                </svg>
+                <svg class="icon-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4.8 6.6 8.6H3.4v6.8h3.2L11 19.2V4.8Z"/>
+                    <path d="m15.5 9.5 5 5M20.5 9.5l-5 5"/>
+                </svg>
+            </div>
+            <div class="bili-slider-container" id="volumeContainer" style="--progress: 50%">
+                <div class="bili-slider-track">
+                    <div class="bili-slider-fill"></div>
+                    <div class="bili-slider-knob"></div>
+                </div>
+                <input type="range" id="volumeSlider" class="bili-slider" min="0" max="100" value="50" aria-label="音量">
+            </div>
+            <div class="bili-percentage" id="volumeText">50%</div>
+        </div>
+    </div>
+
+    <!-- 底部播放控制条 -->
+    <div class="bottom-bar">
+        <div class="progress-track"><div class="progress-fill"></div></div>
+        <div class="controls-row">
+            <span>12:34 / 45:00</span>
+            <span>全屏</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* ================= 通用 ================= */
+    let lastHapticAt = 0;
+    function hapticFeedback() {
+        const now = performance.now();
+        if (now - lastHapticAt < 55) return;
+        lastHapticAt = now;
+        if (navigator.vibrate) navigator.vibrate(4);
+    }
+
+    /* ================= OSD 属性与元素 ================= */
+    const brightnessWidget = document.getElementById('brightnessWidget');
+    const volumeWidget = document.getElementById('volumeWidget');
+    const brightnessSlider = document.getElementById('brightnessSlider');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const brightnessContainer = document.getElementById('brightnessContainer');
+    const volumeContainer = document.getElementById('volumeContainer');
+    const brightnessText = document.getElementById('brightnessText');
+    const volumeText = document.getElementById('volumeText');
+    const volumeIcon = document.getElementById('volumeIcon');
+
+    let hideTimer = null;
+
+    function setVisible(widget, visible) {
+        widget.classList.toggle('show', visible);
+        widget.setAttribute('aria-hidden', String(!visible));
+    }
+
+    function scheduleHide(widget, delay = 3000) {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => setVisible(widget, false), delay);
+    }
+
+    function showWidget(widget) {
+        clearTimeout(hideTimer);
+        [brightnessWidget, volumeWidget].forEach(w => {
+            if (w !== widget) setVisible(w, false);
+        });
+        setVisible(widget, true);
+        scheduleHide(widget);
+    }
+
+    /* 拖动期间暂停自动收起，松手后再计时 */
+    function bindAdjustState(widget, slider) {
+        const start = () => {
+            clearTimeout(hideTimer);
+            widget.classList.add('is-adjusting');
+        };
+        const end = () => {
+            if (!widget.classList.contains('is-adjusting')) return;
+            widget.classList.remove('is-adjusting');
+            if (widget.classList.contains('show')) scheduleHide(widget, 2200);
+        };
+
+        slider.addEventListener('pointerdown', start);
+        slider.addEventListener('focus', start);
+        slider.addEventListener('blur', end);
+        window.addEventListener('pointerup', end);
+        window.addEventListener('pointercancel', end);
+    }
+
+    /* ================= 亮度 ================= */
+    function bindSlider({ slider, container, text, icon, onChange }) {
+        const render = () => {
+            const value = Number(slider.value);
+            container.style.setProperty('--progress', value + '%');
+            text.textContent = value + '%';
+            slider.setAttribute('aria-valuetext', value + '%');
+            if (onChange) onChange(value);
+        };
+        slider.addEventListener('input', () => {
+            render();
+            hapticFeedback();
+        });
+        render();
+    }
+
+    bindSlider({
+        slider: brightnessSlider,
+        container: brightnessContainer,
+        text: brightnessText,
+    });
+    bindAdjustState(brightnessWidget, brightnessSlider);
+
+    /* ================= 音量 ================= */
+    bindSlider({
+        slider: volumeSlider,
+        container: volumeContainer,
+        text: volumeText,
+        onChange(value) {
+            volumeIcon.classList.toggle('is-muted', value === 0);
+        }
+    });
+    bindAdjustState(volumeWidget, volumeSlider);
+
+    /* ================= 点击左右唤出 ================= */
+    document.getElementById('clickLeft').addEventListener('click', () => {
+        showWidget(brightnessWidget);
+    });
+    document.getElementById('clickRight').addEventListener('click', () => {
+        showWidget(volumeWidget);
+    });
+
+    // 拖动时不要触发左右点击区逻辑
+    [brightnessContainer, volumeContainer].forEach(container => {
+        ['click', 'touchstart'].forEach(type => {
+            container.addEventListener(type, e => e.stopPropagation(), { passive: true });
+        });
+    });
+
+    /* ================= 首次进入 / 设计预览 ================= */
+    const previewMode = new URLSearchParams(location.search).get('preview');
+    if (previewMode === 'both') {
+        // ?preview=both：并排展示两条 OSD，方便设计走查与截图
+        document.querySelector('.toast-container').classList.add('preview-both');
+        [brightnessWidget, volumeWidget].forEach(widget => setVisible(widget, true));
+        clearTimeout(hideTimer);
+    } else {
+        // 模拟进入视频时自动浮出亮度条
+        requestAnimationFrame(() => showWidget(brightnessWidget));
+    }
+
+    /* ================= 弹幕氛围 ================= */
+    const danmakuLayer = document.getElementById('danmakuLayer');
+    const texts = ["前方高能！", "画质真不错", "打卡", "这风景绝了", "B站无处不在", "空降成功", "粉色的进度条爱了"];
+
+    function createDanmaku() {
+        const el = document.createElement('div');
+        el.className = 'danmaku';
+        el.textContent = texts[Math.floor(Math.random() * texts.length)];
+        el.style.top = `${Math.random() * 50 + 10}%`;
+        el.style.animationDuration = `${Math.random() * 4 + 6}s`;
+        danmakuLayer.appendChild(el);
+        setTimeout(() => el.remove(), 10000);
+    }
+
+    if (previewMode !== 'both') {
+        setInterval(createDanmaku, 1500);
+    }
+</script>
+
+</body>
+</html>

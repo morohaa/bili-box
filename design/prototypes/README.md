@@ -11,5 +11,10 @@ local assets, so each page renders standalone (open it in a browser as-is).
 | `bili_profile_redesign.html` | Profile tab, profile card redesign |
 | `bili_profile_official.html` | Profile tab, official-style rebuild |
 | `bili_dynamic_search.html` | Dynamic tab: search landing, typing state and results |
+| `bili_player_osd.html` | Player OSD: brightness and volume bar redesign |
 
-`*_preview.png` are full-page screenshots of the two profile variants.
+`*_preview.png` are full-page screenshots of the profile variants and the player
+OSD. `bili_player_osd_detail.png` is a close-up of the two OSD bars.
+
+Append `?preview=both` to `bili_player_osd.html` to show both OSD bars at once
+for design review.
