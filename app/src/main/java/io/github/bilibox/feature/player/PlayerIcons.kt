@@ -47,11 +47,12 @@ internal fun PlaybackIcon(playing: Boolean, modifier: Modifier = Modifier.size(2
 
 @Composable
 internal fun TelevisionSeekThumb() {
+    val accent = OnlinePink
     Canvas(Modifier.size(width = 18.dp, height = 16.dp)) {
         val u = size.width / 24f
         val stroke = Stroke(1.8f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        drawLine(OnlinePink, Offset(7.5f * u, 1.5f * u), Offset(10.5f * u, 4.5f * u), 2f * u, StrokeCap.Round)
-        drawLine(OnlinePink, Offset(16.5f * u, 1.5f * u), Offset(13.5f * u, 4.5f * u), 2f * u, StrokeCap.Round)
+        drawLine(accent, Offset(7.5f * u, 1.5f * u), Offset(10.5f * u, 4.5f * u), 2f * u, StrokeCap.Round)
+        drawLine(accent, Offset(16.5f * u, 1.5f * u), Offset(13.5f * u, 4.5f * u), 2f * u, StrokeCap.Round)
         drawRoundRect(
             Color.White,
             Offset(2.5f * u, 4f * u),
@@ -59,7 +60,7 @@ internal fun TelevisionSeekThumb() {
             androidx.compose.ui.geometry.CornerRadius(4.5f * u)
         )
         drawRoundRect(
-            OnlinePink,
+            accent,
             Offset(2.5f * u, 4f * u),
             androidx.compose.ui.geometry.Size(19f * u, 14f * u),
             androidx.compose.ui.geometry.CornerRadius(4.5f * u),

@@ -19,7 +19,9 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import io.github.bilibox.core.ui.component.LiquidNavigation
+import io.github.bilibox.core.ui.theme.AppearanceSettings
 import io.github.bilibox.core.ui.theme.BrandSpringEasing
+import io.github.bilibox.feature.appearance.AppearanceScreen
 import io.github.bilibox.feature.home.HomeScreen
 import io.github.bilibox.feature.library.LibraryScreen
 import io.github.bilibox.feature.online.OnlineVideoScreen
@@ -30,7 +32,23 @@ internal enum class AppTab { HOME, LIBRARY, PROFILE }
 
 /** 组合功能页面与播放覆盖层；跨功能导航仅在应用组装层处理。 */
 @Composable
-internal fun AppNavigation(appState: BiliBoxAppState, darkMode: Boolean, onToggleDarkMode: () -> Unit) {
+internal fun AppNavigation(
+    appState: BiliBoxAppState,
+    darkMode: Boolean,
+    appearance: AppearanceSettings,
+    onAppearanceChange: (AppearanceSettings) -> Unit,
+    onToggleDarkMode: () -> Unit,
+) {
+    if (appState.appearanceOpen) {
+        AppearanceScreen(
+            appearance = appearance,
+            darkMode = darkMode,
+            onBack = appState::closeAppearance,
+            onChange = onAppearanceChange,
+        )
+        return
+    }
+
     appState.selectedVideo?.let { video ->
         OnlineVideoScreen(
             video = video,
@@ -74,6 +92,7 @@ internal fun AppNavigation(appState: BiliBoxAppState, darkMode: Boolean, onToggl
                     session = appState.session,
                     darkMode = darkMode,
                     onToggleDarkMode = onToggleDarkMode,
+                    onOpenThemeAppearance = appState::openAppearance,
                     onOpenLibrary = appState::openLibrary,
                     onSessionChange = appState::updateSession,
                     scrollState = appState.profileScroll,
@@ -98,6 +117,7 @@ internal fun AppNavigation(appState: BiliBoxAppState, darkMode: Boolean, onToggl
                     onExpandedChange = { appState.homeExpanded = it },
                     scrollState = appState.homeScroll,
                     darkMode = darkMode,
+                    backgroundStyle = appearance.background,
                 )
             }
         }

@@ -36,11 +36,19 @@ data         → core
 
 | 状态 | 归属 | 生命周期 / 恢复方式 |
 |---|---|---|
-| 会话、顶层导航、搜索选项、选中的视频 | `app/BiliBoxAppState` | 组合各功能；会话从加密存储加载。Saver 只恢复标签索引、搜索词、排序 / 时长 / 时间筛选、列表布局和首页展开状态 |
+| 会话、顶层导航、搜索选项、选中的视频 | `app/BiliBoxAppState` | 组合各功能；会话从加密存储加载。Saver 只恢复标签索引、搜索词、排序 / 时长 / 时间筛选、列表布局、首页展开状态与「主题外观」是否打开 |
 | 搜索结果、加载 / 失败、请求取消 | `feature/search/SearchStateHolder` | 由应用组装层持有；会话 Cookie 改变时重建，结果不经 Saver 恢复 |
 | 在线分 P、清晰度、加载、弹幕；本地队列与播放状态 | 对应 `feature/online`、`feature/player` 入口 | 跟随播放会话；选中的播放对象、本地播放列表和视频库临时筛选不经应用 Saver 恢复 |
 | 手势、抽屉、弹层等局部 UI 状态 | 最近的页面或组件 | 按需使用 `remember` / `rememberSaveable`，无需提升到应用层 |
-| Cookie、历史、播放进度、弹幕偏好 | 对应 `data/*` 存储 | 按存储实现持久化；主题偏好目前由 `BiliBoxApp` 直接读写 `appearance` SharedPreferences |
+| Cookie、历史、播放进度、弹幕偏好、主题外观 | 对应 `data/*` 存储 | 按存储实现持久化；主题外观由 `BiliBoxApp` 通过 `data/appearance/AppearanceStore` 读写 `appearance` SharedPreferences |
+
+## 主题外观
+
+- `core/ui/theme/Appearance.kt` 保存明暗模式、首页背景与 12 套主题色板；`AppearanceBackdrop` 提供首页可复用的背景光晕。
+- `data/appearance/AppearanceStore` 负责 `appearance` SharedPreferences 的读写与旧版 `dark_mode` 迁移。
+- `BiliBoxApp` 解析「浅色 / 深色 / 自动」得到实际明暗，创建带强调色的 `BiliBoxTheme`，并通过 `LocalAccentColor` 下发给首页、底部导航与个人页头图。
+- `feature/appearance` 只负责页面和交互，选中的主题、模式与背景通过回调交给应用组装层持久化；页面不直接读写 SharedPreferences，也不依赖 `app`。
+- 「立即应用」不改变已经即时生效的预览，只做一次确认提示；退出页面不会回滚已保存的设置。
 
 共享模型放在 `core/model`，不夹带接口客户端或页面状态。UI 文案与图标由 UI 层映射，接口参数和响应转换放在数据层。
 

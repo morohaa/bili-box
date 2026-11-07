@@ -57,10 +57,11 @@ internal fun MiniPlaybackProgress(
     } else {
         0f
     }
+    val accent = OnlinePink
     Canvas(modifier.height(2.dp)) {
         if (fraction <= 0f) return@Canvas
         drawLine(
-            color = OnlinePink,
+            color = accent,
             start = Offset(0f, center.y),
             end = Offset(size.width * fraction, center.y),
             strokeWidth = size.height,

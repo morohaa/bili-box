@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppTopBar
+import io.github.bilibox.core.ui.theme.LocalAccentColor
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoLayout
 import io.github.bilibox.data.localvideo.LocalVideoPlayback
@@ -54,7 +56,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 internal val LibraryBg = Color(0xFFF4F6FA)
-internal val LibrarySoftPink = Color(0xFFFFF1F5)
+
+/** 选中态浅底，跟随主题强调色。 */
+internal val LibrarySoftPink: Color
+    @Composable @ReadOnlyComposable
+    get() = LocalAccentColor.current.copy(alpha = .10f)
 internal val LibrarySecondary = Color(0xFF61666D)
 internal val LibraryLine = Color(0xFFE9EDF2)
 internal val LibraryCard = Color(0xFFFFFFFF)

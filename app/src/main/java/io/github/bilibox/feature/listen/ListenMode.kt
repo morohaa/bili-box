@@ -343,11 +343,12 @@ internal fun ListenVisualizer(playing: Boolean, modifier: Modifier = Modifier, b
             if (!playing && !moving) break
         }
     }
+    val accent = OnlinePink
     Canvas(modifier) {
         // Reading the frame counter makes the canvas redraw on every animation frame.
         if (frame < 0L) return@Canvas
         val w = size.width / bars
-        val brush = Brush.verticalGradient(listOf(OnlinePink, Color.White.copy(alpha = .92f), OnlinePink))
+        val brush = Brush.verticalGradient(listOf(accent, Color.White.copy(alpha = .92f), accent))
         for (k in 0 until bars) {
             val h = max(size.height * .08f, levels[k] * size.height)
             val bw = w * .56f
@@ -501,6 +502,7 @@ internal fun ListenScreen(
 
             Spacer(Modifier.height(6.dp))
             val sliderMax = durationMs.coerceAtLeast(1L).toFloat()
+            val accent = OnlinePink
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
                 Slider(
                     value = (if (scrubbing) scrubValue else positionMs.toFloat()).coerceIn(0f, sliderMax),
@@ -531,7 +533,7 @@ internal fun ListenScreen(
                             )
                             if (played > 0f) {
                                 drawLine(
-                                    OnlinePink,
+                                    accent,
                                     Offset(0f, y),
                                     Offset(size.width * played, y),
                                     size.height,

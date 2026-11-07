@@ -1,29 +1,45 @@
 package io.github.bilibox.app
 
 import android.app.Activity
-import android.content.Context
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import io.github.bilibox.core.ui.theme.AppearanceMode
+import io.github.bilibox.core.ui.theme.AppearanceSettings
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
+import io.github.bilibox.core.ui.theme.resolveDark
+import io.github.bilibox.data.appearance.AppearanceStore
 
 /** 应用根布局：组合主题、系统栏外观与页面导航。 */
 @Composable
 internal fun BiliBoxApp() {
     val context = LocalContext.current
-    val preferences = remember(context) { context.getSharedPreferences("appearance", Context.MODE_PRIVATE) }
-    var darkMode by remember(preferences) { mutableStateOf(preferences.getBoolean("dark_mode", false)) }
+    val store = remember(context) { AppearanceStore(context) }
+    var appearance by remember(store) { mutableStateOf(store.load()) }
+    val systemDark = isSystemInDarkTheme()
+    val darkMode = appearance.mode.resolveDark(systemDark)
     val appState = rememberBiliBoxAppState()
 
-    BiliBoxTheme(darkTheme = darkMode, dynamicColor = false) {
+    fun updateAppearance(value: AppearanceSettings) {
+        appearance = value
+        store.save(value)
+    }
+
+    BiliBoxTheme(darkTheme = darkMode, accent = appearance.theme.base, dynamicColor = false) {
         AppSystemBars(appState, darkMode)
         AppNavigation(
             appState = appState,
             darkMode = darkMode,
+            appearance = appearance,
+            onAppearanceChange = ::updateAppearance,
             onToggleDarkMode = {
-                darkMode = !darkMode
-                preferences.edit().putBoolean("dark_mode", darkMode).apply()
+                updateAppearance(
+                    appearance.copy(
+                        mode = if (darkMode) AppearanceMode.LIGHT else AppearanceMode.DARK,
+                    )
+                )
             },
         )
     }
@@ -41,10 +57,16 @@ private fun AppSystemBars(appState: BiliBoxAppState, darkMode: Boolean) {
     }
     // 在组合中读取，越过阈值时才会重组，SideEffect 才能重新应用系统栏外观。
     val pastBanner = pastBannerState.value
+    // 外观页盖在「我的」页之上，必须单独读一次，否则 SideEffect 不会因它关闭而重跑。
+    val appearanceOpen = appState.appearanceOpen
     SideEffect {
         val window = (view.context as? Activity)?.window ?: return@SideEffect
         WindowCompat.getInsetsController(window, view).apply {
-            isAppearanceLightStatusBars = !darkMode && (appState.selectedTab != AppTab.PROFILE || pastBanner)
+            isAppearanceLightStatusBars = !darkMode && (
+                appearanceOpen ||
+                    appState.selectedTab != AppTab.PROFILE ||
+                    pastBanner
+                )
             isAppearanceLightNavigationBars = !darkMode
         }
     }

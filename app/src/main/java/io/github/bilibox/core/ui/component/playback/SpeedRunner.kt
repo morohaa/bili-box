@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
-import io.github.bilibox.core.ui.theme.OnlinePink
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -28,6 +27,7 @@ internal fun DrawScope.drawSpeedRunner(
     speed: Float,
     phase: Float,
     blink: Float,
+    pink: Color,
 ) {
     val motion = speed
     val gait = (motion * 2f).coerceIn(0f, 1f)
@@ -164,7 +164,7 @@ internal fun DrawScope.drawSpeedRunner(
         }
 
         drawRoundRect(
-            color = OnlinePink,
+            color = pink,
             topLeft = Offset(x(18f), y(26f)),
             size = Size(64f * unit, 50f * unit),
             cornerRadius = CornerRadius(16f * unit)
@@ -178,12 +178,12 @@ internal fun DrawScope.drawSpeedRunner(
 
         // Blush.
         drawOval(
-            color = OnlinePink.copy(alpha = .35f),
+            color = pink.copy(alpha = .35f),
             topLeft = Offset(x(32.5f) - 3.6f * unit, y(57f) - 2.2f * unit),
             size = Size(7.2f * unit, 4.4f * unit)
         )
         drawOval(
-            color = OnlinePink.copy(alpha = .35f),
+            color = pink.copy(alpha = .35f),
             topLeft = Offset(x(67.5f) - 3.6f * unit, y(57f) - 2.2f * unit),
             size = Size(7.2f * unit, 4.4f * unit)
         )

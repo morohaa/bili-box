@@ -33,6 +33,7 @@ class BiliBoxAppStateTest {
         state.runSearch(order = SearchOrder.NEWEST)
         state.searchGrid = true
         state.homeExpanded = true
+        state.openAppearance()
         state.dispose()
 
         val restored = restore(state)
@@ -44,6 +45,7 @@ class BiliBoxAppStateTest {
         assertEquals(SearchTimeRange.LAST_MONTH, restored.searchTimeRange)
         assertTrue(restored.searchGrid)
         assertTrue(restored.homeExpanded)
+        assertTrue(restored.appearanceOpen)
         assertEquals(SearchUiState.Idle, restored.searchState)
     }
 
@@ -72,6 +74,7 @@ class BiliBoxAppStateTest {
         assertNull(restored.searchTimeRange)
         assertFalse(restored.searchGrid)
         assertFalse(restored.homeExpanded)
+        assertFalse(restored.appearanceOpen)
     }
 
     @Test

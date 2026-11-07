@@ -103,7 +103,6 @@ private val SettingsSecondary = Color(0xFF5F6266)
 private val SettingsMuted = Color(0xFF9499A0)
 private val SettingsIdleTrack = Color(0xFFE1E4E6)
 private val SettingsGrabber = Color(0xFFC8CBD0)
-private val SettingsPink = OnlinePink
 private val SettingsGlyphTint = Color(0xFF111315)
 
 @Composable
@@ -494,7 +493,7 @@ private fun LoopSettingRow(
                         PlayerLoopMode.LIST_LOOP -> "列表循环"
                         PlayerLoopMode.NONE -> "不循环"
                     },
-                    color = if (active) SettingsPink else Color(0xFF73777B),
+                    color = if (active) OnlinePink else Color(0xFF73777B),
                     fontSize = 11.5.sp,
                     fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
                     maxLines = 1,
@@ -581,7 +580,7 @@ private fun SettingsSwitch(checked: Boolean) {
     Box(
         Modifier.width(44.dp).height(24.dp)
             .clip(CircleShape)
-            .background(if (checked) SettingsPink else SettingsIdleTrack)
+            .background(if (checked) OnlinePink else SettingsIdleTrack)
             .clearAndSetSemantics { },
     ) {
         Box(
@@ -648,7 +647,7 @@ internal fun PlayerQualitySheet(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 option.label,
-                                color = if (active) SettingsPink else SettingsInk,
+                                color = if (active) OnlinePink else SettingsInk,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                             )
@@ -656,12 +655,12 @@ internal fun PlayerQualitySheet(
                                 Spacer(Modifier.width(6.dp))
                                 Box(
                                     Modifier.clip(RoundedCornerShape(4.dp))
-                                        .background(SettingsPink.copy(alpha = .16f))
+                                        .background(OnlinePink.copy(alpha = .16f))
                                         .padding(horizontal = 5.dp, vertical = 1.dp)
                                 ) {
                                     Text(
                                         badge,
-                                        color = SettingsPink,
+                                        color = OnlinePink,
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.SemiBold,
                                     )
@@ -679,7 +678,7 @@ internal fun PlayerQualitySheet(
                     }
                     if (active) {
                         Box(
-                            Modifier.size(18.dp).clip(CircleShape).background(SettingsPink),
+                            Modifier.size(18.dp).clip(CircleShape).background(OnlinePink),
                             contentAlignment = Alignment.Center,
                         ) {
                             AppGlyphIcon(AppIcon.CHECK, Color.White, Modifier.size(11.dp), 2.6f)

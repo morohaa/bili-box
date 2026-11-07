@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.theme.LocalAccentColor
 import io.github.bilibox.data.auth.BiliSession
 
 // 头图高度跟屏宽成比例：各机型裁切和观感一致，不再把系统状态栏高度加进高度。
@@ -133,11 +135,12 @@ internal fun ProfileHeader(
 internal fun Banner(avatar: ImageBitmap?, darkMode: Boolean, modifier: Modifier = Modifier) {
     val blurPx = with(LocalDensity.current) { 26.dp.toPx() }
     val canBlur = Build.VERSION.SDK_INT >= 31
+    val accent = LocalAccentColor.current
     // BlurEffect 会把图层向外扩散，必须裁掉，否则头图会糊到信息区里。
     Box(modifier.clipToBounds()) {
         Box(
             Modifier.matchParentSize().background(
-                Brush.linearGradient(listOf(Color(0xFFF87CA1), Color(0xFFB0335D)))
+                Brush.linearGradient(listOf(lerp(accent, Color.White, .12f), lerp(accent, Color.Black, .32f)))
             )
         )
         if (avatar != null) {
@@ -150,8 +153,8 @@ internal fun Banner(avatar: ImageBitmap?, darkMode: Boolean, modifier: Modifier 
                     if (canBlur) renderEffect = BlurEffect(blurPx, blurPx, TileMode.Clamp)
                 },
             )
-            // 统一成品牌粉调，避免头像放大后喧宾夺主。
-            Box(Modifier.matchParentSize().background(Color(0x33F1739B)))
+            // 统一成主题强调色，避免头像放大后喧宾夺主。
+            Box(Modifier.matchParentSize().background(accent.copy(alpha = .2f)))
         }
         // 状态栏图标是白色，顶部压一层深色保证可读。
         Box(
@@ -185,7 +188,7 @@ internal fun ProfileAvatar(
         } else {
             Text(
                 text = session?.username?.take(1) ?: "B",
-                color = MyPink,
+                color = LocalAccentColor.current,
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
             )

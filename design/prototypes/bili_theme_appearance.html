@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>主题外观 · 可交互版</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+
+body{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:22px;
+  padding:44px 20px;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue","Microsoft YaHei",sans-serif;
+  background:#EDEFF3;
+  background-image:
+    radial-gradient(820px 520px at 18% 0%, #FFE7EF 0%, transparent 62%),
+    radial-gradient(760px 480px at 92% 100%, #E3F4FB 0%, transparent 60%);
+  -webkit-font-smoothing:antialiased;
+}
+
+.stage-title{
+  font-size:13px;letter-spacing:.4px;color:#8A8F98;
+  display:flex;align-items:center;gap:9px;
+}
+.stage-title b{
+  font-weight:800;color:#F25D8E;background:#fff;
+  border:1px solid rgba(251,114,153,.25);
+  padding:4px 11px;border-radius:999px;
+  box-shadow:0 4px 14px -6px rgba(251,114,153,.6);
+}
+
+/* ==================== 手机外壳 ==================== */
+.device{
+  width:380px;height:800px;
+  margin:auto 0;
+  border-radius:46px;
+  background:#000;
+  border:10px solid #16171a;
+  box-shadow:
+    0 36px 64px -24px rgba(20,22,30,.5),
+    0 0 0 1px rgba(0,0,0,.06),
+    inset 0 0 0 1px #2a2c31;
+  overflow:hidden;
+  position:relative;
+  isolation:isolate;
+
+  /* ---------- 主题变量 ---------- */
+  --brand:#FB7299;
+  --brand-d:#F25D8E;
+  --brand-l:#FF9DB8;
+  --brand-soft:rgba(251,114,153,.14);
+  --brand-glow:rgba(251,114,153,.45);
+
+  --ink:#18191C;
+  --ink2:#61666D;
+  --ink3:#9499A0;
+  --line:#F1F2F4;
+  --bg:#F6F7F8;
+  --card:#FFFFFF;
+  --card-border:rgba(24,25,28,.04);
+  --card-shadow:0 4px 18px -8px rgba(24,25,28,.16);
+  --bg-img:none;
+  --fs-scale:1;
+
+  color:var(--ink);
+}
+.device.dark{
+  --ink:#EDEEF0;
+  --ink2:#A9AEB6;
+  --ink3:#7C828B;
+  --line:#25272D;
+  --bg:#121317;
+  --card:#1C1E24;
+  --card-border:rgba(255,255,255,.06);
+  --card-shadow:0 4px 18px -8px rgba(0,0,0,.7);
+}
+
+/* ==================== 屏幕 ==================== */
+.screen{
+  width:100%;height:100%;
+  overflow-y:auto;overflow-x:hidden;
+  position:relative;
+  background-color:var(--bg);
+  background-image:var(--bg-img);
+  scrollbar-width:none;
+  transition:background-color .35s ease;
+}
+.screen::-webkit-scrollbar{display:none;}
+
+/* 状态栏 */
+.sbar{
+  height:46px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;font-size:13px;font-weight:700;color:var(--ink);
+  transition:color .3s;
+}
+.sbar .sys{display:flex;align-items:center;gap:7px;}
+.sbar .dots{display:flex;gap:2.5px;}
+.sbar .dots i{width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.75;}
+.sbar .bat{width:19px;height:9.5px;border:1.3px solid currentColor;border-radius:3px;position:relative;opacity:.85;}
+.sbar .bat::before{content:"";position:absolute;left:1.5px;top:1.5px;bottom:1.5px;width:9px;background:currentColor;border-radius:1px;}
+.sbar .bat::after{content:"";position:absolute;right:-3.5px;top:2.5px;width:2px;height:4px;background:currentColor;border-radius:0 1px 1px 0;opacity:.8;}
+
+/* 导航 */
+.nav{display:flex;align-items:center;height:48px;padding:0 18px;gap:14px;color:var(--ink);transition:color .3s;}
+.nav .back{display:grid;place-items:center;width:20px;cursor:pointer;}
+.nav .title{font-size:17px;font-weight:700;flex:1;}
+.nav .more{color:var(--ink2);cursor:pointer;}
+.chev-l{display:inline-block;width:9px;height:9px;border-left:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);border-radius:1.5px;}
+.dots-h{display:flex;gap:3px;align-items:center;}
+.dots-h i{width:3.5px;height:3.5px;border-radius:50%;background:currentColor;}
+
+/* ==================== 大图预览 ==================== */
+.b-hero{
+  height:244px;position:relative;overflow:hidden;
+  display:grid;place-items:center;
+  background:var(--hero-grad);
+  margin-bottom:4px;
+  transition:background .45s ease;
+}
+.b-hero .blob{position:absolute;border-radius:50%;transition:background .45s ease;}
+.b-hero .blob1{width:240px;height:240px;background:var(--blob1);left:-90px;top:-100px;}
+.b-hero .blob2{width:200px;height:200px;background:var(--blob2);right:-70px;bottom:-90px;}
+
+.b-hero .tv-wrap{
+  position:relative;z-index:2;color:var(--brand);
+  filter:drop-shadow(0 14px 26px var(--brand-glow));
+  transition:color .35s, filter .35s, transform .35s;
+}
+.tv{display:block;}
+.tv-lg{width:85px;height:85px;}
+
+.b-hero .cap{position:absolute;left:20px;bottom:24px;z-index:2;}
+.b-hero .cap h3{
+  margin:0;font-size:19px;font-weight:800;letter-spacing:-.3px;
+  color:var(--ink);transition:color .3s;
+}
+
+/* ==================== 主题网格 ==================== */
+.b-grid{
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap: 20px 8px;
+  margin: 14px 16px 0;
+  padding: 20px 12px;
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--card-border);
+  transition: background .3s, border-color .3s, box-shadow .3s;
+}
+
+.b-item{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.b-item .c{
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  transition: box-shadow .22s, transform .18s;
+}
+.b-item:active .c{
+  transform: scale(.9);
+}
+.b-item.on .c{
+  box-shadow: 0 0 0 2.5px var(--brand), 0 0 0 6px var(--brand-soft);
+}
+.b-item .t{
+  font-size: 11px;
+  color: var(--ink3);
+  margin-top: 10px;
+  transition: color .2s;
+  white-space: nowrap;
+}
+.b-item.on .t{
+  color: var(--brand);
+  font-weight: 700;
+}
+
+/* ==================== 设置列表 ==================== */
+.b-list{
+  margin:14px 16px 0;
+  background:var(--card);
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:var(--card-shadow);
+  border:1px solid var(--card-border);
+  transition:background .3s, border-color .3s, box-shadow .3s;
+}
+.b-row{
+  display:flex;align-items:center;gap:12px;
+  padding:15px 16px;
+  font-size:calc(14px * var(--fs-scale));
+  color:var(--ink);
+  transition:color .3s, font-size .2s, background .15s;
+}
+.b-row[data-sheet]{cursor:pointer;}
+.b-row[data-sheet]:active{background:var(--brand-soft);}
+.b-row + .b-row{border-top:1px solid var(--line);}
+.b-row .lb{flex:1;}
+
+.b-row .val{
+  color:var(--ink3);font-size:12.5px;
+  display:flex;align-items:center;gap:9px;
+  transition:color .3s;
+}
+.arrow-r{
+  width:7px;height:7px;
+  border-top:1.7px solid currentColor;
+  border-right:1.7px solid currentColor;
+  transform:rotate(45deg);
+  border-radius:1px;
+  opacity:.85;
+}
+
+/* 分段控制器 (浅色/深色/自动) */
+.segmented-control{
+  display:flex;
+  background:var(--line);
+  border-radius:8px;
+  padding:3px;
+  gap:2px;
+  transition:background 0.3s;
+}
+.seg-item{
+  padding:4px 10px;
+  font-size:12px;
+  color:var(--ink3);
+  border-radius:6px;
+  cursor:pointer;
+  transition:all 0.2s;
+  font-weight:500;
+}
+.seg-item.on{
+  background:var(--card);
+  color:var(--ink);
+  box-shadow:0 1px 3px rgba(0,0,0,0.1);
+  font-weight:700;
+}
+.device.dark .seg-item.on{
+  background:#3A3D44;
+  color:#fff;
+}
+
+/* 底部留白 */
+.b-pad{height:126px;}
+
+/* ==================== 底部固定按钮 ==================== */
+.b-fixed{
+  position:absolute;left:0;right:0;bottom:0;z-index:5;
+  padding:16px 16px 26px;
+  background:linear-gradient(to top, var(--bg) 56%, transparent);
+  transition:background .35s;
+  pointer-events:none;
+}
+.btn-main{
+  pointer-events:auto;
+  width:100%;height:48px;border:none;border-radius:999px;
+  font-family:inherit;
+  background:linear-gradient(96deg, var(--brand), var(--brand-l));
+  color:#fff;font-size:15px;font-weight:700;letter-spacing:.3px;
+  cursor:pointer;
+  box-shadow:0 12px 26px -10px var(--brand-glow);
+  transition:transform .14s, box-shadow .14s, background .35s;
+}
+.btn-main:active{transform:scale(.98);box-shadow:0 6px 16px -8px var(--brand-glow);}
+
+/* ==================== 遮罩 & 底部弹层 ==================== */
+.mask{
+  position:absolute;inset:0;z-index:20;
+  background:rgba(0,0,0,.36);
+  opacity:0;pointer-events:none;
+  transition:opacity .26s;
+  backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);
+}
+.mask.show{opacity:1;pointer-events:auto;}
+
+.sheet{
+  position:absolute;left:0;right:0;bottom:0;z-index:21;
+  background:var(--card);
+  border-radius:24px 24px 0 0;
+  transform:translateY(110%);
+  transition:transform .34s cubic-bezier(.32,.72,0,1), background .3s;
+  padding:6px 0 26px;
+  box-shadow:0 -12px 40px -18px rgba(0,0,0,.5);
+}
+.sheet.show{transform:translateY(0);}
+.sheet-bar{width:38px;height:4px;border-radius:99px;background:var(--line);margin:6px auto 2px;}
+.sheet-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 22px 8px;
+  font-size:15px;font-weight:700;color:var(--ink);
+}
+.sheet-done{font-size:13px;font-weight:600;color:var(--brand);cursor:pointer;}
+.sheet-opt{
+  display:flex;align-items:center;gap:12px;
+  padding:15px 22px;
+  font-size:15px;color:var(--ink);
+  cursor:pointer;
+  transition:background .15s;
+}
+.sheet-opt:active{background:var(--brand-soft);}
+.sheet-opt + .sheet-opt{border-top:1px solid var(--line);}
+.sheet-opt .tick{
+  width:19px;height:19px;margin-left:auto;color:var(--brand);
+  opacity:0;transform:scale(.55);
+  transition:opacity .2s, transform .2s cubic-bezier(.34,1.5,.64,1);
+}
+.sheet-opt.on{font-weight:700;}
+.sheet-opt.on .tick{opacity:1;transform:scale(1);}
+
+/* Toast */
+.toast{
+  position:absolute;left:50%;bottom:112px;z-index:30;
+  transform:translate(-50%,12px);
+  background:rgba(24,25,28,.9);
+  color:#fff;font-size:13px;font-weight:600;
+  padding:10px 18px;border-radius:999px;
+  opacity:0;pointer-events:none;
+  transition:opacity .26s, transform .26s;
+  white-space:nowrap;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.toast.show{opacity:1;transform:translate(-50%,0);}
+</style>
+</head>
+<body>
+
+<div class="stage-title">方案 B · 深色沉浸 <b>可交互版</b></div>
+
+<div class="device" id="device">
+  <div class="screen" id="screen">
+
+    <!-- 状态栏 -->
+    <div class="sbar">
+      <span>9:41</span>
+      <span class="sys">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="bat"></span>
+      </span>
+    </div>
+
+    <!-- 导航 -->
+    <div class="nav">
+      <span class="back"><span class="chev-l"></span></span>
+      <span class="title">主题外观</span>
+      <span class="more"><span class="dots-h"><i></i><i></i><i></i></span></span>
+    </div>
+
+    <!-- 大图预览 -->
+    <div class="b-hero">
+      <span class="blob blob1"></span>
+      <span class="blob blob2"></span>
+
+      <div class="tv-wrap">
+        <svg class="tv tv-lg" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M4.977 3.561a1.31 1.31 0 111.818-1.884l2.828 2.728c.08.078.149.163.205.254h4.277a1.32 1.32 0 01.205-.254l2.828-2.728a1.31 1.31 0 011.818 1.884L17.82 4.66h.848A5.333 5.333 0 0124 9.992v7.34a5.333 5.333 0 01-5.333 5.334H5.333A5.333 5.333 0 010 17.333V9.992a5.333 5.333 0 015.333-5.333h.781L4.977 3.56zm.356 3.67a2.667 2.667 0 00-2.666 2.667v7.529a2.667 2.667 0 002.666 2.666h13.334a2.667 2.667 0 002.666-2.666v-7.53a2.667 2.667 0 00-2.666-2.666H5.333zm1.334 5.192a1.333 1.333 0 112.666 0v1.192a1.333 1.333 0 11-2.666 0v-1.192zM16 11.09c-.736 0-1.333.597-1.333 1.333v1.192a1.333 1.333 0 102.666 0v-1.192c0-.736-.597-1.333-1.333-1.333z"/>
+        </svg>
+      </div>
+
+      <div class="cap">
+        <h3 id="heroTitle">粉电视 · 经典</h3>
+      </div>
+    </div>
+
+    <!-- 12个主题网格布局 -->
+    <div class="b-grid" id="themes"></div>
+
+    <!-- 设置列表 -->
+    <div class="b-list">
+      <!-- 外观模式 -->
+      <div class="b-row">
+        <span class="lb">外观模式</span>
+        <div class="segmented-control" id="appearanceSeg">
+          <span class="seg-item on" data-mode="light">浅色</span>
+          <span class="seg-item" data-mode="dark">深色</span>
+          <span class="seg-item" data-mode="auto">自动</span>
+        </div>
+      </div>
+
+      <!-- 首页背景（删除了右侧文字） -->
+      <div class="b-row" data-sheet="bg">
+        <span class="lb">首页背景</span>
+        <span class="val"><span class="arrow-r"></span></span>
+      </div>
+    </div>
+
+    <div class="b-pad"></div>
+  </div>
+
+  <!-- 底部固定按钮 -->
+  <div class="b-fixed">
+    <button class="btn-main" id="applyBtn">立即应用</button>
+  </div>
+
+  <!-- 底部弹层 -->
+  <div class="mask" id="mask"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-bar"></div>
+    <div class="sheet-head">
+      <span id="sheetTitle">背景</span>
+      <span class="sheet-done" id="sheetDone">完成</span>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var device     = document.getElementById('device');
+  var screenEl   = document.getElementById('screen');
+  var themesEl   = document.getElementById('themes');
+  var heroTitle  = document.getElementById('heroTitle');
+  var mask       = document.getElementById('mask');
+  var sheet      = document.getElementById('sheet');
+  var sheetBody  = document.getElementById('sheetBody');
+  var sheetTitle = document.getElementById('sheetTitle');
+  var sheetDone  = document.getElementById('sheetDone');
+  var toastEl    = document.getElementById('toast');
+
+  /* ================= 颜色工具 ================= */
+  function hex2rgb(h){
+    h = h.replace('#','');
+    if(h.length === 3) h = h.split('').map(function(c){ return c+c; }).join('');
+    return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+  }
+  function rgb2hex(r,g,b){
+    return '#' + [r,g,b].map(function(v){
+      v = Math.max(0, Math.min(255, Math.round(v)));
+      return v.toString(16).padStart(2,'0');
+    }).join('');
+  }
+  function mix(a, b, t){
+    var A = hex2rgb(a), B = hex2rgb(b);
+    return rgb2hex(A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t, A[2]+(B[2]-A[2])*t);
+  }
+  function alpha(hex, a){
+    var c = hex2rgb(hex);
+    return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+  }
+
+  /* ================= 数据：排布调整 ================= */
+  var THEMES = [
+    // 第一行：红/粉/橙系
+    { id:'rose',   label:'玫瑰红', name:'玫瑰红 · 热烈', base:'#F43F5E', c1:'#FB7185', c2:'#FDA4AF' },
+    { id:'pink',   label:'粉电视', name:'粉电视 · 经典', base:'#FB7299', c1:'#FB7299', c2:'#FFA7C0' },
+    { id:'sakura', label:'樱花粉', name:'樱花粉 · 浪漫', base:'#FF85A2', c1:'#FF9CB6', c2:'#FFD1DC' },
+    { id:'orange', label:'落日橙', name:'落日橙 · 暖阳', base:'#FF8A3D', c1:'#FF8A3D', c2:'#FFC46B' },
+
+    // 第二行：深海蓝、星空蓝、青空蓝（由深到浅） + 极光紫（颜色减淡）
+    { id:'deep',   label:'深海蓝', name:'深海蓝 · 深邃', base:'#1E40AF', c1:'#2563EB', c2:'#60A5FA' },
+    { id:'blue',   label:'星空蓝', name:'星空蓝 · 静谧', base:'#0284C7', c1:'#0EA5E9', c2:'#7DD3FC' },
+    { id:'sky',    label:'青空蓝', name:'青空蓝 · 旷野', base:'#38BDF8', c1:'#7DD3FC', c2:'#BAE6FD' },
+    { id:'aurora', label:'极光紫', name:'极光紫 · 梦幻', base:'#A78BFA', c1:'#C4B5FD', c2:'#EDE9FE' }, // 颜色减淡
+
+    // 第三行：抹茶绿、薄荷绿 + 暗夜灰 + 自定义
+    { id:'green',  label:'抹茶绿', name:'抹茶绿 · 清新', base:'#4FBF6A', c1:'#4FBF6A', c2:'#A6E36B' },
+    { id:'mint',   label:'薄荷绿', name:'薄荷绿 · 清凉', base:'#2DD4BF', c1:'#5EEAD4', c2:'#99F6E4' },
+    { id:'night',  label:'暗夜灰', name:'暗夜灰 · 极简', base:'#6D71A6', c1:'#2B2D42', c2:'#4A4E69' },
+    { id:'custom', label:'自定义', name:'自定义 · 专属', base:'#FB7299', c1:'custom', c2:'custom' }
+  ];
+
+  var SETTINGS = {
+    bg:    { title:'背景样式', options:[
+              {v:'home',     label:'首页背景'},
+              {v:'solid',    label:'纯色'},
+              {v:'gradient', label:'渐变'} ] }
+  };
+
+  var state = { theme:'pink', appearance:'light', dark:false, bg:'home' };
+
+  /* ================= 渲染 ================= */
+  function tvSvg(){
+    return '<svg style="width:22px;height:22px;display:block;" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M4.977 3.561a1.31 1.31 0 111.818-1.884l2.828 2.728c.08.078.149.163.205.254h4.277a1.32 1.32 0 01.205-.254l2.828-2.728a1.31 1.31 0 011.818 1.884L17.82 4.66h.848A5.333 5.333 0 0124 9.992v7.34a5.333 5.333 0 01-5.333 5.334H5.333A5.333 5.333 0 010 17.333V9.992a5.333 5.333 0 015.333-5.333h.781L4.977 3.56zm.356 3.67a2.667 2.667 0 00-2.666 2.667v7.529a2.667 2.667 0 002.666 2.666h13.334a2.667 2.667 0 002.666-2.666v-7.53a2.667 2.667 0 00-2.666-2.666H5.333zm1.334 5.192a1.333 1.333 0 112.666 0v1.192a1.333 1.333 0 11-2.666 0v-1.192zM16 11.09c-.736 0-1.333.597-1.333 1.333v1.192a1.333 1.333 0 102.666 0v-1.192c0-.736-.597-1.333-1.333-1.333z"/></svg>';
+  }
+
+  function paletteSvg(){
+    return '<svg style="width:22px;height:22px;display:block;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20z"/><circle cx="8" cy="9" r="1.5" fill="currentColor"/><circle cx="16" cy="9" r="1.5" fill="currentColor"/><circle cx="12" cy="15" r="1.5" fill="currentColor"/></svg>';
+  }
+
+  themesEl.innerHTML = THEMES.map(function(t){
+    var bgStyle = '';
+    var icon = tvSvg();
+
+    if (t.id === 'custom') {
+      bgStyle = 'background: conic-gradient(from 0deg, #FF9A9E, #FECFEF, #A1C4FD, #C2E9FB, #FF9A9E);';
+      icon = paletteSvg();
+    } else {
+      bgStyle = 'background:linear-gradient(135deg,' + t.c1 + ',' + t.c2 + ')';
+    }
+
+    return '<div class="b-item' + (t.id === state.theme ? ' on' : '') + '" data-theme="' + t.id + '">' +
+             '<div class="c" style="' + bgStyle + '">' +
+               icon +
+             '</div>' +
+             '<div class="t">' + t.label + '</div>' +
+           '</div>';
+  }).join('');
+
+  /* ================= 核心：应用主题 ================= */
+  function currentTheme(){
+    for(var i=0;i<THEMES.length;i++){ if(THEMES[i].id === state.theme) return THEMES[i]; }
+    return THEMES[0];
+  }
+
+  function applyTheme(id){
+    state.theme = id;
+    var t = currentTheme();
+    var b = t.base;
+
+    device.style.setProperty('--brand',      b);
+    device.style.setProperty('--brand-d',    mix(b, '#000000', 0.14));
+    device.style.setProperty('--brand-l',    mix(b, '#ffffff', 0.26));
+    device.style.setProperty('--brand-soft', alpha(b, 0.14));
+    device.style.setProperty('--brand-glow', alpha(b, 0.45));
+
+    heroTitle.textContent = t.name;
+
+    Array.prototype.forEach.call(themesEl.querySelectorAll('.b-item'), function(el){
+      el.classList.toggle('on', el.dataset.theme === id);
+    });
+
+    refreshVisuals();
+  }
+
+  /* ================= 核心：视觉刷新 ================= */
+  function refreshVisuals(){
+    var t    = currentTheme();
+    var dark = state.dark;
+    var anchor = dark ? '#121317' : '#FFFFFF';
+
+    var g1 = mix(t.base, anchor, dark ? 0.87 : 0.90);
+    var g2 = mix(t.base, anchor, dark ? 0.79 : 0.82);
+    var g3 = mix(t.base, anchor, dark ? 0.70 : 0.74);
+    device.style.setProperty('--hero-grad', 'linear-gradient(150deg,' + g1 + ',' + g2 + ' 48%,' + g3 + ')');
+    device.style.setProperty('--blob1', dark ? 'rgba(255,255,255,.06)' : 'rgba(255,255,255,.62)');
+    device.style.setProperty('--blob2', alpha(t.base, dark ? 0.20 : 0.13));
+
+    if (state.bg === 'home') {
+      device.style.setProperty('--bg-img',
+        'radial-gradient(circle at 10% 20%, ' + alpha(t.base, dark ? 0.15 : 0.08) + ' 0%, transparent 45%),' +
+        'radial-gradient(circle at 90% 80%, ' + alpha(t.base, dark ? 0.15 : 0.08) + ' 0%, transparent 45%)'
+      );
+      screenEl.style.backgroundSize = '';
+    } else if(state.bg === 'gradient'){
+      device.style.setProperty('--bg-img',
+        'radial-gradient(560px 420px at 100% 0%, ' + alpha(t.base, dark ? 0.24 : 0.17) + ' 0%, transparent 62%),' +
+        'radial-gradient(520px 420px at 0% 100%, ' + alpha(t.base, dark ? 0.18 : 0.12) + ' 0%, transparent 60%)'
+      );
+      screenEl.style.backgroundSize = '';
+    } else {
+      device.style.setProperty('--bg-img', 'none');
+      screenEl.style.backgroundSize = '';
+    }
+  }
+
+  /* ================= 交互：主题 ================= */
+  themesEl.addEventListener('click', function(e){
+    var item = e.target.closest('.b-item');
+    if(item) {
+      applyTheme(item.dataset.theme);
+      if (item.dataset.theme === 'custom') {
+        toastEl.textContent = '自定义模式：可接入调色板取色';
+        toastEl.classList.add('show');
+        clearTimeout(window.customTimer);
+        window.customTimer = setTimeout(function(){
+          toastEl.classList.remove('show');
+        }, 1800);
+      }
+    }
+  });
+
+  /* ================= 交互：外观模式 ================= */
+  var segItems = document.querySelectorAll('.seg-item');
+  segItems.forEach(function(item) {
+    item.addEventListener('click', function() {
+      segItems.forEach(function(n) { n.classList.remove('on'); });
+      item.classList.add('on');
+      state.appearance = item.dataset.mode;
+      updateAppearance();
+    });
+  });
+
+  function updateAppearance() {
+    var isDark = false;
+    if (state.appearance === 'dark') {
+      isDark = true;
+    } else if (state.appearance === 'auto') {
+      isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    state.dark = isDark;
+    device.classList.toggle('dark', isDark);
+    refreshVisuals();
+  }
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+    if (state.appearance === 'auto') updateAppearance();
+  });
+
+  /* ================= 交互：底部弹层 ================= */
+  var sheetKey = null;
+
+  function openSheet(key){
+    sheetKey = key;
+    var cfg = SETTINGS[key];
+    sheetTitle.textContent = cfg.title;
+    sheetBody.innerHTML = cfg.options.map(function(o){
+      return '<div class="sheet-opt' + (state[key] === o.v ? ' on' : '') + '" data-v="' + o.v + '">' +
+               '<span>' + o.label + '</span>' +
+               '<svg class="tick" viewBox="0 0 24 24"><path d="M4 12.6l5.4 5.4L20 6.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+             '</div>';
+    }).join('');
+    mask.classList.add('show');
+    sheet.classList.add('show');
+  }
+
+  function closeSheet(){
+    mask.classList.remove('show');
+    sheet.classList.remove('show');
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.b-row[data-sheet]'), function(row){
+    row.addEventListener('click', function(){ openSheet(row.dataset.sheet); });
+  });
+
+  sheetBody.addEventListener('click', function(e){
+    var opt = e.target.closest('.sheet-opt');
+    if(!opt || !sheetKey) return;
+    setSetting(sheetKey, opt.dataset.v);
+    Array.prototype.forEach.call(sheetBody.querySelectorAll('.sheet-opt'), function(el){
+      el.classList.toggle('on', el === opt);
+    });
+    setTimeout(closeSheet, 170);
+  });
+
+  mask.addEventListener('click', closeSheet);
+  sheetDone.addEventListener('click', closeSheet);
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') closeSheet();
+  });
+
+  /* ================= 设置项生效 ================= */
+  function setSetting(key, val){
+    state[key] = val;
+    // var opt = SETTINGS[key].options.filter(function(o){ return o.v === val; })[0];
+
+    if(key === 'bg'){
+      // 不再更新右侧文本（已删除）
+      refreshVisuals();
+    }
+  }
+
+  /* ================= 立即应用 ================= */
+  var applyTimer = null;
+  document.getElementById('applyBtn').addEventListener('click', function(){
+    var t = currentTheme();
+    toastEl.textContent = '已应用「' + t.name + '」';
+    toastEl.classList.add('show');
+    clearTimeout(applyTimer);
+    applyTimer = setTimeout(function(){
+      toastEl.classList.remove('show');
+    }, 1800);
+  });
+
+  /* ================= 初始化 ================= */
+  applyTheme(state.theme);
+  updateAppearance();
+})();
+</script>
+
+</body>
+</html>

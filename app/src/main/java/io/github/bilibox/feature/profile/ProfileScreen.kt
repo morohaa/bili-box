@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
+import io.github.bilibox.core.ui.theme.LocalAccentColor
 import io.github.bilibox.data.auth.BiliSession
 import io.github.bilibox.data.auth.BiliSessionStore
 import io.github.bilibox.data.auth.biliLoginRequest
@@ -61,7 +63,11 @@ internal val MyCardLight = Color(0xFFFFFFFF)
 internal val MyCardDark = Color(0xFF23262C)
 internal val MyBlue = Color(0xFF00AEEC)
 internal val MyRose = Color(0xFFFF85A2)
-internal val MyPink = Color(0xFFEF7196)
+
+/** 跟随主题强调色；登录按钮、退出登录等位置直接使用。 */
+internal val MyPink: Color
+    @Composable @ReadOnlyComposable
+    get() = LocalAccentColor.current
 internal val MyOrange = Color(0xFFFF6600)
 internal val MyBadgeRed = Color(0xFFFA5A57)
 
@@ -85,6 +91,7 @@ internal fun ProfileScreen(
     session: BiliSession?,
     darkMode: Boolean = false,
     onToggleDarkMode: () -> Unit = {},
+    onOpenThemeAppearance: () -> Unit = {},
     onOpenLibrary: (LocalVideoQuickFilter?) -> Unit = {},
     onSessionChange: (BiliSession?) -> Unit,
     scrollState: ScrollState,
@@ -209,7 +216,7 @@ internal fun ProfileScreen(
                     onLocalVideos = { onOpenLibrary(null) },
                     onLoginMethods = { sheet = MySheet.LoginMethods },
                     onSession = { sheet = MySheet.Session },
-                    onTheme = onToggleDarkMode,
+                    onTheme = onOpenThemeAppearance,
                     onAbout = { sheet = MySheet.About },
                     onClearCache = {
                         scope.launch {

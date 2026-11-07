@@ -8,23 +8,25 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFEF7196),
+private fun darkScheme(accent: Color) = darkColorScheme(
+    primary = accent,
     secondary = Color(0xFF9BA3AE),
-    tertiary = Color(0xFFFFC857),
+    tertiary = accent,
     background = Color(0xFF17191D),
     surface = Color(0xFF24272D),
+    onPrimary = Color.White,
     onBackground = Color(0xFFE7E9ED),
     onSurface = Color(0xFFE7E9ED),
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = Pink,
+private fun lightScheme(accent: Color) = lightColorScheme(
+    primary = accent,
     secondary = OnlineSecondary,
-    tertiary = OnlinePink,
+    tertiary = OnlinePinkBrand,
     background = OnlineSurface,
     surface = OnlineSurface,
     onPrimary = Color.White,
@@ -35,6 +37,8 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun BiliBoxTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    // 主题外观选中的强调色；动态取色开启时以系统色板为准。
+    accent: Color = OnlinePinkBrand,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
@@ -45,14 +49,16 @@ fun BiliBoxTheme(
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        darkTheme -> DarkColorScheme
+        darkTheme -> darkScheme(accent)
 
-        else -> LightColorScheme
+        else -> lightScheme(accent)
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalAccentColor provides accent) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

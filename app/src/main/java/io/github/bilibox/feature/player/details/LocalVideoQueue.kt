@@ -264,7 +264,8 @@ internal fun QueueMeta(
         watched -> "已看完"
         else -> null
     }
-    val text = remember(item.key, progress, isCurrent, parts) {
+    val accent = OnlinePink
+    val text = remember(item.key, progress, isCurrent, parts, accent) {
         buildAnnotatedString {
             parts.forEachIndexed { index, part ->
                 if (index > 0) withStyle(SpanStyle(color = Muted.copy(alpha = .6f))) { append("  ·  ") }
@@ -272,7 +273,7 @@ internal fun QueueMeta(
             }
             if (progress != null) {
                 if (parts.isNotEmpty()) withStyle(SpanStyle(color = Muted.copy(alpha = .6f))) { append("  ·  ") }
-                withStyle(SpanStyle(color = if (isCurrent || watching != null) OnlinePink else Muted)) { append(progress) }
+                withStyle(SpanStyle(color = if (isCurrent || watching != null) accent else Muted)) { append(progress) }
             }
         }
     }

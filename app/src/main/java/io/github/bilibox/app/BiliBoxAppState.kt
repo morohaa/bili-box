@@ -77,6 +77,10 @@ internal class BiliBoxAppState(
     var libraryRefresh by mutableIntStateOf(0)
         private set
 
+    // 「主题外观」是覆盖在「我的」页上的整页设置，关闭后回到原标签。
+    var appearanceOpen by mutableStateOf(false)
+        private set
+
     // “我的”页头图滚过状态栏的阈值（px）：只在矮视口整页滚动时有效，固定头图时为 Int.MAX_VALUE。
     var profileBannerScrollLimitPx by mutableIntStateOf(Int.MAX_VALUE)
         private set
@@ -93,6 +97,14 @@ internal class BiliBoxAppState(
     fun openLibrary(filter: LocalVideoQuickFilter?) {
         libraryFilter = filter
         selectedIndex = AppTab.LIBRARY.ordinal
+    }
+
+    fun openAppearance() {
+        appearanceOpen = true
+    }
+
+    fun closeAppearance() {
+        appearanceOpen = false
     }
 
     fun updateSession(value: BiliSession?) {
@@ -177,6 +189,7 @@ internal class BiliBoxAppState(
                     "searchTimeRange" to it.searchTimeRange?.name,
                     "searchGrid" to it.searchGrid,
                     "homeExpanded" to it.homeExpanded,
+                    "appearanceOpen" to it.appearanceOpen,
                 )
             },
             restore = {
@@ -188,6 +201,7 @@ internal class BiliBoxAppState(
                     searchTimeRange = (it["searchTimeRange"] as String?)?.let(SearchTimeRange::valueOf)
                     searchGrid = it["searchGrid"] as Boolean
                     homeExpanded = it["homeExpanded"] as Boolean
+                    appearanceOpen = it["appearanceOpen"] as Boolean? ?: false
                 }
             },
         )

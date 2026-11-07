@@ -104,8 +104,6 @@ private val CacheSheetSurface = Color(0xFFFFFFFF)
 private val CacheHeaderSurface = Color(0xFFFFFFFF)
 private val CacheItemSurface = OnlineCardGray
 private val CacheItemPressed = Color(0xFFEDEFF2)
-private val CacheItemSelected = OnlinePinkSoft
-private val CacheItemSelectedPressed = Color(0xFFFFE3EC)
 private val CacheSecondaryBorder = Color(0xFFE6E9ED)
 private val CacheInk = Color(0xFF18191C)
 private val CacheSecondary = Color(0xFF5F6266)
@@ -494,8 +492,8 @@ private fun CacheEpisodeRow(
     val shape = RoundedCornerShape(12.dp)
     val surface by animateColorAsState(
         targetValue = when {
-            playing && pressed -> CacheItemSelectedPressed
-            playing -> CacheItemSelected
+            playing && pressed -> OnlinePinkSoft.copy(alpha = .18f)
+            playing -> OnlinePinkSoft
             pressed -> CacheItemPressed
             else -> CacheItemSurface
         },

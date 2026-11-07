@@ -145,6 +145,7 @@ internal fun BiliLoadingIndicator(message: String) {
         animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "小电视浮动"
     )
+    val accent = OnlinePink
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.size(44.dp).rotate(rotation)) {
@@ -156,7 +157,7 @@ internal fun BiliLoadingIndicator(message: String) {
                     style = Stroke(3.2f * u)
                 )
                 drawArc(
-                    OnlinePink,
+                    accent,
                     startAngle = -90f,
                     sweepAngle = 244f,
                     useCenter = false,

@@ -23,6 +23,7 @@ internal fun VideoSeekBar(
     modifier: Modifier = Modifier,
 ) {
     // Keep the visual layout compact; Compose still expands the touch target.
+    val accent = OnlinePink
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
         Slider(
             value = position.coerceIn(0f, duration.coerceAtLeast(1L).toFloat()),
@@ -55,7 +56,7 @@ internal fun VideoSeekBar(
                     }
                     if (played > 0f) {
                         drawLine(
-                            OnlinePink,
+                            accent,
                             start,
                             Offset(size.width * played, center.y),
                             size.height,

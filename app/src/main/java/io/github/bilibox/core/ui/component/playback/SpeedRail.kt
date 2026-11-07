@@ -109,6 +109,7 @@ internal fun SpeedRail(
                 }
             }
     ) {
+        val accent = OnlinePink
         Canvas(Modifier.fillMaxSize()) {
             val railY = size.height - 36.dp.toPx()
             val startX = railInsetPx
@@ -120,7 +121,7 @@ internal fun SpeedRail(
             val glowRadius = 86.dp.toPx()
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(OnlinePink.copy(alpha = .17f), Color.Transparent),
+                    colors = listOf(accent.copy(alpha = .17f), Color.Transparent),
                     center = Offset(dotX, railY - 14.dp.toPx()),
                     radius = glowRadius
                 ),
@@ -137,7 +138,7 @@ internal fun SpeedRail(
             if (progress > 0.002f) {
                 drawRoundRect(
                     brush = Brush.horizontalGradient(
-                        colors = listOf(SpeedBlue, OnlinePink),
+                        colors = listOf(SpeedBlue, accent),
                         startX = startX,
                         endX = dotX
                     ),
@@ -179,7 +180,7 @@ internal fun SpeedRail(
             }
 
             // Playhead marker.
-            drawCircle(OnlinePink.copy(alpha = .30f), 7.dp.toPx(), Offset(dotX, railY))
+            drawCircle(accent.copy(alpha = .30f), 7.dp.toPx(), Offset(dotX, railY))
             drawCircle(Color.White, 3.dp.toPx(), Offset(dotX, railY))
 
             drawSpeedRunner(
@@ -188,7 +189,8 @@ internal fun SpeedRail(
                 unit = 60.dp.toPx() / 100f,
                 speed = speed,
                 phase = phase.floatValue,
-                blink = blink.floatValue
+                blink = blink.floatValue,
+                pink = accent
             )
         }
         Box(

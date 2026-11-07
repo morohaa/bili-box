@@ -54,12 +54,13 @@ internal fun OnlineCreatorCard(
     following: Boolean,
     onToggleFollow: () -> Unit,
 ) {
+    val accent = OnlinePink
     Row(
         Modifier.fillMaxWidth()
             .padding(horizontal = 14.dp)
             .padding(vertical = 8.dp)
             .drawBehind {
-                drawRect(OnlinePink, size = Size(4.dp.toPx(), size.height))
+                drawRect(accent, size = Size(4.dp.toPx(), size.height))
             }
             .padding(start = 12.dp, top = 4.dp, end = 0.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,

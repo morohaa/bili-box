@@ -38,10 +38,10 @@ import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.theme.BrandSpringEasing
 import io.github.bilibox.core.ui.theme.DarkInkSoft
 import io.github.bilibox.core.ui.theme.DynamicColors
+import io.github.bilibox.core.ui.theme.LocalAccentColor
 import io.github.bilibox.core.ui.theme.dynamicColors
 
 private val HomeInk = Color(0xFF24313D)
-private val HomePink = Color(0xFFEF7196)
 private val HomeMuted = Color(0xFF82909D)
 
 /**
@@ -77,7 +77,7 @@ internal fun AppTopBar(
 
 @Composable
 private fun RowScope.BrandTopBarContent(darkMode: Boolean, onToggleDarkMode: () -> Unit) {
-    Text("bili", color = HomePink, fontWeight = FontWeight.Black, fontSize = 28.sp, letterSpacing = (-1).sp)
+    Text("bili", color = LocalAccentColor.current, fontWeight = FontWeight.Black, fontSize = 28.sp, letterSpacing = (-1).sp)
     Text("box", color = if (darkMode) Color(0xFFE9E9EC) else HomeInk, fontWeight = FontWeight.Light, fontSize = 28.sp, letterSpacing = (-1).sp)
     Spacer(Modifier.weight(1f))
     DarkModeToggle(darkMode, onToggleDarkMode)
@@ -136,7 +136,7 @@ internal fun LiquidNavigation(
     darkMode: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val colors = dynamicColors(darkMode)
+    val colors = dynamicColors(darkMode, LocalAccentColor.current)
     BoxWithConstraints(modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
         // 外层左右各留 5dp，让选中底色正好落在内层的一段宽度里。
         val itemWidth = (maxWidth - 10.dp) / 3

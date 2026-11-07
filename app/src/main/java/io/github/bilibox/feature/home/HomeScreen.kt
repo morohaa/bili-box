@@ -84,6 +84,9 @@ import io.github.bilibox.core.model.SearchTimeRange
 import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.ui.theme.BrandSpringEasing
 import io.github.bilibox.core.ui.theme.DynamicColors
+import io.github.bilibox.core.ui.theme.HomeBackground
+import io.github.bilibox.core.ui.theme.LocalAccentColor
+import io.github.bilibox.core.ui.theme.appearanceBackdrop
 import io.github.bilibox.core.ui.theme.dynamicColors
 import io.github.bilibox.data.search.SearchHistoryStore
 import io.github.bilibox.feature.search.SearchControlsBar
@@ -119,8 +122,10 @@ internal fun HomeScreen(
     onExpandedChange: (Boolean) -> Unit,
     scrollState: ScrollState,
     darkMode: Boolean = false,
+    backgroundStyle: HomeBackground = HomeBackground.HOME,
 ) {
-    val colors = dynamicColors(darkMode)
+    val accent = LocalAccentColor.current
+    val colors = dynamicColors(darkMode, accent)
     val context = LocalContext.current
     val historyStore = remember(context) { SearchHistoryStore(context.applicationContext) }
     var history by remember(historyStore) { mutableStateOf(historyStore.load()) }
@@ -155,7 +160,7 @@ internal fun HomeScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize().background(colors.background)) {
+    Box(Modifier.fillMaxSize().background(colors.background).appearanceBackdrop(backgroundStyle, accent, darkMode)) {
         BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
             // 参考稿把 logo 顶边放在屏高一半 - 100；这里再上移 40dp，搜索框正好落在视觉中心。
             val homeTop = (maxHeight * 0.5f - 120.dp).coerceAtLeast(16.dp)
