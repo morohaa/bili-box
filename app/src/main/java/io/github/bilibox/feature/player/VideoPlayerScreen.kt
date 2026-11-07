@@ -47,6 +47,7 @@ import io.github.bilibox.data.danmaku.Danmaku
 import io.github.bilibox.data.danmaku.DanmakuSettings
 import io.github.bilibox.data.player.LightsOffMode
 import io.github.bilibox.data.player.LightsOffPreferences
+import io.github.bilibox.feature.danmaku.DanmakuAreaGuide
 import io.github.bilibox.feature.danmaku.DanmakuComposerDialog
 import io.github.bilibox.feature.danmaku.DanmakuOverlay
 import io.github.bilibox.feature.danmaku.DanmakuSettingsSheet
@@ -429,8 +430,7 @@ internal fun VideoPlayerScreen(
                     when {
                         fullScreen -> Modifier
 
-                        // 状态栏会随控件隐藏，但顶部安全区始终保持同一高度，
-                        // 避免控件显隐时视频画面上下跳动。
+                        // 状态栏随控件隐藏，但顶部安全区高度不变，画面不会上下跳动。
                         verticalFullScreen -> Modifier.windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
 
                         else -> Modifier.statusBarsPadding()
@@ -456,8 +456,7 @@ internal fun VideoPlayerScreen(
                         playerView = it
                     },
                     modifier = Modifier.fillMaxSize().then(
-                        // 竖屏全屏保留状态栏后画面会整体下移，这里额外上移，
-                        // 让视频落在更舒适的观看区域。
+                        // 竖屏全屏画面整体下移，这里额外上移，让视频落在更舒适的观看区域。
                         if (verticalFullScreen) Modifier.offset(y = (-88).dp) else Modifier
                     ).then(
                         if (mirrorEnabled) Modifier.graphicsLayer { scaleX = -1f } else Modifier
@@ -478,12 +477,8 @@ internal fun VideoPlayerScreen(
                     modifier = Modifier.fillMaxSize().testTag("player-touch-surface")
                 )
                 if (danmakuSupported && !listening && !listenPageOpen) {
-                    DanmakuOverlay(
-                        player = player,
-                        items = danmakuItems,
-                        settings = danmakuSettings,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    DanmakuOverlay(player, danmakuItems, danmakuSettings, Modifier.fillMaxSize())
+                    DanmakuAreaGuide(danmakuSettings.areaFraction, Modifier.fillMaxSize())
                 }
                 if (listening && !listenPageOpen) {
                     CollapsedListenOverlay(
@@ -840,8 +835,7 @@ internal fun VideoPlayerScreen(
                 )
             }
         }
-        // 播放设置卡片从视频下沿铺到屏幕底部；它是整个播放器的兄弟节点，
-        // 才能盖住详情区而不被视频 Box 裁切。
+        // 播放设置卡片从视频下沿铺到屏幕底部，作为兄弟节点才能盖住详情区。
         if (!fullScreen && !verticalFullScreen) {
             PlayerPlaybackSettingsHost(
                 visible = settingsSheetOpen,
@@ -943,9 +937,11 @@ internal fun VideoPlayerScreen(
                 )
             }
         }
-        if (danmakuSupported && danmakuSettingsOpen) {
+        if (danmakuSupported) {
             DanmakuSettingsSheet(
+                visible = danmakuSettingsOpen,
                 settings = danmakuSettings,
+                topInset = if (fullScreen || verticalFullScreen) null else videoBottom,
                 onDismiss = { danmakuSettingsOpen = false },
                 onSettingsChange = onDanmakuSettingsChange,
             )

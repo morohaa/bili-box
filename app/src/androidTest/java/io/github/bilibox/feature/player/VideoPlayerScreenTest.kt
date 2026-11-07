@@ -29,11 +29,13 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.bilibox.data.bili.Page
+import io.github.bilibox.data.danmaku.DanmakuBlockType
 import io.github.bilibox.data.danmaku.DanmakuSettings
 import io.github.bilibox.feature.listen.ListenInfo
 import io.github.bilibox.feature.online.OnlineEpisodesBottomSheet
@@ -409,7 +411,95 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("弹幕设置").assertExists()
         compose.onNodeWithText("不透明度").assertExists()
         compose.onNodeWithText("显示区域").assertExists()
-        compose.onNodeWithText("半屏").assertExists()
+        compose.onNodeWithText("字体大小").assertExists()
+        // 显示区域改成连续滑杆后不再有档位按钮，改为断言滑杆本身存在。
+        compose.onNodeWithContentDescription("显示区域 滑杆").assertExists()
+    }
+
+    @Test
+    fun danmakuSettingsTogglesTypeMasking() {
+        var settings by mutableStateOf(DanmakuSettings())
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            val landscape = Configuration(LocalConfiguration.current).apply {
+                orientation = Configuration.ORIENTATION_LANDSCAPE
+            }
+            CompositionLocalProvider(LocalConfiguration provides landscape) {
+                VideoPlayerScreen(
+                    player = player,
+                    title = "搜索视频",
+                    sourceLabel = "哔哩哔哩",
+                    commentMessage = "暂不支持查看在线评论",
+                    onBack = {},
+                    onRetry = {},
+                    danmakuSupported = true,
+                    danmakuSettings = settings,
+                    onDanmakuSettingsChange = { settings = it },
+                    onSendDanmaku = { _, _ -> Result.success(Unit) },
+                    details = { Text("搜索视频简介") },
+                )
+            }
+        }
+
+        compose.onNodeWithContentDescription("弹幕设置").performClick()
+        compose.waitForIdle()
+        // 画面防挡和更多工具都在同一张卡片里，不再有二级页。
+        compose.onNodeWithText("画面防挡").assertExists()
+        compose.onNodeWithText("按弹幕类型屏蔽").assertExists()
+        compose.onNodeWithText("更多工具").assertExists()
+        compose.onNodeWithText("弹幕观看屏蔽词").assertExists()
+
+        compose.onNodeWithContentDescription("屏蔽顶部弹幕").performScrollTo().performClick()
+        compose.runOnIdle { assertTrue(DanmakuBlockType.TOP in settings.blockedTypes) }
+        compose.onNodeWithContentDescription("取消屏蔽顶部弹幕").assertExists()
+        compose.onNodeWithContentDescription("取消屏蔽顶部弹幕").performClick()
+        compose.runOnIdle { assertFalse(DanmakuBlockType.TOP in settings.blockedTypes) }
+
+        // 重置需要点两次：第一次进入确认态，第二次才恢复默认。
+        compose.onNodeWithContentDescription("屏蔽滚动弹幕").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("重置弹幕设置").performScrollTo().performClick()
+        compose.onNodeWithText("确认重置？").assertExists()
+        compose.onNodeWithContentDescription("重置弹幕设置").performClick()
+        compose.runOnIdle { assertTrue(settings.blockedTypes.isEmpty()) }
+        compose.onNodeWithText("已恢复默认").assertExists()
+    }
+
+    @Test
+    fun danmakuSettingsCardIsAnchoredBelowVideo() {
+        var settings by mutableStateOf(DanmakuSettings())
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            VideoPlayerScreen(
+                player = player,
+                title = "搜索视频",
+                sourceLabel = "哔哩哔哩",
+                commentMessage = "暂不支持查看在线评论",
+                onBack = {},
+                onRetry = {},
+                danmakuSupported = true,
+                danmakuSettings = settings,
+                onDanmakuSettingsChange = { settings = it },
+                onSendDanmaku = { _, _ -> Result.success(Unit) },
+                details = { Text("搜索视频简介") }
+            )
+        }
+
+        compose.onNodeWithContentDescription("更多").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("弹幕设置").performClick()
+        compose.waitForIdle()
+
+        // 和播放设置卡片一样：上沿贴住视频下沿，下沿贴住屏幕底部。
+        val video = compose.onNodeWithTag("player-touch-surface").fetchSemanticsNode().boundsInRoot
+        val sheet = compose.onNodeWithTag("danmaku-settings-sheet").fetchSemanticsNode().boundsInRoot
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        assertEquals(video.bottom, sheet.top, 1f)
+        assertEquals(root.bottom, sheet.bottom, 1f)
+        compose.onNodeWithText("弹幕速度").assertExists()
     }
 
     @Test

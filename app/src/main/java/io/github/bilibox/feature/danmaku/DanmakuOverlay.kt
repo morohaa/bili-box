@@ -25,6 +25,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import io.github.bilibox.data.danmaku.Danmaku
+import io.github.bilibox.data.danmaku.DanmakuFilter
 import io.github.bilibox.data.danmaku.DanmakuSettings
 import io.github.bilibox.feature.danmaku.layout.DanmakuTrackBuilder
 import kotlinx.coroutines.delay
@@ -49,13 +50,19 @@ internal fun DanmakuOverlay(
     // long videos.
     if (items.isEmpty()) return
 
+    // 屏蔽在测量和排轨道之前生效：被过滤掉的弹幕既不会绘制，也不会占住轨道。
+    val visible = remember(items, settings.blockedTypes) {
+        DanmakuFilter.apply(items, settings)
+    }
+    if (visible.isEmpty()) return
+
     val localDensity = LocalDensity.current
     val density = localDensity.density
     val textMeasurer = rememberTextMeasurer()
     var positionMs by remember(player) { mutableLongStateOf(player.currentPosition.coerceAtLeast(0L)) }
 
-    val measured = remember(items, settings.fontScale, density, localDensity.fontScale) {
-        items.map { item ->
+    val measured = remember(visible, settings.fontScale, density, localDensity.fontScale) {
+        visible.map { item ->
             val fontSize = (item.fontSize.coerceIn(12, 36) * settings.fontScale).sp
             item to textMeasurer.measure(
                 text = AnnotatedString(item.text),
@@ -73,8 +80,8 @@ internal fun DanmakuOverlay(
         }
     }
     val layouts: Map<Danmaku, TextLayoutResult> = remember(measured) { measured.toMap() }
-    val maxFontPx = remember(items, settings.fontScale, density, localDensity.fontScale) {
-        val largest = items.maxOfOrNull { it.fontSize.coerceIn(12, 36) } ?: 25
+    val maxFontPx = remember(visible, settings.fontScale, density, localDensity.fontScale) {
+        val largest = visible.maxOfOrNull { it.fontSize.coerceIn(12, 36) } ?: 25
         largest * settings.fontScale * localDensity.fontScale * density
     }
 
@@ -84,10 +91,10 @@ internal fun DanmakuOverlay(
         val widthPx = constraints.maxWidth.toFloat()
         val heightPx = constraints.maxHeight.toFloat()
         val laneHeightPx = maxFontPx * 1.35f
-        val areaHeightPx = (heightPx * settings.area.fraction).coerceAtLeast(laneHeightPx)
-        val tracks = remember(items, layouts, widthPx, areaHeightPx, laneHeightPx, density, settings.speedScale) {
+        val areaHeightPx = (heightPx * settings.areaFraction).coerceAtLeast(laneHeightPx)
+        val tracks = remember(visible, layouts, widthPx, areaHeightPx, laneHeightPx, density, settings.speedScale) {
             DanmakuTrackBuilder.build(
-                items = items,
+                items = visible,
                 viewportWidthPx = widthPx,
                 areaHeightPx = areaHeightPx,
                 laneHeightPx = laneHeightPx,
