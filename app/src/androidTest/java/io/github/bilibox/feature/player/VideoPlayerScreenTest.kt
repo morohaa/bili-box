@@ -221,6 +221,40 @@ class VideoPlayerScreenTest {
     }
 
     @Test
+    fun sleepTimerCardIsAnchoredBelowVideo() {
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            VideoPlayerScreen(
+                player = player,
+                title = "搜索视频",
+                sourceLabel = "哔哩哔哩",
+                commentMessage = "暂不支持查看在线评论",
+                onBack = {},
+                onRetry = {},
+                details = { Text("搜索视频简介") }
+            )
+        }
+
+        compose.onNodeWithContentDescription("更多").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("定时关闭").performClick()
+        compose.waitForIdle()
+
+        // 定时关闭卡片同样从视频下沿开始，不遮挡画面。
+        val video = compose.onNodeWithTag("player-touch-surface").fetchSemanticsNode().boundsInRoot
+        val sheet = compose.onNodeWithTag("player-sleep-timer-sheet").fetchSemanticsNode().boundsInRoot
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        assertEquals(video.bottom, sheet.top, 1f)
+        assertEquals(root.bottom, sheet.bottom, 1f)
+
+        compose.onNodeWithText("完成").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("player-sleep-timer-sheet").assertDoesNotExist()
+    }
+
+    @Test
     fun hiddenChromeKeepsDimmedFullscreenEntryAtVideoBottom() {
         var density = 1f
         compose.setContent {

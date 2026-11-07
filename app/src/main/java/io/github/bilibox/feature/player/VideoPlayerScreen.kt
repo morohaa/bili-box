@@ -874,17 +874,17 @@ internal fun VideoPlayerScreen(
                 onUnavailable = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() },
             )
         }
-        // 缓存面板也贴在视频下沿；内容在 feature/online 中，播放器只提供
-        // 量好的 topInset，避免 feature/player 反向依赖在线视频包。
+        // 缓存面板也贴在视频下沿；播放器只量 topInset，避免反向依赖在线视频包。
         if (!fullScreen && !verticalFullScreen) {
             cacheSheet?.invoke(cacheSheetVisible, videoBottom) {
                 onCacheSheetVisibleChange(false)
             }
         }
-        // 旋转进入全屏时关闭缓存面板，避免面板停留在已不存在的视频下沿。
+        // 旋转进入全屏时关闭下沿面板，避免面板停留在已不存在的视频下沿。
         LaunchedEffect(fullScreen, verticalFullScreen) {
-            if ((fullScreen || verticalFullScreen) && cacheSheetVisible) {
+            if (fullScreen || verticalFullScreen) {
                 onCacheSheetVisibleChange(false)
+                sleepTimerOpen = false
             }
         }
         // 竖屏的画质选择使用底部弹层；横屏仍沿用侧边抽屉。
@@ -899,9 +899,8 @@ internal fun VideoPlayerScreen(
                 },
             )
         }
-        // The timer lives on the player, so it keeps counting while the sheet is
-        // closed and the queue switches files. It is a sibling of the player
-        // column so the panel covers the video too, like the reference design.
+        // The timer outlives the sheet. The card starts at the video's bottom
+        // edge so the picture stays visible while picking a duration.
         if (!fullScreen) {
             PlayerDrawerVisibility(visible = sleepTimerOpen, fromBottom = true) {
                 SleepTimerSheet(
@@ -909,6 +908,7 @@ internal fun VideoPlayerScreen(
                     remainingVideos = remainingVideos,
                     currentRemainingMs = (duration - position).coerceAtLeast(0L),
                     durationMs = duration,
+                    topInset = videoBottom,
                     onDismiss = { sleepTimerOpen = false },
                 )
             }
