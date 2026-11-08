@@ -59,15 +59,21 @@ private fun AppSystemBars(appState: BiliBoxAppState, darkMode: Boolean) {
     val pastBanner = pastBannerState.value
     // 外观页盖在「我的」页之上，必须单独读一次，否则 SideEffect 不会因它关闭而重跑。
     val appearanceOpen = appState.appearanceOpen
+    // 头图预览是深色沉浸层，系统栏图标始终用白色。
+    val bannerPreviewOpen = appState.bannerPreviewOpen
     SideEffect {
         val window = (view.context as? Activity)?.window ?: return@SideEffect
         WindowCompat.getInsetsController(window, view).apply {
-            isAppearanceLightStatusBars = !darkMode && (
-                appearanceOpen ||
-                    appState.selectedTab != AppTab.PROFILE ||
-                    pastBanner
-                )
-            isAppearanceLightNavigationBars = !darkMode
+            isAppearanceLightStatusBars = if (bannerPreviewOpen) {
+                false
+            } else {
+                !darkMode && (
+                    appearanceOpen ||
+                        appState.selectedTab != AppTab.PROFILE ||
+                        pastBanner
+                    )
+            }
+            isAppearanceLightNavigationBars = if (bannerPreviewOpen) false else !darkMode
         }
     }
     // 进入“我的”页时，内容回到顶部。

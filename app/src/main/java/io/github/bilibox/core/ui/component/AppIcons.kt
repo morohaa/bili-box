@@ -64,6 +64,8 @@ internal enum class AppIcon {
     LOOP_ONE,
     WAVEFORM,
     SHUFFLE,
+    ROTATE_LEFT,
+    IMAGE,
 }
 
 @Composable
@@ -336,6 +338,17 @@ internal fun DrawScope.drawAppGlyph(
                 path("M20 16v4h-4")
                 path("M14.5 14.5L20 20")
                 path("M4 4l5 5")
+            }
+
+            AppIcon.ROTATE_LEFT -> {
+                path("M4 4v6h6")
+                path("M4.6 10a8 8 0 1 1 .7 5.4")
+            }
+
+            AppIcon.IMAGE -> {
+                drawRoundRect(tint, Offset(3f, 5f), Size(18f, 14f), CornerRadius(2f), style = stroke)
+                circle(8.5f, 9.8f, 1.3f, filled = true)
+                path("M4.5 17l5-5 4 4 2.5-2.5L20 17")
             }
         }
     }

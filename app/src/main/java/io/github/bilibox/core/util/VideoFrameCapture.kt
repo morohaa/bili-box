@@ -22,8 +22,8 @@ internal fun captureVideoFrame(playerView: PlayerView): Bitmap? {
     return surface.bitmap
 }
 
-/** Publish the frame to the gallery only after its contents have been written successfully. */
-internal fun saveVideoFrame(context: Context, bitmap: Bitmap): android.net.Uri {
+/** Publish an image to the gallery only after its contents have been written successfully. */
+internal fun saveImageToGallery(context: Context, bitmap: Bitmap): android.net.Uri {
     val resolver = context.contentResolver
     val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
     val name = "BiliBox_${timestamp}_${UUID.randomUUID().toString().take(8)}.png"
@@ -38,18 +38,18 @@ internal fun saveVideoFrame(context: Context, bitmap: Bitmap): android.net.Uri {
             put(MediaStore.Images.Media.IS_PENDING, 1)
         } else {
             val directory = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "BiliBox")
-            if (!directory.isDirectory && !directory.mkdirs()) throw IOException("无法创建截帧目录")
+            if (!directory.isDirectory && !directory.mkdirs()) throw IOException("无法创建图片目录")
             legacyFile = File(directory, name)
             @Suppress("DEPRECATION")
             put(MediaStore.Images.Media.DATA, legacyFile.absolutePath)
         }
     }
     val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-        ?: throw IOException("无法创建截帧文件")
+        ?: throw IOException("无法创建图片文件")
     try {
-        val output = resolver.openOutputStream(uri) ?: throw IOException("无法写入截帧文件")
+        val output = resolver.openOutputStream(uri) ?: throw IOException("无法写入图片文件")
         output.use {
-            if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) throw IOException("截帧编码失败")
+            if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) throw IOException("图片编码失败")
         }
         if (Build.VERSION.SDK_INT >= 29) {
             val published = resolver.update(
@@ -60,7 +60,7 @@ internal fun saveVideoFrame(context: Context, bitmap: Bitmap): android.net.Uri {
                 null,
                 null
             )
-            if (published != 1) throw IOException("无法保存截帧")
+            if (published != 1) throw IOException("无法保存图片")
         }
         return uri
     } catch (error: Exception) {

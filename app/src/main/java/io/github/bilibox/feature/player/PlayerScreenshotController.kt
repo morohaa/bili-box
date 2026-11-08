@@ -24,7 +24,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalContext
 import androidx.media3.ui.PlayerView
 import io.github.bilibox.core.util.captureVideoFrame
-import io.github.bilibox.core.util.saveVideoFrame
+import io.github.bilibox.core.util.saveImageToGallery
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -92,7 +92,7 @@ internal class PlayerScreenshotController internal constructor(
         scope.launch {
             var saved = false
             try {
-                withContext(Dispatchers.IO) { saveVideoFrame(context, frame) }
+                withContext(Dispatchers.IO) { saveImageToGallery(context, frame) }
                 saved = true
                 flashAnimation.join()
                 previewFrame = frame

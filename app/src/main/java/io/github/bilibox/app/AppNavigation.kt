@@ -10,25 +10,38 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import io.github.bilibox.core.ui.component.LiquidNavigation
 import io.github.bilibox.core.ui.theme.AppearanceSettings
 import io.github.bilibox.core.ui.theme.BrandSpringEasing
+import io.github.bilibox.data.profile.ProfileBannerStore
 import io.github.bilibox.feature.appearance.AppearanceScreen
 import io.github.bilibox.feature.home.HomeScreen
 import io.github.bilibox.feature.library.LibraryScreen
 import io.github.bilibox.feature.online.OnlineVideoScreen
 import io.github.bilibox.feature.player.LocalVideoScreen
+import io.github.bilibox.feature.profile.ProfileBannerPreviewScreen
 import io.github.bilibox.feature.profile.ProfileScreen
 import io.github.bilibox.feature.profile.randomGhostAvatar
+import io.github.bilibox.feature.profile.rememberRemoteBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal enum class AppTab { HOME, LIBRARY, PROFILE }
 
@@ -44,6 +57,15 @@ internal fun AppNavigation(
     // 未登录默认头像在一次应用运行内固定：放在根组合里记住，切页、退后台、转屏都不会换脸，
     // 只有完全退出后重新启动（没有可恢复的保存状态）才会重新随机。
     val defaultAvatar = rememberSaveable { randomGhostAvatar() }
+    val context = LocalContext.current
+    val bannerStore = remember(context) { ProfileBannerStore(context) }
+    var customBanner by remember { mutableStateOf<ImageBitmap?>(null) }
+    // 自定义头图存在应用私有目录，进前台时异步读回；未读完前先展示主题默认头图。
+    LaunchedEffect(bannerStore) {
+        customBanner = withContext(Dispatchers.IO) { bannerStore.load()?.asImageBitmap() }
+    }
+    // 个人页与头图预览共用同一份头像位图，避免预览时重复下载。
+    val avatar = rememberRemoteBitmap(appState.session?.avatarUrl)
 
     if (appState.appearanceOpen) {
         AppearanceScreen(
@@ -51,6 +73,17 @@ internal fun AppNavigation(
             darkMode = darkMode,
             onBack = appState::closeAppearance,
             onChange = onAppearanceChange,
+        )
+        return
+    }
+
+    if (appState.bannerPreviewOpen) {
+        ProfileBannerPreviewScreen(
+            avatar = avatar,
+            customBanner = customBanner,
+            store = bannerStore,
+            onBannerChange = { customBanner = it },
+            onClose = appState::closeBannerPreview,
         )
         return
     }
@@ -96,11 +129,14 @@ internal fun AppNavigation(
 
                 AppTab.PROFILE -> ProfileScreen(
                     session = appState.session,
+                    avatar = avatar,
                     defaultAvatar = defaultAvatar,
+                    customBanner = customBanner,
                     darkMode = darkMode,
                     onToggleDarkMode = onToggleDarkMode,
                     onOpenThemeAppearance = appState::openAppearance,
                     onOpenLibrary = appState::openLibrary,
+                    onBannerClick = appState::openBannerPreview,
                     onSessionChange = appState::updateSession,
                     scrollState = appState.profileScroll,
                     onBannerScrollLimitChange = appState::updateProfileBannerScrollLimit,

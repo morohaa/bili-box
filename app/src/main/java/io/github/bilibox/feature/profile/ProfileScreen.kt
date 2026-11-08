@@ -89,11 +89,14 @@ private val NavigationBarClearance = 82.dp
 @Composable
 internal fun ProfileScreen(
     session: BiliSession?,
+    avatar: ImageBitmap?,
     defaultAvatar: Int,
+    customBanner: ImageBitmap?,
     darkMode: Boolean = false,
     onToggleDarkMode: () -> Unit = {},
     onOpenThemeAppearance: () -> Unit = {},
     onOpenLibrary: (LocalVideoQuickFilter?) -> Unit = {},
+    onBannerClick: () -> Unit = {},
     onSessionChange: (BiliSession?) -> Unit,
     scrollState: ScrollState,
     onBannerScrollLimitChange: (Int) -> Unit = {},
@@ -156,7 +159,6 @@ internal fun ProfileScreen(
     val background = if (darkMode) MyBgDark else MyBgLight
     val ink = if (darkMode) MyInkDark else MyInkLight
     val sub = if (darkMode) MySubDark else MySubLight
-    val avatar = rememberRemoteBitmap(session?.avatarUrl)
     val version = remember(context) {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "1.0"
     }
@@ -249,7 +251,16 @@ internal fun ProfileScreen(
         }
 
         val header: @Composable () -> Unit = {
-            ProfileHeader(session, avatar, defaultAvatar, darkMode, onToggleDarkMode, bannerHeight)
+            ProfileHeader(
+                session = session,
+                avatar = avatar,
+                defaultAvatar = defaultAvatar,
+                customBanner = customBanner,
+                darkMode = darkMode,
+                onToggleDarkMode = onToggleDarkMode,
+                onBannerClick = onBannerClick,
+                bannerHeight = bannerHeight,
+            )
         }
 
         if (compact) {
@@ -322,8 +333,9 @@ internal fun ProfileScreen(
 
 // ---------------------------------------------------------------- header ---
 
+/** 加载当前账号头像；个人页与头图预览共用同一份结果。 */
 @Composable
-private fun rememberRemoteBitmap(url: String?): ImageBitmap? {
+internal fun rememberRemoteBitmap(url: String?): ImageBitmap? {
     var bitmap by remember(url) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(url) {
         bitmap = if (url.isNullOrBlank()) {

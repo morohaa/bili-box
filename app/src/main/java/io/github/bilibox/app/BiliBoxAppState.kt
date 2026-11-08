@@ -81,6 +81,10 @@ internal class BiliBoxAppState(
     var appearanceOpen by mutableStateOf(false)
         private set
 
+    // 「头图预览」同样覆盖整页，优先于底部导航与内容层展示。
+    var bannerPreviewOpen by mutableStateOf(false)
+        private set
+
     // “我的”页头图滚过状态栏的阈值（px）：只在矮视口整页滚动时有效，固定头图时为 Int.MAX_VALUE。
     var profileBannerScrollLimitPx by mutableIntStateOf(Int.MAX_VALUE)
         private set
@@ -105,6 +109,14 @@ internal class BiliBoxAppState(
 
     fun closeAppearance() {
         appearanceOpen = false
+    }
+
+    fun openBannerPreview() {
+        bannerPreviewOpen = true
+    }
+
+    fun closeBannerPreview() {
+        bannerPreviewOpen = false
     }
 
     fun updateSession(value: BiliSession?) {
@@ -190,6 +202,7 @@ internal class BiliBoxAppState(
                     "searchGrid" to it.searchGrid,
                     "homeExpanded" to it.homeExpanded,
                     "appearanceOpen" to it.appearanceOpen,
+                    "bannerPreviewOpen" to it.bannerPreviewOpen,
                 )
             },
             restore = {
@@ -202,6 +215,7 @@ internal class BiliBoxAppState(
                     searchGrid = it["searchGrid"] as Boolean
                     homeExpanded = it["homeExpanded"] as Boolean
                     appearanceOpen = it["appearanceOpen"] as Boolean? ?: false
+                    bannerPreviewOpen = it["bannerPreviewOpen"] as Boolean? ?: false
                 }
             },
         )

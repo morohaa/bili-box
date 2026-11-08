@@ -40,7 +40,7 @@ data         → core
 | 搜索结果、加载 / 失败、请求取消 | `feature/search/SearchStateHolder` | 由应用组装层持有；会话 Cookie 改变时重建，结果不经 Saver 恢复 |
 | 在线分 P、清晰度、加载、弹幕；本地队列与播放状态 | 对应 `feature/online`、`feature/player` 入口 | 跟随播放会话；选中的播放对象、本地播放列表和视频库临时筛选不经应用 Saver 恢复 |
 | 手势、抽屉、弹层等局部 UI 状态 | 最近的页面或组件 | 按需使用 `remember` / `rememberSaveable`，无需提升到应用层 |
-| Cookie、历史、播放进度、弹幕偏好、主题外观 | 对应 `data/*` 存储 | 按存储实现持久化；主题外观由 `BiliBoxApp` 通过 `data/appearance/AppearanceStore` 读写 `appearance` SharedPreferences |
+| Cookie、历史、播放进度、弹幕偏好、主题外观、自定义头图 | 对应 `data/*` 存储 | 按存储实现持久化；主题外观由 `BiliBoxApp` 通过 `data/appearance/AppearanceStore` 读写 `appearance` SharedPreferences；自定义头图由 `data/profile/ProfileBannerStore` 写入应用私有目录 |
 
 ## 主题外观
 
@@ -49,6 +49,13 @@ data         → core
 - `BiliBoxApp` 解析「浅色 / 深色 / 自动」得到实际明暗，创建带强调色的 `BiliBoxTheme`，并通过 `LocalAccentColor` 下发给首页、底部导航与个人页头图。
 - `feature/appearance` 只负责页面和交互，选中的主题、模式与背景通过回调交给应用组装层持久化；页面不直接读写 SharedPreferences，也不依赖 `app`。
 - 「立即应用」不改变已经即时生效的预览，只做一次确认提示；退出页面不会回滚已保存的设置。
+
+## 个人页头图
+
+- 「我的」页头图点击后进入沉浸式全屏预览，开合状态放在 `app/BiliBoxAppState`，由应用组装层统一处理底部导航隐藏、系统栏与返回键。
+- 默认头图仍由主题强调色与头像生成；自定义头图经 `data/profile/ProfileBannerStore` 按 16:9 居中裁切为 JPEG 后写入应用私有目录，不依赖相册 URI 的临时权限。
+- 预览页的「默认 / 保存 / 更换」分别对应清除自定义头图、把当前 16:9 画面写入相册、通过系统照片选择器更换；保存与更换的界面状态留在 `feature/profile`。
+- 更换头图先进入 16:9 裁剪页：拖动 / 双指缩放的状态留在 `feature/profile`，`bannerCropRect` 把视口映射回源图坐标，`ProfileBannerStore.saveCrop` 只负责裁切与落盘；确认后才替换预览中的头图。
 
 共享模型放在 `core/model`，不夹带接口客户端或页面状态。UI 文案与图标由 UI 层映射，接口参数和响应转换放在数据层。
 

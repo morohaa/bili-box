@@ -37,7 +37,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.bilibox.MainActivity
 import io.github.bilibox.R
 import io.github.bilibox.core.util.captureVideoFrame
-import io.github.bilibox.core.util.saveVideoFrame
+import io.github.bilibox.core.util.saveImageToGallery
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -202,7 +202,7 @@ class PlayerToolsTest {
         val frame = compose.runOnIdle { captureVideoFrame(playerView)!! }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         try {
-            val uri = saveVideoFrame(context, frame)
+            val uri = saveImageToGallery(context, frame)
             try {
                 val saved = context.contentResolver.openInputStream(uri).use { BitmapFactory.decodeStream(it) }
                 assertNotNull(saved)
