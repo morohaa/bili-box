@@ -52,6 +52,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -122,7 +123,8 @@ internal fun HomeScreen(
     onExpandedChange: (Boolean) -> Unit,
     scrollState: ScrollState,
     darkMode: Boolean = false,
-    backgroundStyle: HomeBackground = HomeBackground.HOME,
+    backgroundStyle: HomeBackground = HomeBackground.GRADIENT,
+    backgroundImage: ImageBitmap? = null,
 ) {
     val accent = LocalAccentColor.current
     val colors = dynamicColors(darkMode, accent)
@@ -160,7 +162,7 @@ internal fun HomeScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize().background(colors.background).appearanceBackdrop(backgroundStyle, accent, darkMode)) {
+    Box(Modifier.fillMaxSize().background(colors.background).appearanceBackdrop(backgroundStyle, accent, darkMode, backgroundImage)) {
         BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
             // 参考稿把 logo 顶边放在屏高一半 - 100；这里再上移 40dp，搜索框正好落在视觉中心。
             val homeTop = (maxHeight * 0.5f - 120.dp).coerceAtLeast(16.dp)

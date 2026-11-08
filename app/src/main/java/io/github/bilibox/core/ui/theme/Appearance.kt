@@ -9,11 +9,15 @@ internal enum class AppearanceMode(val label: String) {
     AUTO("自动"),
 }
 
-/** 首页背景样式，「主题外观」页的底部弹层直接映射到这个枚举。 */
+/**
+ * 首页背景样式，「主题外观」页的底部弹层直接映射到这个枚举，顺序即展示顺序。
+ *
+ * [CUSTOM] 使用用户自己上传的图片，图片缺失时退回 [GRADIENT] 的渐变光晕。
+ */
 internal enum class HomeBackground(val label: String) {
-    HOME("首页背景"),
-    SOLID("纯色"),
     GRADIENT("渐变"),
+    SOLID("纯色"),
+    CUSTOM("自定义"),
 }
 
 /**
@@ -54,7 +58,7 @@ internal val ThemeCatalog: List<ThemeOption> = listOf(
 internal data class AppearanceSettings(
     val themeId: String = DefaultThemeId,
     val mode: AppearanceMode = AppearanceMode.LIGHT,
-    val background: HomeBackground = HomeBackground.HOME,
+    val background: HomeBackground = HomeBackground.GRADIENT,
 ) {
     val theme: ThemeOption get() = themeById(themeId)
 }

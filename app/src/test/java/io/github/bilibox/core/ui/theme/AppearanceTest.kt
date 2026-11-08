@@ -29,12 +29,20 @@ class AppearanceTest {
     }
 
     @Test
-    fun `settings default to the classic pink theme and home background`() {
+    fun `settings default to the classic pink theme and gradient background`() {
         val settings = AppearanceSettings()
 
         assertEquals(DefaultThemeId, settings.themeId)
         assertEquals(AppearanceMode.LIGHT, settings.mode)
-        assertEquals(HomeBackground.HOME, settings.background)
+        assertEquals(HomeBackground.GRADIENT, settings.background)
         assertEquals("粉电视 · 经典", settings.theme.name)
+    }
+
+    @Test
+    fun `home background offers gradient then solid then custom`() {
+        assertEquals(
+            listOf("渐变", "纯色", "自定义"),
+            HomeBackground.entries.map { it.label },
+        )
     }
 }

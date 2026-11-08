@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import io.github.bilibox.core.ui.component.LiquidNavigation
 import io.github.bilibox.core.ui.theme.AppearanceSettings
 import io.github.bilibox.core.ui.theme.BrandSpringEasing
+import io.github.bilibox.data.appearance.HomeBackgroundImageStore
 import io.github.bilibox.data.profile.ProfileBannerStore
 import io.github.bilibox.feature.appearance.AppearanceScreen
 import io.github.bilibox.feature.home.HomeScreen
@@ -51,6 +52,9 @@ internal fun AppNavigation(
     appState: BiliBoxAppState,
     darkMode: Boolean,
     appearance: AppearanceSettings,
+    backgroundImage: ImageBitmap?,
+    backgroundStore: HomeBackgroundImageStore,
+    onBackgroundImageChange: (ImageBitmap?) -> Unit,
     onAppearanceChange: (AppearanceSettings) -> Unit,
     onToggleDarkMode: () -> Unit,
 ) {
@@ -71,6 +75,9 @@ internal fun AppNavigation(
         AppearanceScreen(
             appearance = appearance,
             darkMode = darkMode,
+            backgroundImage = backgroundImage,
+            backgroundStore = backgroundStore,
+            onBackgroundImageChange = onBackgroundImageChange,
             onBack = appState::closeAppearance,
             onChange = onAppearanceChange,
         )
@@ -161,6 +168,7 @@ internal fun AppNavigation(
                     scrollState = appState.homeScroll,
                     darkMode = darkMode,
                     backgroundStyle = appearance.background,
+                    backgroundImage = backgroundImage,
                 )
             }
         }

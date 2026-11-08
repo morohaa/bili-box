@@ -40,14 +40,16 @@ data         → core
 | 搜索结果、加载 / 失败、请求取消 | `feature/search/SearchStateHolder` | 由应用组装层持有；会话 Cookie 改变时重建，结果不经 Saver 恢复 |
 | 在线分 P、清晰度、加载、弹幕；本地队列与播放状态 | 对应 `feature/online`、`feature/player` 入口 | 跟随播放会话；选中的播放对象、本地播放列表和视频库临时筛选不经应用 Saver 恢复 |
 | 手势、抽屉、弹层等局部 UI 状态 | 最近的页面或组件 | 按需使用 `remember` / `rememberSaveable`，无需提升到应用层 |
-| Cookie、历史、播放进度、弹幕偏好、主题外观、自定义头图 | 对应 `data/*` 存储 | 按存储实现持久化；主题外观由 `BiliBoxApp` 通过 `data/appearance/AppearanceStore` 读写 `appearance` SharedPreferences；自定义头图由 `data/profile/ProfileBannerStore` 写入应用私有目录 |
+| Cookie、历史、播放进度、弹幕偏好、主题外观、自定义头图与首页背景 | 对应 `data/*` 存储 | 按存储实现持久化；主题外观由 `BiliBoxApp` 通过 `data/appearance/AppearanceStore` 读写 `appearance` SharedPreferences；自定义头图与自定义首页背景分别由 `data/profile/ProfileBannerStore`、`data/appearance/HomeBackgroundImageStore` 写入应用私有目录 |
 
 ## 主题外观
 
-- `core/ui/theme/Appearance.kt` 保存明暗模式、首页背景与 12 套主题色板；`AppearanceBackdrop` 提供首页可复用的背景光晕。
-- `data/appearance/AppearanceStore` 负责 `appearance` SharedPreferences 的读写与旧版 `dark_mode` 迁移。
+- `core/ui/theme/Appearance.kt` 保存明暗模式、首页背景（渐变 / 纯色 / 自定义）与 12 套主题色板；`AppearanceBackdrop` 负责把渐变光晕或用户上传的图片按要求铺满页面，并叠上与明暗模式匹配的蒙层。
+- `data/appearance/AppearanceStore` 负责 `appearance` SharedPreferences 的读写与旧版 `dark_mode`、`home_background=HOME` 的迁移。
+- `data/appearance/HomeBackgroundImageStore` 把「自定义首页背景」缩放到 2160px 以内并编码为 JPEG 写入应用私有目录，启动时由 `BiliBoxApp` 异步读回。
 - `BiliBoxApp` 解析「浅色 / 深色 / 自动」得到实际明暗，创建带强调色的 `BiliBoxTheme`，并通过 `LocalAccentColor` 下发给首页、底部导航与个人页头图。
 - `feature/appearance` 只负责页面和交互，选中的主题、模式与背景通过回调交给应用组装层持久化；页面不直接读写 SharedPreferences，也不依赖 `app`。
+- 首页背景弹层不写标题，只保留右上角「完成」，三项依次是渐变、纯色、自定义；点「自定义」先选图，再进入整屏的首页预览，确认「使用该背景」后才写盘并生效。
 - 「立即应用」不改变已经即时生效的预览，只做一次确认提示；退出页面不会回滚已保存的设置。
 
 ## 个人页头图

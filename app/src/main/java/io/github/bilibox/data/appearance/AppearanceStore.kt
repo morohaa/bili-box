@@ -19,9 +19,10 @@ internal class AppearanceStore(context: Context) {
         val mode = preferences.getString("appearance_mode", null)
             ?.let { raw -> AppearanceMode.entries.firstOrNull { it.name == raw } }
             ?: if (preferences.getBoolean("dark_mode", false)) AppearanceMode.DARK else AppearanceMode.LIGHT
+        // 旧版存过 HOME（纯光晕），现在由 GRADIENT 承担，读不出来时一并退回渐变。
         val background = preferences.getString("home_background", null)
             ?.let { raw -> HomeBackground.entries.firstOrNull { it.name == raw } }
-            ?: HomeBackground.HOME
+            ?: HomeBackground.GRADIENT
         return AppearanceSettings(themeId = themeId, mode = mode, background = background)
     }
 

@@ -1,6 +1,9 @@
 package io.github.bilibox.feature.appearance
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -10,8 +13,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -46,28 +51,44 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.theme.AppearanceSettings
+import io.github.bilibox.core.ui.theme.DynamicColors
 import io.github.bilibox.core.ui.theme.HomeBackground
 import io.github.bilibox.core.ui.theme.ThemeCatalog
 import io.github.bilibox.core.ui.theme.ThemeOption
 import io.github.bilibox.core.ui.theme.appearanceBackdrop
+import io.github.bilibox.core.ui.theme.dynamicColors
+import io.github.bilibox.data.appearance.HomeBackgroundImageStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // 设计稿：大图 244px、网格 4 列、底部胶囊按钮 48px。
 private val HeroHeight = 244.dp
@@ -84,18 +105,25 @@ private val SheetEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
 internal fun AppearanceScreen(
     appearance: AppearanceSettings,
     darkMode: Boolean,
+    backgroundImage: ImageBitmap?,
+    backgroundStore: HomeBackgroundImageStore,
+    onBackgroundImageChange: (ImageBitmap?) -> Unit,
     onBack: () -> Unit,
     onChange: (AppearanceSettings) -> Unit,
 ) {
     val palette = remember(darkMode) { appearancePalette(darkMode) }
     val theme = appearance.theme
     val accent = theme.base
+    val scope = rememberCoroutineScope()
 
     var sheetOpen by remember { mutableStateOf(false) }
     var moreOpen by remember { mutableStateOf(false) }
     var toastText by remember { mutableStateOf("") }
     var toastVisible by remember { mutableStateOf(false) }
     var toastTick by remember { mutableIntStateOf(0) }
+    // 选好但还没确认的自定义背景：在预览页里「使用该背景」之后才真正生效并落盘。
+    var candidate by remember { mutableStateOf<ImageBitmap?>(null) }
+    var readingImage by remember { mutableStateOf(false) }
 
     fun showToast(text: String) {
         toastText = text
@@ -109,14 +137,67 @@ internal fun AppearanceScreen(
         toastVisible = false
     }
 
+    val pickImage = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        readingImage = true
+        scope.launch {
+            try {
+                val bitmap = withContext(Dispatchers.IO) { backgroundStore.loadSource(uri) }
+                if (bitmap == null) {
+                    showToast("图片读取失败，请换一张试试")
+                } else {
+                    candidate = bitmap.asImageBitmap()
+                    sheetOpen = false
+                }
+            } finally {
+                readingImage = false
+            }
+        }
+    }
+
+    fun pickCustomImage() {
+        pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+
+    // 已经有自定义背景时先看当前效果，需要换图再进相册。
+    fun openCustomBackground() {
+        val existing = backgroundImage
+        if (existing != null) {
+            candidate = existing
+            sheetOpen = false
+        } else {
+            pickCustomImage()
+        }
+    }
+
+    fun confirmBackground(image: ImageBitmap) {
+        scope.launch {
+            val saved = withContext(Dispatchers.IO) { backgroundStore.save(image.asAndroidBitmap()) }
+            if (!saved) {
+                showToast("背景保存失败，请稍后重试")
+                return@launch
+            }
+            onBackgroundImageChange(image)
+            onChange(appearance.copy(background = HomeBackground.CUSTOM))
+            candidate = null
+            showToast("已设为首页背景")
+        }
+    }
+
     BackHandler {
-        if (sheetOpen) sheetOpen = false else onBack()
+        when {
+            candidate != null -> candidate = null
+            sheetOpen -> sheetOpen = false
+            else -> onBack()
+        }
     }
 
     Box(
         Modifier.fillMaxSize()
             .background(palette.background)
-            .appearanceBackdrop(appearance.background, accent, darkMode)
+            .appearanceBackdrop(appearance.background, accent, darkMode, backgroundImage)
     ) {
         Column(Modifier.fillMaxSize()) {
             AppearanceTopBar(
@@ -165,14 +246,41 @@ internal fun AppearanceScreen(
         BackgroundSheetOverlay(
             open = sheetOpen,
             selected = appearance.background,
+            backgroundImage = backgroundImage,
             accent = accent,
             palette = palette,
             onSelect = { background ->
                 onChange(appearance.copy(background = background))
                 sheetOpen = false
             },
+            onCustom = { openCustomBackground() },
             onDismiss = { sheetOpen = false },
         )
+
+        candidate?.let { image ->
+            HomeBackgroundPreview(
+                image = image,
+                accent = accent,
+                darkMode = darkMode,
+                onCancel = { candidate = null },
+                onReplace = { pickCustomImage() },
+                onUse = { confirmBackground(image) },
+            )
+        }
+
+        if (readingImage) {
+            Box(
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = .32f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xE61A1B1F))
+                        .padding(horizontal = 18.dp, vertical = 12.dp)
+                ) {
+                    Text("正在读取图片…", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
+            }
+        }
 
         AnimatedVisibility(
             visible = toastVisible,
@@ -330,17 +438,23 @@ private fun BoxScope.ApplyBar(accent: Color, palette: AppearancePalette, onApply
             .navigationBarsPadding()
             .padding(bottom = 26.dp),
     ) {
-        ApplyButton(accent, onApply)
+        PrimaryPill(text = "立即应用", accent = accent, onClick = onApply)
     }
 }
 
+/** 强调色胶囊按钮：「立即应用」与背景预览里的「使用该背景」共用同一套按压与阴影。 */
 @Composable
-private fun ApplyButton(accent: Color, onApply: () -> Unit) {
+private fun PrimaryPill(
+    text: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .98f else 1f, tween(140), label = "apply press")
+    val scale by animateFloatAsState(if (pressed) .98f else 1f, tween(140), label = "primary press")
     Box(
-        Modifier.fillMaxWidth().height(48.dp)
+        modifier.fillMaxWidth().height(48.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -353,10 +467,10 @@ private fun ApplyButton(accent: Color, onApply: () -> Unit) {
             )
             .clip(CircleShape)
             .background(Brush.horizontalGradient(listOf(accent, lerp(accent, Color.White, .26f))))
-            .clickable(interactionSource = interaction, indication = null, onClick = onApply),
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text("立即应用", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, letterSpacing = .3.sp)
+        Text(text, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, letterSpacing = .3.sp)
     }
 }
 
@@ -366,9 +480,11 @@ private fun ApplyButton(accent: Color, onApply: () -> Unit) {
 private fun BoxScope.BackgroundSheetOverlay(
     open: Boolean,
     selected: HomeBackground,
+    backgroundImage: ImageBitmap?,
     accent: Color,
     palette: AppearancePalette,
     onSelect: (HomeBackground) -> Unit,
+    onCustom: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val scrimInteraction = remember { MutableInteractionSource() }
@@ -384,16 +500,23 @@ private fun BoxScope.BackgroundSheetOverlay(
         enter = slideInVertically(tween(340, easing = SheetEasing)) { it },
         exit = slideOutVertically(tween(280, easing = SheetEasing)) { it },
     ) {
-        BackgroundSheet(selected, accent, palette, onSelect, onDismiss)
+        BackgroundSheet(selected, backgroundImage, accent, palette, onSelect, onCustom, onDismiss)
     }
 }
 
+/**
+ * 首页背景弹层：不再写标题，只留右上角「完成」；三项依次是渐变、纯色、自定义。
+ *
+ * 「自定义」不走即时生效：先选图，再进入首页预览，确认后才写入设置。
+ */
 @Composable
 private fun BackgroundSheet(
     selected: HomeBackground,
+    backgroundImage: ImageBitmap?,
     accent: Color,
     palette: AppearancePalette,
     onSelect: (HomeBackground) -> Unit,
+    onCustom: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     Column(
@@ -409,10 +532,10 @@ private fun BackgroundSheet(
                 .clip(CircleShape).background(palette.line)
         )
         Row(
-            Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 8.dp),
+            Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 10.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("背景样式", color = palette.ink, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Spacer(Modifier.weight(1f))
             Text(
                 "完成",
                 color = accent,
@@ -424,7 +547,11 @@ private fun BackgroundSheet(
         }
         HomeBackground.entries.forEachIndexed { index, option ->
             Row(
-                Modifier.fillMaxWidth().clickable { onSelect(option) }.padding(horizontal = 22.dp, vertical = 15.dp),
+                Modifier.fillMaxWidth()
+                    .clickable {
+                        if (option == HomeBackground.CUSTOM) onCustom() else onSelect(option)
+                    }
+                    .padding(horizontal = 22.dp, vertical = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -434,11 +561,196 @@ private fun BackgroundSheet(
                     fontWeight = if (option == selected) FontWeight.Bold else FontWeight.Normal,
                     modifier = Modifier.weight(1f),
                 )
+                if (option == HomeBackground.CUSTOM && backgroundImage != null) {
+                    Image(
+                        bitmap = backgroundImage,
+                        contentDescription = "当前自定义背景",
+                        modifier = Modifier.size(30.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                }
                 if (option == selected) TickGlyph(accent, Modifier.size(19.dp))
             }
             if (index < HomeBackground.entries.lastIndex) {
                 HorizontalDivider(Modifier.padding(start = 22.dp), color = palette.line)
             }
         }
+    }
+}
+
+// --------------------------------------------------------------- preview ---
+
+/**
+ * 自定义背景的首页预览：把候选图片按首页的铺法画一遍，再叠一层与正式生效时一致的蒙层。
+ *
+ * 顶部可关闭或换图，底部「使用该背景」才把图片写进设置；只按返回则等于放弃这次选择。
+ */
+@Composable
+private fun HomeBackgroundPreview(
+    image: ImageBitmap,
+    accent: Color,
+    darkMode: Boolean,
+    onCancel: () -> Unit,
+    onReplace: () -> Unit,
+    onUse: () -> Unit,
+) {
+    val colors = remember(darkMode, accent) { dynamicColors(darkMode, accent) }
+    val scrim = if (darkMode) Color.Black else Color.White
+    // 预览是整层覆盖：空白处的点按必须被吞掉，否则会穿透到下面的主题网格。
+    Box(
+        Modifier.fillMaxSize().background(Color.Black)
+            .pointerInput(Unit) { detectTapGestures(onTap = {}) }
+    ) {
+        Image(
+            bitmap = image,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to scrim.copy(alpha = .52f),
+                    .32f to scrim.copy(alpha = if (darkMode) .34f else .22f),
+                    .68f to scrim.copy(alpha = if (darkMode) .38f else .26f),
+                    1f to scrim.copy(alpha = .56f),
+                )
+            )
+        )
+        Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+            Row(
+                Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape)
+                        .background(Color.Black.copy(alpha = .30f))
+                        .clickable(onClick = onCancel)
+                        .semantics { contentDescription = "取消预览" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CloseGlyph(Color.White, Modifier.size(15.dp))
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "首页预览",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "更换图片",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clip(CircleShape)
+                        .background(Color.Black.copy(alpha = .30f))
+                        .clickable(onClick = onReplace)
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            HomePreviewContent(colors, accent)
+            Spacer(Modifier.weight(1f))
+            Row(
+                Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.weight(1f).height(48.dp).clip(CircleShape)
+                        .background(Color.Black.copy(alpha = .34f))
+                        .clickable(onClick = onCancel),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("取消", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+                PrimaryPill(
+                    text = "使用该背景",
+                    accent = accent,
+                    modifier = Modifier.weight(1.25f),
+                    onClick = onUse,
+                )
+            }
+        }
+    }
+}
+
+/** 首页骨架：标志、搜索框与底部胶囊导航，缩略到预览页里用于判断背景是否合适。 */
+@Composable
+private fun HomePreviewContent(colors: DynamicColors, accent: Color) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(34.dp).clip(RoundedCornerShape(10.dp))
+                    .background(colors.card.copy(alpha = .92f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                TvGlyph(accent, Modifier.size(21.dp))
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "bilibox",
+                color = colors.ink,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = (-0.6).sp,
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+        Row(
+            Modifier.fillMaxWidth().height(44.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .background(colors.card.copy(alpha = .92f))
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MagnifierGlyph(colors.pink, Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "输入关键词、BV 号或粘贴链接",
+                color = colors.ink3,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.height(18.dp))
+        Box(
+            Modifier.clip(CircleShape).background(Color.Black.copy(alpha = .38f))
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                "确认后，这张图就会成为首页背景",
+                color = Color.White.copy(alpha = .92f),
+                fontSize = 11.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MagnifierGlyph(tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val unit = size.minDimension / 24f
+        val stroke = Stroke(width = 2.4f * unit, cap = StrokeCap.Round)
+        drawCircle(tint, 7f * unit, Offset(11f * unit, 11f * unit), style = stroke)
+        drawLine(tint, Offset(16.5f * unit, 16.5f * unit), Offset(20f * unit, 20f * unit), stroke.width, StrokeCap.Round)
+    }
+}
+
+@Composable
+private fun CloseGlyph(tint: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val unit = size.minDimension / 24f
+        val stroke = 2.4f * unit
+        drawLine(tint, Offset(6f * unit, 6f * unit), Offset(18f * unit, 18f * unit), stroke, StrokeCap.Round)
+        drawLine(tint, Offset(18f * unit, 6f * unit), Offset(6f * unit, 18f * unit), stroke, StrokeCap.Round)
     }
 }

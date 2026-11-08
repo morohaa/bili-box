@@ -3,6 +3,8 @@ package io.github.bilibox.app
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -11,6 +13,9 @@ import io.github.bilibox.core.ui.theme.AppearanceSettings
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.core.ui.theme.resolveDark
 import io.github.bilibox.data.appearance.AppearanceStore
+import io.github.bilibox.data.appearance.HomeBackgroundImageStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** 应用根布局：组合主题、系统栏外观与页面导航。 */
 @Composable
@@ -18,6 +23,12 @@ internal fun BiliBoxApp() {
     val context = LocalContext.current
     val store = remember(context) { AppearanceStore(context) }
     var appearance by remember(store) { mutableStateOf(store.load()) }
+    // 自定义首页背景是本地图片，启动时异步读回；没读完前按渐变绘制，不会白屏。
+    val backgroundStore = remember(context) { HomeBackgroundImageStore(context) }
+    var backgroundImage by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(backgroundStore) {
+        backgroundImage = withContext(Dispatchers.IO) { backgroundStore.load()?.asImageBitmap() }
+    }
     val systemDark = isSystemInDarkTheme()
     val darkMode = appearance.mode.resolveDark(systemDark)
     val appState = rememberBiliBoxAppState()
@@ -33,6 +44,9 @@ internal fun BiliBoxApp() {
             appState = appState,
             darkMode = darkMode,
             appearance = appearance,
+            backgroundImage = backgroundImage,
+            backgroundStore = backgroundStore,
+            onBackgroundImageChange = { backgroundImage = it },
             onAppearanceChange = ::updateAppearance,
             onToggleDarkMode = {
                 updateAppearance(
