@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.ui.component.RemoteCover
+import io.github.bilibox.core.ui.component.VideoCoverPlaceholder
 import io.github.bilibox.core.ui.component.VideoMetaIcon
 import io.github.bilibox.core.util.formatSearchDuration
 import java.text.SimpleDateFormat
@@ -75,7 +76,12 @@ internal fun SearchResultCard(
         // 因此右栏文字（多行或系统字体放大）决定卡片高度时封面仍能填满。
         Row(Modifier.matchParentSize()) {
             Box(Modifier.width(CoverWidth).fillMaxHeight()) {
-                RemoteCover(video.coverUrl, Modifier.fillMaxSize(), RectangleShape)
+                RemoteCover(
+                    video.coverUrl,
+                    Modifier.fillMaxSize(),
+                    RectangleShape,
+                    placeholder = { VideoCoverPlaceholder(Modifier.fillMaxSize()) },
+                )
                 DurationBadge(video.duration, Modifier.align(Alignment.BottomEnd))
             }
             Spacer(Modifier.weight(1f))
@@ -124,7 +130,12 @@ internal fun SearchGridCard(
     VideoCardSurface(darkMode, modifier.fillMaxWidth(), onClick) {
         Column(Modifier.fillMaxWidth()) {
             Box(Modifier.fillMaxWidth().aspectRatio(16f / 10f)) {
-                RemoteCover(video.coverUrl, Modifier.fillMaxSize(), RectangleShape)
+                RemoteCover(
+                    video.coverUrl,
+                    Modifier.fillMaxSize(),
+                    RectangleShape,
+                    placeholder = { VideoCoverPlaceholder(Modifier.fillMaxSize()) },
+                )
                 DurationBadge(video.duration, Modifier.align(Alignment.BottomEnd))
             }
             Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 9.dp)) {
