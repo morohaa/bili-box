@@ -36,6 +36,7 @@ import io.github.bilibox.data.auth.fetchBiliSession
 import io.github.bilibox.data.auth.hasLoginCookies
 import io.github.bilibox.data.auth.mergeCookies
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
+import io.github.bilibox.data.profile.BannerAdjustments
 import io.github.bilibox.feature.auth.BiliNativeLoginDialog
 import io.github.bilibox.feature.auth.BiliWebLoginDialog
 import java.net.HttpURLConnection
@@ -92,6 +93,7 @@ internal fun ProfileScreen(
     avatar: ImageBitmap?,
     defaultAvatar: Int,
     customBanner: ImageBitmap?,
+    bannerAdjustments: BannerAdjustments = BannerAdjustments(),
     darkMode: Boolean = false,
     onToggleDarkMode: () -> Unit = {},
     onOpenThemeAppearance: () -> Unit = {},
@@ -260,6 +262,7 @@ internal fun ProfileScreen(
                 onToggleDarkMode = onToggleDarkMode,
                 onBannerClick = onBannerClick,
                 bannerHeight = bannerHeight,
+                bannerAdjustments = bannerAdjustments,
             )
         }
 

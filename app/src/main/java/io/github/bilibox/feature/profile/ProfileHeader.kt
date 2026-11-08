@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.theme.LocalAccentColor
 import io.github.bilibox.data.auth.BiliSession
+import io.github.bilibox.data.profile.BannerAdjustments
 
 // 头图高度跟屏宽成比例：各机型裁切和观感一致，不再把系统状态栏高度加进高度。
 private const val BANNER_ASPECT_RATIO = 1.7f
@@ -77,6 +78,7 @@ internal fun ProfileHeader(
     onToggleDarkMode: () -> Unit,
     onBannerClick: () -> Unit,
     bannerHeight: Dp,
+    bannerAdjustments: BannerAdjustments = BannerAdjustments(),
 ) {
     val background = if (darkMode) MyBgDark else MyBgLight
 
@@ -87,6 +89,7 @@ internal fun ProfileHeader(
             modifier = Modifier.fillMaxWidth().height(bannerHeight)
                 .clickable(role = Role.Button, onClick = onBannerClick)
                 .semantics { contentDescription = "预览头图" },
+            adjustments = bannerAdjustments,
         )
         ProfileAvatar(
             session = session,
@@ -146,10 +149,11 @@ internal fun Banner(
     avatar: ImageBitmap?,
     customBanner: ImageBitmap?,
     modifier: Modifier = Modifier,
+    adjustments: BannerAdjustments = BannerAdjustments(),
 ) {
     // BlurEffect 会把图层向外扩散，必须裁掉，否则头图会糊到信息区里。
     Box(modifier.clipToBounds()) {
-        BannerArtwork(avatar, customBanner, Modifier.matchParentSize())
+        BannerArtwork(avatar, customBanner, Modifier.matchParentSize(), adjustments)
         // 状态栏图标是白色，顶部压一层深色保证可读。
         Box(
             Modifier.matchParentSize().background(
@@ -162,46 +166,65 @@ internal fun Banner(
 /**
  * 头图画面本身：默认由主题色与头像生成，换过头图时直接铺自定义图片。
  *
- * 单独拆出来给全屏预览复用，预览不叠加顶部状态栏遮罩。
+ * 单独拆出来给全屏预览复用，预览不叠加顶部状态栏遮罩；暗化 / 模糊按预览结果
+ * 叠加在同一层画面里，保证个人页与编辑页看到的效果一致。
  */
 @Composable
 internal fun BannerArtwork(
     avatar: ImageBitmap?,
     customBanner: ImageBitmap?,
     modifier: Modifier = Modifier,
+    adjustments: BannerAdjustments = BannerAdjustments(),
 ) {
-    val blurPx = with(LocalDensity.current) { 26.dp.toPx() }
+    val avatarBlurPx = with(LocalDensity.current) { 26.dp.toPx() }
+    // 编辑器里的模糊按 px 计算，与设计稿的滑杆刻度一致。
+    val imageBlurPx = adjustments.blur.toFloat()
     val canBlur = Build.VERSION.SDK_INT >= 31
     val accent = LocalAccentColor.current
-    Box(modifier) {
-        if (customBanner != null) {
-            Image(
-                bitmap = customBanner,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize(),
-            )
-        } else {
-            Box(
-                Modifier.matchParentSize().background(
-                    Brush.linearGradient(
-                        listOf(lerp(accent, Color.White, .12f), lerp(accent, Color.Black, .32f))
-                    )
-                )
-            )
-            if (avatar != null) {
+    Box(modifier.clipToBounds()) {
+        Box(
+            Modifier.matchParentSize().graphicsLayer {
+                if (canBlur && imageBlurPx > 0f) {
+                    renderEffect = BlurEffect(imageBlurPx, imageBlurPx, TileMode.Clamp)
+                    val scale = 1f + adjustments.blur / 200f
+                    scaleX = scale
+                    scaleY = scale
+                }
+            }
+        ) {
+            if (customBanner != null) {
                 Image(
-                    bitmap = avatar,
+                    bitmap = customBanner,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.matchParentSize().graphicsLayer {
-                        alpha = 0.94f
-                        if (canBlur) renderEffect = BlurEffect(blurPx, blurPx, TileMode.Clamp)
-                    },
+                    modifier = Modifier.matchParentSize(),
                 )
-                // 统一成主题强调色，避免头像放大后喧宾夺主。
-                Box(Modifier.matchParentSize().background(accent.copy(alpha = .2f)))
+            } else {
+                Box(
+                    Modifier.matchParentSize().background(
+                        Brush.linearGradient(
+                            listOf(lerp(accent, Color.White, .12f), lerp(accent, Color.Black, .32f))
+                        )
+                    )
+                )
+                if (avatar != null) {
+                    Image(
+                        bitmap = avatar,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize().graphicsLayer {
+                            alpha = 0.94f
+                            if (canBlur) renderEffect = BlurEffect(avatarBlurPx, avatarBlurPx, TileMode.Clamp)
+                        },
+                    )
+                    // 统一成主题强调色，避免头像放大后喧宾夺主。
+                    Box(Modifier.matchParentSize().background(accent.copy(alpha = .2f)))
+                }
             }
+        }
+        val darkness = adjustments.darkness.coerceIn(0, 100)
+        if (darkness > 0) {
+            Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = darkness / 100f)))
         }
     }
 }

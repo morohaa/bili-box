@@ -9,6 +9,8 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import android.net.Uri
+import io.github.bilibox.core.ui.theme.WallpaperBlurMax
+import io.github.bilibox.core.ui.theme.WallpaperDarknessMax
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -22,17 +24,30 @@ private const val BannerHeight = 900
 // 相册原图先按最长边限制解码尺寸，既保留裁切余量，又不会把整张原图读进内存。
 private const val DecodeMaxEdge = 2400
 
+/** 头图的暗化与模糊，范围与壁纸编辑器共用。 */
+internal data class BannerAdjustments(
+    val darkness: Int = 0,
+    val blur: Int = 0,
+) {
+    fun clamped(): BannerAdjustments = BannerAdjustments(
+        darkness = darkness.coerceIn(0, WallpaperDarknessMax),
+        blur = blur.coerceIn(0, WallpaperBlurMax),
+    )
+}
+
 /**
  * 「我的」页自定义头图的本地存储。
  *
  * 图片会按 16:9 裁切后以 JPEG 写入应用私有目录，不依赖相册 URI 的临时读权限；
  * 相册只负责提供一次源图，应用重启后仍能直接展示。
+ * 暗化 / 模糊与图片分开保存在 SharedPreferences，恢复默认头图时可以一并清零。
  */
 internal class ProfileBannerStore(context: Context) {
     private val appContext = context.applicationContext
     private val directory = File(appContext.filesDir, "profile")
     private val bannerFile = File(directory, "banner.jpg")
     private val tempFile = File(directory, "banner.tmp")
+    private val preferences = appContext.getSharedPreferences("profile_banner", Context.MODE_PRIVATE)
 
     /** 读取已保存的头图；界面层再转换成 Compose 位图。 */
     fun load(): Bitmap? = runCatching {
@@ -75,6 +90,19 @@ internal class ProfileBannerStore(context: Context) {
     fun clear() {
         bannerFile.delete()
         tempFile.delete()
+    }
+
+    fun loadAdjustments(): BannerAdjustments = BannerAdjustments(
+        darkness = preferences.getInt("darkness", 0),
+        blur = preferences.getInt("blur", 0),
+    ).clamped()
+
+    fun saveAdjustments(adjustments: BannerAdjustments) {
+        val value = adjustments.clamped()
+        preferences.edit()
+            .putInt("darkness", value.darkness)
+            .putInt("blur", value.blur)
+            .apply()
     }
 
     private fun write(bitmap: Bitmap) {

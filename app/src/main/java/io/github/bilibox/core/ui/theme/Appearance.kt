@@ -38,6 +38,10 @@ internal data class ThemeOption(
 
 internal const val DefaultThemeId = "pink"
 
+// 壁纸 / 头图编辑器的暗化与模糊上限，取值范围与设计稿一致。
+internal const val WallpaperDarknessMax = 80
+internal const val WallpaperBlurMax = 20
+
 /** 12 套预设主题，顺序与设计稿的 4 列 3 行网格一致。 */
 internal val ThemeCatalog: List<ThemeOption> = listOf(
     ThemeOption("rose", "玫瑰红", "玫瑰红 · 热烈", Color(0xFFF43F5E), Color(0xFFFB7185), Color(0xFFFDA4AF)),
@@ -59,6 +63,9 @@ internal data class AppearanceSettings(
     val themeId: String = DefaultThemeId,
     val mode: AppearanceMode = AppearanceMode.LIGHT,
     val background: HomeBackground = HomeBackground.GRADIENT,
+    // 自定义背景的暗化与模糊，只对 HomeBackground.CUSTOM 生效；0 表示保持原样。
+    val backgroundDarkness: Int = 0,
+    val backgroundBlur: Int = 0,
 ) {
     val theme: ThemeOption get() = themeById(themeId)
 }

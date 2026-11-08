@@ -36,6 +36,8 @@ internal enum class AppIcon {
     ARROW_UP,
     ARROW_DOWN,
     MORE,
+    MORE_HORIZONTAL,
+    FULLSCREEN,
     REFRESH,
     CLOSE,
     SHARE,
@@ -168,6 +170,19 @@ internal fun DrawScope.drawAppGlyph(
                 circle(12f, 5f, 1.3f, filled = true)
                 circle(12f, 12f, 1.3f, filled = true)
                 circle(12f, 19f, 1.3f, filled = true)
+            }
+
+            AppIcon.MORE_HORIZONTAL -> {
+                circle(5f, 12f, 1.6f, filled = true)
+                circle(12f, 12f, 1.6f, filled = true)
+                circle(19f, 12f, 1.6f, filled = true)
+            }
+
+            AppIcon.FULLSCREEN -> {
+                path("M8 3H5a2 2 0 0 0-2 2v3")
+                path("M21 8V5a2 2 0 0 0-2-2h-3")
+                path("M3 16v3a2 2 0 0 0 2 2h3")
+                path("M16 21h3a2 2 0 0 0 2-2v-3")
             }
 
             AppIcon.REFRESH -> {

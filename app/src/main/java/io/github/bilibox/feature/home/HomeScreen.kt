@@ -83,11 +83,11 @@ import io.github.bilibox.core.model.SearchDuration
 import io.github.bilibox.core.model.SearchOrder
 import io.github.bilibox.core.model.SearchTimeRange
 import io.github.bilibox.core.model.VideoSummary
+import io.github.bilibox.core.ui.theme.AppearanceBackdrop
 import io.github.bilibox.core.ui.theme.BrandSpringEasing
 import io.github.bilibox.core.ui.theme.DynamicColors
 import io.github.bilibox.core.ui.theme.HomeBackground
 import io.github.bilibox.core.ui.theme.LocalAccentColor
-import io.github.bilibox.core.ui.theme.appearanceBackdrop
 import io.github.bilibox.core.ui.theme.dynamicColors
 import io.github.bilibox.data.search.SearchHistoryStore
 import io.github.bilibox.feature.search.SearchControlsBar
@@ -125,6 +125,8 @@ internal fun HomeScreen(
     darkMode: Boolean = false,
     backgroundStyle: HomeBackground = HomeBackground.GRADIENT,
     backgroundImage: ImageBitmap? = null,
+    backgroundBlur: Int = 0,
+    backgroundDarkness: Int = 0,
 ) {
     val accent = LocalAccentColor.current
     val colors = dynamicColors(darkMode, accent)
@@ -162,7 +164,15 @@ internal fun HomeScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize().background(colors.background).appearanceBackdrop(backgroundStyle, accent, darkMode, backgroundImage)) {
+    Box(Modifier.fillMaxSize().background(colors.background)) {
+        AppearanceBackdrop(
+            style = backgroundStyle,
+            accent = accent,
+            darkMode = darkMode,
+            image = backgroundImage,
+            blur = backgroundBlur,
+            darkness = backgroundDarkness,
+        )
         BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
             // 参考稿把 logo 顶边放在屏高一半 - 100；这里再上移 40dp，搜索框正好落在视觉中心。
             val homeTop = (maxHeight * 0.5f - 120.dp).coerceAtLeast(16.dp)

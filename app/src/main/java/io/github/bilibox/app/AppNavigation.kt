@@ -64,6 +64,7 @@ internal fun AppNavigation(
     val context = LocalContext.current
     val bannerStore = remember(context) { ProfileBannerStore(context) }
     var customBanner by remember { mutableStateOf<ImageBitmap?>(null) }
+    var bannerAdjustments by remember(bannerStore) { mutableStateOf(bannerStore.loadAdjustments()) }
     // 自定义头图存在应用私有目录，进前台时异步读回；未读完前先展示主题默认头图。
     LaunchedEffect(bannerStore) {
         customBanner = withContext(Dispatchers.IO) { bannerStore.load()?.asImageBitmap() }
@@ -88,8 +89,13 @@ internal fun AppNavigation(
         ProfileBannerPreviewScreen(
             avatar = avatar,
             customBanner = customBanner,
+            adjustments = bannerAdjustments,
             store = bannerStore,
             onBannerChange = { customBanner = it },
+            onAdjustmentsChange = {
+                bannerAdjustments = it
+                bannerStore.saveAdjustments(it)
+            },
             onClose = appState::closeBannerPreview,
         )
         return
@@ -138,6 +144,7 @@ internal fun AppNavigation(
                     avatar = avatar,
                     defaultAvatar = defaultAvatar,
                     customBanner = customBanner,
+                    bannerAdjustments = bannerAdjustments,
                     darkMode = darkMode,
                     onToggleDarkMode = onToggleDarkMode,
                     onOpenThemeAppearance = appState::openAppearance,
@@ -168,6 +175,8 @@ internal fun AppNavigation(
                     darkMode = darkMode,
                     backgroundStyle = appearance.background,
                     backgroundImage = backgroundImage,
+                    backgroundBlur = appearance.backgroundBlur,
+                    backgroundDarkness = appearance.backgroundDarkness,
                 )
             }
         }

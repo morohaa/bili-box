@@ -35,6 +35,8 @@ class AppearanceTest {
         assertEquals(DefaultThemeId, settings.themeId)
         assertEquals(AppearanceMode.LIGHT, settings.mode)
         assertEquals(HomeBackground.GRADIENT, settings.background)
+        assertEquals(0, settings.backgroundDarkness)
+        assertEquals(0, settings.backgroundBlur)
         assertEquals("粉电视 · 经典", settings.theme.name)
     }
 
