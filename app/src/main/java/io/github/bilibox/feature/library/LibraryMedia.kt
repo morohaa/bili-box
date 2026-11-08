@@ -319,6 +319,23 @@ internal fun folderMetaParts(
     return parts
 }
 
+/**
+ * 文件夹卡片底部一行：数量 + 总时长。
+ *
+ * 概览行取消后视频数量没有别处显示，放在这里既不增加行数，也不会把
+ * 「大小 · 日期」挤成省略号。
+ */
+internal fun folderFootParts(
+    folder: LocalVideoFolder,
+    settings: LocalVideoSettings,
+): List<MetaPart> {
+    val parts = mutableListOf(MetaPart("${folder.count} 个视频"))
+    if (settings.folderFields.duration && folder.totalDurationMs > 0L) {
+        parts += MetaPart("总时长 ${formatVideoDuration(folder.totalDurationMs)}")
+    }
+    return parts
+}
+
 internal fun hasLocalVideoPermission(context: Context): Boolean {
     val permission = if (Build.VERSION.SDK_INT >= 33) {
         Manifest.permission.READ_MEDIA_VIDEO

@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import io.github.bilibox.core.ui.theme.OnlinePinkBrand
@@ -46,8 +47,6 @@ internal data class LibraryPalette(
     val accent: Color,
     val onAccent: Color,
     val accentSoft: Color,
-    /** 头部强调色光晕，替代整块彩色标题栏。 */
-    val glow: Color,
     /** 卡片按下时的叠加色。 */
     val pressTint: Color,
 )
@@ -71,7 +70,6 @@ internal fun libraryPalette(darkMode: Boolean, accent: Color): LibraryPalette {
             accent = accent,
             onAccent = onAccent,
             accentSoft = accent.copy(alpha = .20f),
-            glow = accent.copy(alpha = .16f),
             pressTint = Color.White.copy(alpha = .06f),
         )
     } else {
@@ -88,10 +86,50 @@ internal fun libraryPalette(darkMode: Boolean, accent: Color): LibraryPalette {
             accent = accent,
             onAccent = onAccent,
             accentSoft = accent.copy(alpha = .10f),
-            glow = accent.copy(alpha = .11f),
             pressTint = Color(0xFF101215).copy(alpha = .05f),
         )
     }
+}
+
+/**
+ * 头部渐变底色与配套前景色。
+ *
+ * 主题色压暗成深调做竖向渐变，白字 + 白搜索框：颜色有品牌感但不刺眼，
+ * 比整块高饱和色条更闷、更收敛。
+ */
+internal data class LibraryHeaderStyle(
+    val brush: Brush,
+    val content: Color,
+    val contentSoft: Color,
+    val searchBackground: Color,
+    val searchHint: Color,
+    val searchText: Color,
+    val chipActiveBackground: Color,
+    val chipActiveContent: Color,
+    val chipIdleContent: Color,
+    val accentBar: Color,
+    val breadcrumbSoft: Color,
+)
+
+internal fun libraryHeaderStyle(palette: LibraryPalette): LibraryHeaderStyle {
+    val accent = palette.accent
+    val base = if (palette.dark) Color(0xFF0B0D10) else Color(0xFF1B1D22)
+    return LibraryHeaderStyle(
+        brush = Brush.verticalGradient(
+            0f to lerp(accent, base, if (palette.dark) .58f else .34f),
+            1f to lerp(accent, base, if (palette.dark) .44f else .20f),
+        ),
+        content = Color.White,
+        contentSoft = Color.White.copy(alpha = .78f),
+        searchBackground = Color.White.copy(alpha = .94f),
+        searchHint = Color(0xFF8C939C),
+        searchText = Color(0xFF101215),
+        chipActiveBackground = Color.White,
+        chipActiveContent = lerp(accent, Color(0xFF101215), .12f),
+        chipIdleContent = Color.White.copy(alpha = .82f),
+        accentBar = Color.White.copy(alpha = .92f),
+        breadcrumbSoft = Color.White.copy(alpha = .72f),
+    )
 }
 
 internal val LocalLibraryPalette = staticCompositionLocalOf {
@@ -133,18 +171,6 @@ internal fun Modifier.pressFeedback(
     return modifier
         .background(overlay)
         .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-}
-
-/** 页面顶部的强调色光晕：比整块彩色标题栏安静得多，但仍保留品牌感。 */
-internal fun Modifier.topGlow(color: Color): Modifier = drawBehind {
-    if (color.alpha <= 0f) return@drawBehind
-    drawRect(
-        Brush.radialGradient(
-            colors = listOf(color, color.copy(alpha = color.alpha * .45f), Color.Transparent),
-            center = Offset(size.width * .18f, 0f),
-            radius = size.width * 1.05f,
-        )
-    )
 }
 
 /** 底部渐隐蒙层：让滚动内容在悬浮导航与继续观看条之前自然淡出。 */

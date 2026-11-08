@@ -256,11 +256,6 @@ internal fun LibraryScreen(
 
     CompositionLocalProvider(LocalLibraryPalette provides palette) {
         Box(Modifier.fillMaxSize().background(palette.background)) {
-            // 品牌色只以顶部光晕的形式出现，替代整块彩色标题栏。
-            Box(
-                Modifier.fillMaxWidth().height(320.dp).align(Alignment.TopCenter)
-                    .topGlow(palette.glow),
-            )
             Column(Modifier.fillMaxSize()) {
                 LibraryTopBar(
                     inFolder = nav.isNotEmpty(),
@@ -288,20 +283,6 @@ internal fun LibraryScreen(
                     onClearFilter = { quickFilter = null },
                     onSelectFilter = ::selectFilter,
                 )
-
-                if (scanState is LocalVideoScanState.Ready) {
-                    LibrarySummaryRow(
-                        view = view,
-                        settings = effectiveSettings,
-                        nav = effectiveNav,
-                        query = query,
-                        quickFilter = quickFilter,
-                        onOpenSettings = {
-                            draftSettings = settings
-                            settingsOpen = true
-                        },
-                    )
-                }
 
                 Box(
                     Modifier.weight(1f).fillMaxWidth().graphicsLayer {

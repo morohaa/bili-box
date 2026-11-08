@@ -53,19 +53,14 @@ import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.data.localvideo.LocalVideoFolder
-import io.github.bilibox.data.localvideo.LocalVideoLibraryView
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
-import io.github.bilibox.data.localvideo.LocalVideoSettings
-import io.github.bilibox.data.localvideo.LocalVideoSort
-import io.github.bilibox.data.localvideo.LocalVideoViewMode
 import io.github.bilibox.data.localvideo.localVideoFolderLabel
 
 /**
- * 本地视频页头部。
+ * 本地视频页头部：渐变底 + 顶部搜索框 + 筛选胶囊。
  *
- * 不再用整块彩色标题栏，而是「大标题 + 白色搜索框 + 克制的筛选胶囊」：
- * 品牌色只出现在顶部光晕、选中态和少量图标上。进入文件夹后，胶囊行换成
- * 路径面包屑并出现返回键；搜索展开时其余行淡出，头部保持紧凑。
+ * 搜索框放在最上层，页面不再有单独的大标题；根目录显示快捷筛选，
+ * 进入文件夹后换成路径面包屑并出现返回键。搜索展开时只保留搜索框。
  */
 @Composable
 internal fun LibraryTopBar(
@@ -85,31 +80,16 @@ internal fun LibraryTopBar(
     onSelectFilter: (LocalVideoQuickFilter) -> Unit,
 ) {
     val palette = LocalLibraryPalette.current
+    val style = remember(palette) { libraryHeaderStyle(palette) }
     Column(
         Modifier.fillMaxWidth()
+            .background(style.brush)
             .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().height(46.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "本地视频",
-                color = palette.ink,
-                fontSize = 25.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-.6).sp,
-                maxLines = 1,
-            )
-            Spacer(Modifier.weight(1f))
-            HeaderGlyphButton(AppIcon.SEARCH, "搜索本地视频", palette, onSearchOpen)
-            HeaderGlyphButton(AppIcon.TUNE, "显示与排序设置", palette, onSettings)
-        }
-
-        Row(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().height(44.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
@@ -119,18 +99,18 @@ internal fun LibraryTopBar(
                 exit = fadeOut(tween(120)) + shrinkHorizontally(tween(150)),
             ) {
                 Box(
-                    Modifier.size(34.dp).clip(CircleShape)
+                    Modifier.size(36.dp).clip(CircleShape)
                         .semantics { contentDescription = "返回上一级" }
                         .pressFeedback(onClick = onBack, shape = CircleShape, scaleTo = .9f),
                     contentAlignment = Alignment.Center,
                 ) {
-                    AppGlyphIcon(AppIcon.BACK, palette.ink2, Modifier.size(21.dp), 2.2f)
+                    AppGlyphIcon(AppIcon.BACK, style.content, Modifier.size(21.dp), 2.2f)
                 }
             }
             LibrarySearchField(
+                style = style,
                 searchOpen = searchOpen,
                 query = query,
-                palette = palette,
                 onOpen = onSearchOpen,
                 onQueryChange = onQueryChange,
                 modifier = Modifier.weight(1f),
@@ -142,14 +122,29 @@ internal fun LibraryTopBar(
             ) {
                 Text(
                     "取消",
-                    color = palette.accent,
+                    color = style.content,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
                         .pressFeedback(onClick = onSearchClose)
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
                 )
+            }
+            AnimatedVisibility(
+                visible = !searchOpen,
+                enter = fadeIn(tween(160)) + expandHorizontally(tween(180)),
+                exit = fadeOut(tween(120)) + shrinkHorizontally(tween(150)),
+            ) {
+                Box(
+                    Modifier.size(40.dp)
+                        .clip(CircleShape)
+                        .semantics { contentDescription = "显示与排序设置" }
+                        .pressFeedback(onClick = onSettings, shape = CircleShape, scaleTo = .9f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AppGlyphIcon(AppIcon.TUNE, style.content, Modifier.size(20.dp), 1.9f)
+                }
             }
         }
 
@@ -159,48 +154,31 @@ internal fun LibraryTopBar(
             exit = fadeOut(tween(100)),
         ) {
             if (inFolder) {
-                BreadcrumbBar(palette, breadcrumbs, onRoot, onBreadcrumb)
+                BreadcrumbBar(style, breadcrumbs, onRoot, onBreadcrumb)
             } else {
-                FilterChips(palette, filter, onClear = onClearFilter, onSelect = onSelectFilter)
+                FilterChips(style, filter, onClear = onClearFilter, onSelect = onSelectFilter)
             }
         }
     }
 }
 
 @Composable
-private fun HeaderGlyphButton(
-    icon: AppIcon,
-    description: String,
-    palette: LibraryPalette,
-    onClick: () -> Unit,
-) {
-    Box(
-        Modifier.size(40.dp)
-            .clip(CircleShape)
-            .semantics { contentDescription = description }
-            .pressFeedback(onClick = onClick, shape = CircleShape, scaleTo = .9f),
-        contentAlignment = Alignment.Center,
-    ) {
-        AppGlyphIcon(icon, palette.ink2, Modifier.size(20.dp), 1.9f)
-    }
-}
-
-@Composable
 private fun LibrarySearchField(
+    style: LibraryHeaderStyle,
     searchOpen: Boolean,
     query: String,
-    palette: LibraryPalette,
     onOpen: () -> Unit,
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val palette = LocalLibraryPalette.current
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(searchOpen) {
         if (searchOpen) runCatching { focusRequester.requestFocus() }
     }
     val background by animateColorAsState(
-        if (searchOpen) palette.card else palette.card.copy(alpha = .92f),
+        if (searchOpen) Color.White else style.searchBackground,
         animationSpec = tween(180),
         label = "search background",
     )
@@ -213,7 +191,7 @@ private fun LibrarySearchField(
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AppGlyphIcon(AppIcon.SEARCH, palette.ink3, Modifier.size(16.dp), 2.1f)
+        AppGlyphIcon(AppIcon.SEARCH, style.searchHint, Modifier.size(16.dp), 2.1f)
         Spacer(Modifier.width(8.dp))
         if (searchOpen) {
             BasicTextField(
@@ -221,14 +199,14 @@ private fun LibrarySearchField(
                 onValueChange = onQueryChange,
                 modifier = Modifier.weight(1f).focusRequester(focusRequester),
                 singleLine = true,
-                textStyle = TextStyle(color = palette.ink, fontSize = 14.5.sp),
+                textStyle = TextStyle(color = style.searchText, fontSize = 14.5.sp),
                 cursorBrush = SolidColor(palette.accent),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
                 decorationBox = { inner ->
                     Box {
                         if (query.isEmpty()) {
-                            Text("搜索视频或文件夹", color = palette.ink3, fontSize = 14.5.sp)
+                            Text("搜索视频或文件夹", color = style.searchHint, fontSize = 14.5.sp)
                         }
                         inner()
                     }
@@ -241,13 +219,13 @@ private fun LibrarySearchField(
                         .clickable { onQueryChange("") },
                     contentAlignment = Alignment.Center,
                 ) {
-                    AppGlyphIcon(AppIcon.CLOSE, palette.ink3, Modifier.size(12.dp), 2.3f)
+                    AppGlyphIcon(AppIcon.CLOSE, style.searchHint, Modifier.size(12.dp), 2.3f)
                 }
             }
         } else {
             Text(
                 "搜索视频或文件夹",
-                color = palette.ink3,
+                color = style.searchHint,
                 fontSize = 14.5.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -259,7 +237,7 @@ private fun LibrarySearchField(
 
 @Composable
 private fun FilterChips(
-    palette: LibraryPalette,
+    style: LibraryHeaderStyle,
     selected: LocalVideoQuickFilter?,
     onClear: () -> Unit,
     onSelect: (LocalVideoQuickFilter) -> Unit,
@@ -268,27 +246,27 @@ private fun FilterChips(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        HeaderChip(palette, "全部", selected == null, onClear)
+        HeaderChip(style, "全部", selected == null, onClear)
         LocalVideoQuickFilter.entries.forEach { filter ->
-            HeaderChip(palette, filter.label, selected == filter) { onSelect(filter) }
+            HeaderChip(style, filter.label, selected == filter) { onSelect(filter) }
         }
     }
 }
 
 @Composable
 private fun HeaderChip(
-    palette: LibraryPalette,
+    style: LibraryHeaderStyle,
     label: String,
     active: Boolean,
     onClick: () -> Unit,
 ) {
     val background by animateColorAsState(
-        if (active) palette.accentSoft else Color.Transparent,
+        if (active) style.chipActiveBackground else Color.Transparent,
         animationSpec = tween(200),
         label = "chip background",
     )
     val content by animateColorAsState(
-        if (active) palette.accent else palette.ink2,
+        if (active) style.chipActiveContent else style.chipIdleContent,
         animationSpec = tween(200),
         label = "chip content",
     )
@@ -312,7 +290,7 @@ private fun HeaderChip(
 
 @Composable
 private fun BreadcrumbBar(
-    palette: LibraryPalette,
+    style: LibraryHeaderStyle,
     breadcrumbs: List<String>,
     onRoot: () -> Unit,
     onBreadcrumb: (Int) -> Unit,
@@ -324,10 +302,10 @@ private fun BreadcrumbBar(
         Box(
             Modifier.width(3.dp).height(13.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(palette.accent),
+                .background(style.accentBar),
         )
         Spacer(Modifier.width(7.dp))
-        AppGlyphIcon(AppIcon.FOLDER, palette.ink3, Modifier.size(15.dp), 1.9f)
+        AppGlyphIcon(AppIcon.FOLDER, style.breadcrumbSoft, Modifier.size(15.dp), 1.9f)
         Spacer(Modifier.width(6.dp))
         Row(
             Modifier.weight(1f).horizontalScroll(rememberScrollState()),
@@ -335,7 +313,7 @@ private fun BreadcrumbBar(
         ) {
             Text(
                 "根目录",
-                color = palette.ink2,
+                color = style.contentSoft,
                 fontSize = 14.sp,
                 maxLines = 1,
                 modifier = Modifier
@@ -347,7 +325,7 @@ private fun BreadcrumbBar(
                 Spacer(Modifier.width(2.dp))
                 AppGlyphIcon(
                     AppIcon.CHEVRON_RIGHT,
-                    palette.ink3.copy(alpha = .7f),
+                    style.breadcrumbSoft,
                     Modifier.size(11.dp),
                     2.4f,
                 )
@@ -355,7 +333,7 @@ private fun BreadcrumbBar(
                 val isLast = index == breadcrumbs.lastIndex
                 Text(
                     localVideoFolderLabel(path),
-                    color = if (isLast) palette.ink else palette.ink2,
+                    color = if (isLast) style.content else style.contentSoft,
                     fontSize = 14.sp,
                     fontWeight = if (isLast) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
@@ -378,77 +356,6 @@ private fun BreadcrumbBar(
                 )
             }
         }
-    }
-}
-
-/**
- * 列表上方的概览行：左边是当前目录的数量统计，右边的排序胶囊点开设置弹窗。
- */
-@Composable
-internal fun LibrarySummaryRow(
-    view: LocalVideoLibraryView,
-    settings: LocalVideoSettings,
-    nav: List<String>,
-    query: String,
-    quickFilter: LocalVideoQuickFilter?,
-    onOpenSettings: () -> Unit,
-) {
-    val palette = LocalLibraryPalette.current
-    Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            librarySummaryText(view, settings, nav, query, quickFilter),
-            color = palette.ink3,
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Spacer(Modifier.width(8.dp))
-        SortChip(palette = palette, sort = settings.sort, ascending = settings.ascending, onClick = onOpenSettings)
-    }
-}
-
-internal fun librarySummaryText(
-    view: LocalVideoLibraryView,
-    settings: LocalVideoSettings,
-    nav: List<String>,
-    query: String,
-    quickFilter: LocalVideoQuickFilter?,
-): String = when {
-    query.isNotBlank() -> "搜索到 ${view.videos.size} 个视频"
-    quickFilter != null -> "${quickFilter.label} · ${view.videos.size} 个视频"
-    nav.isNotEmpty() -> "${view.videos.size} 个视频"
-    settings.mode == LocalVideoViewMode.FILES -> "全部视频 · ${view.videos.size}"
-    else -> "${view.folders.size} 个文件夹 · ${view.videos.size} 个视频"
-}
-
-@Composable
-private fun SortChip(
-    palette: LibraryPalette,
-    sort: LocalVideoSort,
-    ascending: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        Modifier.height(28.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(palette.card.copy(alpha = .92f))
-            .pressFeedback(onClick = onClick, shape = RoundedCornerShape(14.dp), scaleTo = .95f)
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AppGlyphIcon(AppIcon.SORT, palette.ink3, Modifier.size(12.dp), 2f)
-        Spacer(Modifier.width(4.dp))
-        Text(
-            "${sort.label} ${if (ascending) "↑" else "↓"}",
-            color = palette.ink2,
-            fontSize = 11.5.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-        )
     }
 }
 

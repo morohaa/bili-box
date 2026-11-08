@@ -82,7 +82,9 @@ private fun AppSystemBars(appState: BiliBoxAppState, darkMode: Boolean) {
                 // 头图预览是深色沉浸层。
                 bannerPreviewOpen -> false
 
-                // 视频页、外观页与「我的」页顶部都是浅色底，用深色图标。
+                // 视频页头部是深色渐变，状态栏固定浅色图标。
+                appState.selectedTab == AppTab.LIBRARY && !appearanceOpen -> false
+
                 else -> !darkMode && (appearanceOpen || appState.selectedTab != AppTab.PROFILE || pastBanner)
             }
             isAppearanceLightNavigationBars = if (bannerPreviewOpen) false else !darkMode

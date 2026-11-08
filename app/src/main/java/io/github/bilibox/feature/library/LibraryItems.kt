@@ -254,14 +254,8 @@ internal fun FolderRow(
                 Spacer(Modifier.height(4.dp))
                 MetaText(meta, fontSize = 12.sp, maxLines = 1)
             }
-            if (settings.folderFields.duration && folder.totalDurationMs > 0L) {
-                Spacer(Modifier.height(3.dp))
-                MetaText(
-                    listOf(MetaPart("总时长 ${formatVideoDuration(folder.totalDurationMs)}")),
-                    fontSize = 11.5.sp,
-                    maxLines = 1,
-                )
-            }
+            Spacer(Modifier.height(3.dp))
+            MetaText(folderFootParts(folder, settings), fontSize = 11.5.sp, maxLines = 1)
             if (settings.fields.path) {
                 Spacer(Modifier.height(3.dp))
                 FolderPathHint(folder)
@@ -455,14 +449,8 @@ internal fun CompactFolderRow(
                 Spacer(Modifier.height(3.dp))
                 MetaText(meta, fontSize = 11.sp, maxLines = 1)
             }
-            if (settings.folderFields.duration && folder.totalDurationMs > 0L) {
-                Spacer(Modifier.height(3.dp))
-                MetaText(
-                    listOf(MetaPart("总时长 ${formatVideoDuration(folder.totalDurationMs)}")),
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                )
-            }
+            Spacer(Modifier.height(3.dp))
+            MetaText(folderFootParts(folder, settings), fontSize = 11.sp, maxLines = 1)
         }
     }
 }
@@ -727,14 +715,8 @@ internal fun FolderCard(
                 Spacer(Modifier.height(3.dp))
                 MetaText(meta, fontSize = 11.sp, maxLines = 1)
             }
-            if (settings.folderFields.duration && folder.totalDurationMs > 0L) {
-                Spacer(Modifier.height(3.dp))
-                MetaText(
-                    listOf(MetaPart("总时长 ${formatVideoDuration(folder.totalDurationMs)}")),
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                )
-            }
+            Spacer(Modifier.height(3.dp))
+            MetaText(folderFootParts(folder, settings), fontSize = 11.sp, maxLines = 1)
         }
     }
 }
