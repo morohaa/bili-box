@@ -5,22 +5,27 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -30,12 +35,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.bilibox.core.ui.component.AppTopBar
 import io.github.bilibox.core.ui.theme.LocalAccentColor
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoLayout
@@ -50,33 +56,26 @@ import io.github.bilibox.data.localvideo.PlaybackProgressStore
 import io.github.bilibox.data.localvideo.buildLocalVideoLibrary
 import io.github.bilibox.data.localvideo.localVideoIsVisible
 import io.github.bilibox.data.localvideo.localVideoMatchesQuickFilter
+import io.github.bilibox.data.localvideo.localVideoSampleFolder
 import io.github.bilibox.data.localvideo.queryLocalVideoLibrary
+import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-
-internal val LibraryBg = Color(0xFFF4F6FA)
-
-/** 选中态浅底，跟随主题强调色。 */
-internal val LibrarySoftPink: Color
-    @Composable @ReadOnlyComposable
-    get() = LocalAccentColor.current.copy(alpha = .10f)
-internal val LibrarySecondary = Color(0xFF61666D)
-internal val LibraryLine = Color(0xFFE9EDF2)
-internal val LibraryCard = Color(0xFFFFFFFF)
 
 @Composable
 internal fun LibraryScreen(
     refreshToken: Int = 0,
     darkMode: Boolean = false,
     initialFilter: LocalVideoQuickFilter? = null,
-    onToggleDarkMode: () -> Unit = {},
     onVideoSelected: (LocalVideo, List<LocalVideo>) -> Unit,
 ) {
     val context = LocalContext.current
     val keyboard = LocalSoftwareKeyboardController.current
     val settingsStore = remember(context) { LocalVideoSettingsStore(context) }
     val progressStore = remember(context) { PlaybackProgressStore(context) }
+    val accent = LocalAccentColor.current
+    val palette = remember(darkMode, accent) { libraryPalette(darkMode, accent) }
 
     var settings by remember { mutableStateOf(settingsStore.load()) }
     var draftSettings by remember { mutableStateOf<LocalVideoSettings?>(null) }
@@ -154,6 +153,7 @@ internal fun LibraryScreen(
     val visibleVideos = remember(videos, effectiveSettings, nomediaFolders) {
         videos.filter { localVideoIsVisible(it, effectiveSettings, nomediaFolders) }
     }
+    val folderSample = remember(videos, playback) { localVideoSampleFolder(videos, playback) }
     val resume = remember(videos, playback) {
         videos.asSequence()
             .mapNotNull { video ->
@@ -236,14 +236,39 @@ internal fun LibraryScreen(
         settingsOpen = false
     }
 
-    val pageBackground = if (darkMode) Color(0xFF17191D) else LibraryBg
-    Box(Modifier.fillMaxSize().background(pageBackground)) {
-        Column(Modifier.fillMaxSize()) {
-            // 视频页顶栏直接承载本地视频标题和操作按钮；品牌顶栏仅保留给其他页面。
-            AppTopBar(darkMode = darkMode, onToggleDarkMode = onToggleDarkMode) {
-                LibraryHeader(
+    // 换目录时内容轻微横移 + 淡入，做出「进入 / 返回上一层」的方向感。
+    val pathKey = effectiveNav.lastOrNull()
+    val pathDepth = effectiveNav.size
+    var previousDepth by remember { mutableIntStateOf(pathDepth) }
+    var animatedOnce by remember { mutableStateOf(false) }
+    val slide = remember { Animatable(0f) }
+    LaunchedEffect(pathKey) {
+        if (!animatedOnce) {
+            animatedOnce = true
+            return@LaunchedEffect
+        }
+        val forward = pathDepth >= previousDepth
+        previousDepth = pathDepth
+        slide.snapTo(if (forward) 26f else -26f)
+        slide.animateTo(0f, tween(260, easing = FastOutSlowInEasing))
+    }
+    val slidePx = with(LocalDensity.current) { slide.value.dp.toPx() }
+
+    CompositionLocalProvider(LocalLibraryPalette provides palette) {
+        Box(Modifier.fillMaxSize().background(palette.background)) {
+            // 品牌色只以顶部光晕的形式出现，替代整块彩色标题栏。
+            Box(
+                Modifier.fillMaxWidth().height(320.dp).align(Alignment.TopCenter)
+                    .topGlow(palette.glow),
+            )
+            Column(Modifier.fillMaxSize()) {
+                LibraryTopBar(
+                    inFolder = nav.isNotEmpty(),
                     searchOpen = searchOpen,
                     query = query,
+                    breadcrumbs = nav,
+                    filter = quickFilter,
+                    onBack = { nav = nav.dropLast(1) },
                     onSearchOpen = { searchOpen = true },
                     onSearchClose = {
                         searchOpen = false
@@ -258,160 +283,178 @@ internal fun LibraryScreen(
                         draftSettings = settings
                         settingsOpen = true
                     },
-                    focusSearcher = searchOpen,
-                )
-            }
-
-            if (scanState is LocalVideoScanState.Ready) {
-                QuickFilterRow(
-                    selected = quickFilter,
-                    onSelect = ::selectFilter,
-                )
-                SortBar(
-                    view = view,
-                    settings = effectiveSettings,
-                    nav = effectiveNav,
-                    query = query,
-                    quickFilter = quickFilter,
-                    onNavigateTo = { index -> nav = nav.take(index + 1) },
                     onRoot = { nav = emptyList() },
+                    onBreadcrumb = { index -> nav = nav.take(index + 1) },
+                    onClearFilter = { quickFilter = null },
+                    onSelectFilter = ::selectFilter,
                 )
-            }
 
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                when (val state = scanState) {
-                    LocalVideoScanState.NeedsPermission -> PermissionState(
-                        onRequest = { permissionLauncher.launch(localVideoPermissions()) },
-                        onRecheck = { scanRequest++ },
+                if (scanState is LocalVideoScanState.Ready) {
+                    LibrarySummaryRow(
+                        view = view,
+                        settings = effectiveSettings,
+                        nav = effectiveNav,
+                        query = query,
+                        quickFilter = quickFilter,
+                        onOpenSettings = {
+                            draftSettings = settings
+                            settingsOpen = true
+                        },
                     )
+                }
 
-                    LocalVideoScanState.Loading -> LoadingState()
+                Box(
+                    Modifier.weight(1f).fillMaxWidth().graphicsLayer {
+                        translationX = slidePx
+                        alpha = (1f - abs(slide.value) / 52f).coerceIn(.6f, 1f)
+                    },
+                ) {
+                    when (val state = scanState) {
+                        LocalVideoScanState.NeedsPermission -> PermissionState(
+                            onRequest = { permissionLauncher.launch(localVideoPermissions()) },
+                            onRecheck = { scanRequest++ },
+                        )
 
-                    is LocalVideoScanState.Error -> ErrorState(
-                        message = state.message,
-                        onRetry = { scanRequest++ },
-                    )
+                        LocalVideoScanState.Loading -> LoadingState()
 
-                    is LocalVideoScanState.Ready -> {
-                        if (view.folders.isEmpty() && view.videos.isEmpty()) {
-                            EmptyState(
-                                title = emptyTitle(query, quickFilter, nav),
-                                message = emptyMessage(query, quickFilter, nav, settings),
-                                action = when {
-                                    videos.isNotEmpty() -> null
-                                    hasLocalVideoPermission(context) -> ({ scanRequest++ })
-                                    else -> ({ permissionLauncher.launch(localVideoPermissions()) })
-                                },
-                                actionLabel = when {
-                                    videos.isNotEmpty() -> null
-                                    hasLocalVideoPermission(context) -> "重新扫描"
-                                    else -> "允许访问并扫描"
-                                },
-                            )
-                        } else {
-                            val bottom = if (resume != null) 206.dp else 150.dp
-                            if (effectiveSettings.layout == LocalVideoLayout.GRID) {
-                                VideoGrid(
-                                    view = view,
-                                    settings = effectiveSettings,
-                                    playback = playback,
-                                    bottomPadding = bottom,
-                                    onFolder = { nav = nav + it.path },
-                                    onVideo = ::play,
-                                    onShare = ::share,
-                                    onInfo = { infoVideo = it },
+                        is LocalVideoScanState.Error -> ErrorState(
+                            message = state.message,
+                            onRetry = { scanRequest++ },
+                        )
+
+                        is LocalVideoScanState.Ready -> {
+                            if (view.folders.isEmpty() && view.videos.isEmpty()) {
+                                EmptyState(
+                                    title = emptyTitle(query, quickFilter, nav),
+                                    message = emptyMessage(query, quickFilter, nav, settings),
+                                    action = when {
+                                        videos.isNotEmpty() -> null
+                                        hasLocalVideoPermission(context) -> ({ scanRequest++ })
+                                        else -> ({ permissionLauncher.launch(localVideoPermissions()) })
+                                    },
+                                    actionLabel = when {
+                                        videos.isNotEmpty() -> null
+                                        hasLocalVideoPermission(context) -> "重新扫描"
+                                        else -> "允许访问并扫描"
+                                    },
                                 )
                             } else {
-                                VideoList(
-                                    view = view,
-                                    settings = effectiveSettings,
-                                    playback = playback,
-                                    bottomPadding = bottom,
-                                    onFolder = { nav = nav + it.path },
-                                    onVideo = ::play,
-                                    onShare = ::share,
-                                    onInfo = { infoVideo = it },
-                                )
+                                val bottom = if (resume != null) 178.dp else 132.dp
+                                if (effectiveSettings.layout == LocalVideoLayout.GRID) {
+                                    VideoGrid(
+                                        view = view,
+                                        settings = effectiveSettings,
+                                        playback = playback,
+                                        bottomPadding = bottom,
+                                        onFolder = { nav = nav + it.path },
+                                        onVideo = ::play,
+                                        onShare = ::share,
+                                        onInfo = { infoVideo = it },
+                                    )
+                                } else {
+                                    VideoList(
+                                        view = view,
+                                        settings = effectiveSettings,
+                                        playback = playback,
+                                        bottomPadding = bottom,
+                                        onFolder = { nav = nav + it.path },
+                                        onVideo = ::play,
+                                        onShare = ::share,
+                                        onInfo = { infoVideo = it },
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        AnimatedVisibility(
-            visible = toastMessage != null,
-            enter = fadeIn(tween(140)),
-            exit = fadeOut(tween(180)),
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
-                .padding(start = 38.dp, end = 38.dp, bottom = if (resume != null) 174.dp else 118.dp),
-        ) {
+            // 底部渐隐：让滚动内容在悬浮导航与继续观看条之前自然淡出。
             Box(
-                Modifier.widthIn(max = 320.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xE618191C))
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(190.dp)
+                    .bottomFade(palette.background),
+            )
+
+            AnimatedVisibility(
+                visible = toastMessage != null,
+                enter = fadeIn(tween(140)),
+                exit = fadeOut(tween(180)),
+                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+                    .padding(start = 38.dp, end = 38.dp, bottom = if (resume != null) 174.dp else 118.dp),
             ) {
-                Text(
-                    lastToastMessage,
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp,
-                    textAlign = TextAlign.Center,
+                Box(
+                    Modifier.widthIn(max = 320.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xE618191C))
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    Text(
+                        lastToastMessage,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+
+            val target = resume
+            AnimatedVisibility(
+                visible = target != null && !settingsOpen,
+                enter = fadeIn(tween(160)) + slideInVertically(tween(240)) { it / 2 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(180)) { it / 2 },
+                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+                    .padding(start = 14.dp, end = 14.dp, bottom = 96.dp),
+            ) {
+                target?.let { resumeTarget ->
+                    ContinueWatchingBar(
+                        video = resumeTarget.video,
+                        playback = resumeTarget.playback,
+                        settings = settings,
+                        onClick = {
+                            val playlist = if (view.playlist.any { it.key == resumeTarget.video.key }) {
+                                view.playlist
+                            } else {
+                                videos.sortedByDescending { it.dateModifiedMs }
+                            }
+                            onVideoSelected(resumeTarget.video, playlist)
+                        },
+                    )
+                }
+            }
+
+            if (settingsOpen) {
+                val sampleVideo = resume?.video ?: videos.firstOrNull()
+                LocalVideoSettingsDialog(
+                    applied = settings,
+                    draft = draftSettings ?: settings,
+                    sampleVideo = sampleVideo,
+                    samplePlayback = sampleVideo?.let { video ->
+                        playback[video.key] ?: LocalVideoPlayback(LocalVideoPlaybackState.Unplayed)
+                    } ?: LocalVideoPlayback(LocalVideoPlaybackState.Unplayed),
+                    sampleFolder = view.folders.firstOrNull() ?: folderSample,
+                    onDraftChange = { draftSettings = it },
+                    onReset = { draftSettings = LocalVideoSettings() },
+                    onDismiss = {
+                        settingsOpen = false
+                        draftSettings = null
+                    },
+                    onApply = { applyDraft(draftSettings ?: settings) },
+                    onRescan = {
+                        val next = draftSettings ?: settings
+                        applyDraft(next)
+                        scanRequest++
+                    },
                 )
             }
-        }
 
-        if (resume != null && !settingsOpen) {
-            val target = resume
-            ContinueWatchingBar(
-                video = target.video,
-                playback = target.playback,
-                settings = settings,
-                onClick = {
-                    val playlist = if (view.playlist.any { it.key == target.video.key }) {
-                        view.playlist
-                    } else {
-                        videos.sortedByDescending { it.dateModifiedMs }
-                    }
-                    onVideoSelected(target.video, playlist)
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(start = 14.dp, end = 14.dp, bottom = 96.dp),
-            )
-        }
-
-        if (settingsOpen) {
-            LocalVideoSettingsSheet(
-                applied = settings,
-                draft = draftSettings ?: settings,
-                sample = resume?.video ?: videos.firstOrNull(),
-                samplePlayback = (resume?.video ?: videos.firstOrNull())?.let { video ->
-                    playback[video.key] ?: LocalVideoPlayback(LocalVideoPlaybackState.Unplayed)
-                } ?: LocalVideoPlayback(LocalVideoPlaybackState.Unplayed),
-                onDraftChange = { draftSettings = it },
-                onReset = { draftSettings = LocalVideoSettings() },
-                onDismiss = {
-                    settingsOpen = false
-                    draftSettings = null
-                },
-                onApply = { applyDraft(draftSettings ?: settings) },
-                onRescan = {
-                    val next = draftSettings ?: settings
-                    applyDraft(next)
-                    scanRequest++
-                },
-            )
-        }
-
-        infoVideo?.let { video ->
-            VideoInfoDialog(
-                video = video,
-                playback = playback[video.key] ?: LocalVideoPlayback(LocalVideoPlaybackState.Unplayed),
-                onDismiss = { infoVideo = null },
-            )
+            infoVideo?.let { video ->
+                VideoInfoDialog(
+                    video = video,
+                    playback = playback[video.key] ?: LocalVideoPlayback(LocalVideoPlaybackState.Unplayed),
+                    onDismiss = { infoVideo = null },
+                )
+            }
         }
     }
 }

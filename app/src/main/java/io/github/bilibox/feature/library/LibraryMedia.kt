@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,7 +27,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,9 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
-import io.github.bilibox.core.ui.theme.Ink
-import io.github.bilibox.core.ui.theme.Muted
-import io.github.bilibox.core.ui.theme.Pink
 import io.github.bilibox.core.util.formatBytes
 import io.github.bilibox.core.util.formatFullDate
 import io.github.bilibox.core.util.formatRelativeDate
@@ -68,13 +63,18 @@ internal fun PermissionState(onRequest: () -> Unit, onRecheck: () -> Unit) {
 
 @Composable
 internal fun LoadingState() {
+    val palette = LocalLibraryPalette.current
     Column(
         Modifier.fillMaxWidth().padding(top = 88.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CircularProgressIndicator(color = Pink, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+        CircularProgressIndicator(
+            color = palette.accent,
+            strokeWidth = 2.dp,
+            modifier = Modifier.size(28.dp),
+        )
         Spacer(Modifier.height(14.dp))
-        Text("正在扫描本地视频…", color = Muted, fontSize = 12.sp)
+        Text("正在扫描本地视频…", color = palette.ink3, fontSize = 12.sp)
     }
 }
 
@@ -115,34 +115,52 @@ internal fun LibraryMessage(
     secondaryLabel: String? = null,
     onSecondary: (() -> Unit)? = null,
 ) {
+    val palette = LocalLibraryPalette.current
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 64.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
-            Modifier.size(76.dp).clip(RoundedCornerShape(24.dp)).background(LibrarySoftPink),
+            Modifier.size(76.dp).clip(RoundedCornerShape(24.dp)).background(palette.accentSoft),
             contentAlignment = Alignment.Center,
         ) {
-            AppGlyphIcon(icon, Pink, Modifier.size(34.dp), 1.5f)
+            AppGlyphIcon(icon, palette.accent, Modifier.size(34.dp), 1.5f)
         }
         Spacer(Modifier.height(18.dp))
-        Text(title, color = Ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+        Text(
+            title,
+            color = palette.ink,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
         Spacer(Modifier.height(8.dp))
-        Text(message, color = Muted, fontSize = 12.sp, lineHeight = 19.sp, textAlign = TextAlign.Center)
+        Text(
+            message,
+            color = palette.ink3,
+            fontSize = 12.sp,
+            lineHeight = 19.sp,
+            textAlign = TextAlign.Center,
+        )
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(20.dp))
             Box(
-                Modifier.height(42.dp).clip(RoundedCornerShape(21.dp)).background(Pink)
+                Modifier.height(42.dp).clip(RoundedCornerShape(21.dp)).background(palette.accent)
                     .clickable(onClick = onAction).padding(horizontal = 24.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(actionLabel, color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    actionLabel,
+                    color = palette.onAccent,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Medium,
+                )
             }
         }
         if (secondaryLabel != null && onSecondary != null) {
             Spacer(Modifier.height(6.dp))
             TextButton(onClick = onSecondary) {
-                Text(secondaryLabel, color = Pink, fontSize = 12.sp)
+                Text(secondaryLabel, color = palette.accent, fontSize = 12.sp)
             }
         }
     }
@@ -154,14 +172,17 @@ internal fun VideoInfoDialog(
     playback: LocalVideoPlayback,
     onDismiss: () -> Unit,
 ) {
+    val palette = LocalLibraryPalette.current
     val context = LocalContext.current
     val formatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm") }
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭", color = Pink) }
+            TextButton(onClick = onDismiss) { Text("关闭", color = palette.accent) }
         },
-        title = { Text("文件信息", color = Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold) },
+        title = {
+            Text("文件信息", color = palette.ink, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        },
         text = {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
                 InfoLine("文件名", video.name)
@@ -173,7 +194,11 @@ internal fun VideoInfoDialog(
                 )
                 InfoLine(
                     "分辨率",
-                    if (video.width > 0 && video.height > 0) "${video.width} × ${video.height} · ${resolutionLabel(video.width, video.height)}" else "未知",
+                    if (video.width > 0 && video.height > 0) {
+                        "${video.width} × ${video.height} · ${resolutionLabel(video.width, video.height)}"
+                    } else {
+                        "未知"
+                    },
                 )
                 InfoLine("帧率", if (video.frameRate > 0f) frameRateLabel(video.frameRate) else "未知")
                 InfoLine("修改时间", formatFullDate(video.dateModifiedMs, formatter))
@@ -188,17 +213,18 @@ internal fun VideoInfoDialog(
                 )
             }
         },
-        containerColor = Color.White,
+        containerColor = palette.card,
         shape = RoundedCornerShape(20.dp),
     )
 }
 
 @Composable
 internal fun InfoLine(label: String, value: String) {
+    val palette = LocalLibraryPalette.current
     Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-        Text(label, color = Muted, fontSize = 10.sp)
+        Text(label, color = palette.ink3, fontSize = 10.sp)
         Spacer(Modifier.height(2.dp))
-        Text(value, color = Ink, fontSize = 12.sp, lineHeight = 17.sp)
+        Text(value, color = palette.ink, fontSize = 12.sp, lineHeight = 17.sp)
     }
 }
 
@@ -272,23 +298,24 @@ internal fun videoMetaParts(
     if (fields.date) {
         parts += MetaPart(formatRelativeDate(video.dateModifiedMs))
     }
+    if (fields.extension && video.extension.isNotBlank()) {
+        parts += MetaPart(video.extension.uppercase())
+    }
     return parts
 }
 
+/**
+ * 文件夹卡片的信息行。数量交给封面角标，时长单独做成胶囊，这里只放
+ * 「大小 · 日期」，两者都关掉时调用方应跳过整行。
+ */
 internal fun folderMetaParts(
     folder: LocalVideoFolder,
     settings: LocalVideoSettings,
-    includeDuration: Boolean = true,
 ): List<MetaPart> {
-    val parts = mutableListOf(MetaPart("${folder.count} 个视频"))
-    if (settings.fields.size) parts += MetaPart(formatBytes(folder.totalSizeBytes))
-    if (settings.fields.date) parts += MetaPart(formatRelativeDate(folder.newestDateMs))
-    if (includeDuration && settings.fields.duration && folder.totalDurationMs > 0L) {
-        parts += MetaPart("共 ${formatVideoDuration(folder.totalDurationMs)}")
-    }
-    if (settings.fields.resolution && folder.maxWidth > 0 && folder.maxHeight > 0) {
-        parts += MetaPart(resolutionLabel(folder.maxWidth, folder.maxHeight))
-    }
+    val fields = settings.folderFields
+    val parts = mutableListOf<MetaPart>()
+    if (fields.size) parts += MetaPart(formatBytes(folder.totalSizeBytes))
+    if (fields.date) parts += MetaPart(formatRelativeDate(folder.newestDateMs))
     return parts
 }
 

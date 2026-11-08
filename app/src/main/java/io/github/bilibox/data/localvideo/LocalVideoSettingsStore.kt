@@ -22,6 +22,12 @@ internal class LocalVideoSettingsStore(context: Context) {
             size = preferences.getBoolean("field_size", true),
             date = preferences.getBoolean("field_date", true),
         ),
+        folderFields = LocalVideoFolderFields(
+            size = preferences.getBoolean("folder_field_size", true),
+            date = preferences.getBoolean("folder_field_date", true),
+            duration = preferences.getBoolean("folder_field_duration", true),
+            status = preferences.getBoolean("folder_field_status", true),
+        ),
         durationOnThumbnail = preferences.getBoolean("duration_on_thumbnail", true),
         showHidden = preferences.getBoolean("show_hidden", false),
         recognizeNomedia = preferences.getBoolean("recognize_nomedia", true),
@@ -42,6 +48,10 @@ internal class LocalVideoSettingsStore(context: Context) {
             .putBoolean("field_path", settings.fields.path)
             .putBoolean("field_size", settings.fields.size)
             .putBoolean("field_date", settings.fields.date)
+            .putBoolean("folder_field_size", settings.folderFields.size)
+            .putBoolean("folder_field_date", settings.folderFields.date)
+            .putBoolean("folder_field_duration", settings.folderFields.duration)
+            .putBoolean("folder_field_status", settings.folderFields.status)
             .putBoolean("duration_on_thumbnail", settings.durationOnThumbnail)
             .putBoolean("show_hidden", settings.showHidden)
             .putBoolean("recognize_nomedia", settings.recognizeNomedia)

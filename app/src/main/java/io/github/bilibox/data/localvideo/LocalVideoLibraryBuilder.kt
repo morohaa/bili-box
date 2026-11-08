@@ -95,6 +95,18 @@ internal fun buildLocalVideoLibrary(
     )
 }
 
+/**
+ * 设置弹窗的文件夹预览样本：取条目最多的文件夹，进入某个目录后也能看到示例。
+ */
+internal fun localVideoSampleFolder(
+    videos: List<LocalVideo>,
+    playback: Map<String, LocalVideoPlayback>,
+): LocalVideoFolder? = videos.asSequence()
+    .filter { it.relativeDirectory.isNotBlank() }
+    .groupBy { it.relativeDirectory }
+    .maxByOrNull { (_, group) -> group.size }
+    ?.let { (path, group) -> aggregateFolder(path, group, playback) }
+
 private fun aggregateFolder(
     path: String,
     videos: List<LocalVideo>,

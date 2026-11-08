@@ -66,6 +66,7 @@ internal enum class AppIcon {
     SHUFFLE,
     ROTATE_LEFT,
     IMAGE,
+    FOLDER_ALL,
 }
 
 @Composable
@@ -349,6 +350,12 @@ internal fun DrawScope.drawAppGlyph(
                 drawRoundRect(tint, Offset(3f, 5f), Size(18f, 14f), CornerRadius(2f), style = stroke)
                 circle(8.5f, 9.8f, 1.3f, filled = true)
                 path("M4.5 17l5-5 4 4 2.5-2.5L20 17")
+            }
+
+            AppIcon.FOLDER_ALL -> {
+                path("M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z")
+                line(7f, 12.5f, 17f, 12.5f)
+                line(7f, 15.6f, 13.5f, 15.6f)
             }
         }
     }

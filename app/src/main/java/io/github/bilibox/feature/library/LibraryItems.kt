@@ -3,8 +3,6 @@ package io.github.bilibox.feature.library
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,11 +15,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -46,8 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -59,15 +53,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
+import io.github.bilibox.core.ui.component.VideoCoverPlaceholder
 import io.github.bilibox.core.ui.component.coverBrush
 import io.github.bilibox.core.ui.component.rememberVideoThumbnail
-import io.github.bilibox.core.ui.theme.Ink
-import io.github.bilibox.core.ui.theme.Muted
-import io.github.bilibox.core.ui.theme.Pink
 import io.github.bilibox.core.util.formatVideoDuration
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoFolder
@@ -81,6 +74,21 @@ import io.github.bilibox.data.localvideo.LocalVideoSort
 import io.github.bilibox.data.localvideo.cachedVideoThumbnail
 import io.github.bilibox.data.localvideo.loadVideoThumbnail
 
+/** 封面圆角，比卡片小一号。 */
+private val CoverShape = RoundedCornerShape(10.dp)
+
+/**
+ * 白卡片底：只用底色和圆角分层，去掉投影与描边。
+ *
+ * 阴影在浅色画布上会发灰、显脏，这个页面靠「浅灰画布 + 纯白卡片 + 充足留白」
+ * 区分层级，夜间模式才补一条极淡的描边。
+ */
+@Composable
+private fun Modifier.libraryCard(radius: Dp = 16.dp): Modifier {
+    val palette = LocalLibraryPalette.current
+    return this.fillMaxWidth().clip(RoundedCornerShape(radius)).background(palette.card)
+}
+
 @Composable
 internal fun VideoList(
     view: LocalVideoLibraryView,
@@ -93,21 +101,36 @@ internal fun VideoList(
     onInfo: (LocalVideo) -> Unit,
 ) {
     val state = rememberLazyListState()
-    ResetScroll(state, settings.layout, settings.sort, settings.ascending, view.currentPath, view.searching, view.activeFilter, view.videos.size)
+    ResetScroll(
+        state,
+        settings.layout,
+        settings.sort,
+        settings.ascending,
+        view.currentPath,
+        view.searching,
+        view.activeFilter,
+        view.videos.size,
+    )
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         state = state,
-        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 2.dp, bottom = bottomPadding),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = bottomPadding),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(view.folders, key = { "folder:${it.path}" }) { folder ->
-            FolderRow(folder, settings, onClick = { onFolder(folder) })
+            FolderRow(
+                folder = folder,
+                settings = settings,
+                modifier = Modifier.animateItem(),
+                onClick = { onFolder(folder) },
+            )
         }
         items(view.videos, key = { "video:${it.key}" }) { video ->
             VideoRow(
                 video = video,
                 settings = settings,
                 playback = playback[video.key] ?: LocalVideoPlayback(LocalVideoPlaybackState.Unplayed),
+                modifier = Modifier.animateItem(),
                 onClick = { onVideo(video) },
                 onShare = { onShare(video) },
                 onInfo = { onInfo(video) },
@@ -128,23 +151,38 @@ internal fun VideoGrid(
     onInfo: (LocalVideo) -> Unit,
 ) {
     val state = rememberLazyGridState()
-    ResetScroll(state, settings.layout, settings.sort, settings.ascending, view.currentPath, view.searching, view.activeFilter, view.videos.size)
+    ResetScroll(
+        state,
+        settings.layout,
+        settings.sort,
+        settings.ascending,
+        view.currentPath,
+        view.searching,
+        view.activeFilter,
+        view.videos.size,
+    )
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier.fillMaxSize(),
         state = state,
-        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 2.dp, bottom = bottomPadding),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = bottomPadding),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(view.folders, key = { "folder:${it.path}" }) { folder ->
-            FolderCard(folder, settings, onClick = { onFolder(folder) })
+            FolderCard(
+                folder = folder,
+                settings = settings,
+                modifier = Modifier.animateItem(),
+                onClick = { onFolder(folder) },
+            )
         }
         items(view.videos, key = { "video:${it.key}" }) { video ->
             VideoCard(
                 video = video,
                 settings = settings,
                 playback = playback[video.key] ?: LocalVideoPlayback(LocalVideoPlaybackState.Unplayed),
+                modifier = Modifier.animateItem(),
                 onClick = { onVideo(video) },
                 onShare = { onShare(video) },
                 onInfo = { onInfo(video) },
@@ -189,82 +227,96 @@ internal fun ResetScroll(
 internal fun FolderRow(
     folder: LocalVideoFolder,
     settings: LocalVideoSettings,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    val palette = LocalLibraryPalette.current
     Row(
-        Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 9.dp),
+        modifier.libraryCard()
+            .pressFeedback(onClick = onClick, shape = LibraryCardShape)
+            .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FolderIcon(folder)
+        FolderCoverTile(folder, settings, Modifier.width(116.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 folder.name,
-                color = Ink,
-                fontSize = 14.5.sp,
-                lineHeight = 19.sp,
-                fontWeight = FontWeight.Medium,
+                color = palette.ink,
+                fontSize = 15.5.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(4.dp))
-            MetaText(folderMetaParts(folder, settings))
-            if (settings.fields.path) {
+            val meta = folderMetaParts(folder, settings)
+            if (meta.isNotEmpty()) {
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    "内部存储 / ${folder.path}",
-                    color = Muted,
-                    fontSize = 10.5.sp,
+                MetaText(meta, fontSize = 12.sp, maxLines = 1)
+            }
+            if (settings.folderFields.duration && folder.totalDurationMs > 0L) {
+                Spacer(Modifier.height(3.dp))
+                MetaText(
+                    listOf(MetaPart("总时长 ${formatVideoDuration(folder.totalDurationMs)}")),
+                    fontSize = 11.5.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
+            }
+            if (settings.fields.path) {
+                Spacer(Modifier.height(3.dp))
+                FolderPathHint(folder)
             }
         }
         Spacer(Modifier.width(6.dp))
-        AppGlyphIcon(AppIcon.CHEVRON_RIGHT, Muted.copy(alpha = .62f), Modifier.size(17.dp), 1.8f)
+        AppGlyphIcon(AppIcon.CHEVRON_RIGHT, palette.ink3, Modifier.size(17.dp), 2.2f)
     }
 }
 
+/** 文件夹封面：优先用最新视频的缩略图，没有就画默认插画。 */
 @Composable
-internal fun FolderIcon(folder: LocalVideoFolder) {
-    // Leave room above the tile so the unread badge can sit fully outside it.
-    Box(Modifier.size(54.dp)) {
-        Box(
-            Modifier.size(46.dp).align(Alignment.BottomStart)
-                .clip(RoundedCornerShape(14.dp))
-                .background(LibrarySoftPink),
-            contentAlignment = Alignment.Center,
-        ) {
-            AppGlyphIcon(AppIcon.FOLDER, Pink, Modifier.size(24.dp), 1.7f)
-        }
-        if (folder.unplayedCount > 0) {
-            Box(
-                Modifier.align(Alignment.TopEnd)
-                    .offset(x = (-3).dp, y = 5.dp)
-                    .widthIn(min = 18.dp)
-                    .height(18.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(LibraryBg)
-                    .padding(2.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .background(Pink)
-                    .padding(horizontal = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    "${folder.unplayedCount}",
-                    color = Color.White,
-                    fontSize = 9.5.sp,
-                    lineHeight = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                )
-            }
+internal fun FolderCoverTile(
+    folder: LocalVideoFolder,
+    settings: LocalVideoSettings,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalLibraryPalette.current
+    val cover = folder.cover
+    val bitmap = cover?.let { video ->
+        rememberVideoThumbnail(video.key, cachedVideoThumbnail(video.key)) { context ->
+            loadVideoThumbnail(context, video.uri, video.key)
         }
     }
+    Box(
+        modifier.aspectRatio(16f / 9f)
+            .clip(CoverShape)
+            .background(coverBrush(folder.path)),
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            VideoCoverPlaceholder(Modifier.fillMaxSize())
+        }
+        if (settings.folderFields.status && folder.unplayedCount > 0) {
+            UnreadDot(Modifier.align(Alignment.TopStart).padding(6.dp))
+        }
+    }
+}
+
+/** 有新内容的文件夹：一枚带白色描边的小圆点，代替大块 NEW 标签。 */
+@Composable
+private fun UnreadDot(modifier: Modifier = Modifier) {
+    val palette = LocalLibraryPalette.current
+    Box(
+        modifier.size(9.dp)
+            .background(Color.White.copy(alpha = .92f), CircleShape)
+            .padding(1.5.dp)
+            .background(palette.accent, CircleShape),
+    )
 }
 
 @Composable
@@ -275,70 +327,154 @@ internal fun VideoRow(
     onClick: () -> Unit,
     onShare: () -> Unit,
     onInfo: () -> Unit,
+    modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
+    val palette = LocalLibraryPalette.current
+    if (compact) {
+        CompactVideoRow(video, settings, playback, Modifier.padding(horizontal = 10.dp, vertical = 8.dp))
+        return
+    }
     val watched = playback.state == LocalVideoPlaybackState.Watched
-    val thumbWidth = if (compact) 96.dp else 122.dp
-    val thumbHeight = if (compact) 54.dp else 69.dp
     Row(
-        Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(if (compact) 10.dp else 14.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = if (compact) 6.dp else 0.dp, vertical = if (compact) 4.dp else 8.dp),
-        verticalAlignment = Alignment.Top,
+        modifier.libraryCard()
+            .pressFeedback(onClick = onClick, shape = LibraryCardShape)
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         if (settings.fields.thumbnail) {
             VideoThumbnail(
                 video = video,
                 settings = settings,
                 playback = playback,
-                modifier = Modifier.width(thumbWidth).height(thumbHeight),
+                modifier = Modifier.width(116.dp),
             )
         } else {
-            Box(
-                Modifier.size(if (compact) 38.dp else 44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(LibrarySoftPink),
-                contentAlignment = Alignment.Center,
-            ) {
-                AppGlyphIcon(AppIcon.FILE, Pink, Modifier.size(if (compact) 20.dp else 23.dp), 1.7f)
-            }
+            FileGlyphTile()
         }
-        Spacer(Modifier.width(if (compact) 9.dp else 11.dp))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Text(
-                    video.title,
-                    color = if (watched) Muted else Ink,
-                    fontSize = if (compact) 13.sp else 14.5.sp,
-                    lineHeight = if (compact) 17.sp else 19.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (settings.fields.extension) ExtensionBadge(video.extension)
-            }
+            Text(
+                video.title,
+                color = if (watched) palette.ink2 else palette.ink,
+                fontSize = 14.5.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
             val meta = videoMetaParts(video, playback, settings)
             if (meta.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                MetaText(meta, maxLines = if (compact) 1 else 2)
+                Spacer(Modifier.height(5.dp))
+                MetaText(meta, fontSize = 12.sp, maxLines = 2)
             }
             if (settings.fields.path) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(3.dp))
                 Text(
                     "内部存储 / ${video.relativeDirectory.ifBlank { "根目录" }} / ${video.name}",
-                    color = Muted,
+                    color = palette.ink3,
                     fontSize = 10.5.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
-        if (!compact) {
-            Spacer(Modifier.width(4.dp))
-            VideoMoreMenu(onPlay = onClick, onShare = onShare, onInfo = onInfo)
+        Spacer(Modifier.width(2.dp))
+        VideoMoreMenu(onPlay = onClick, onShare = onShare, onInfo = onInfo)
+    }
+}
+
+/** 设置弹窗里的紧凑预览行，只保留封面、标题与信息行。 */
+@Composable
+internal fun CompactVideoRow(
+    video: LocalVideo,
+    settings: LocalVideoSettings,
+    playback: LocalVideoPlayback,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalLibraryPalette.current
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (settings.fields.thumbnail) {
+            VideoThumbnail(
+                video = video,
+                settings = settings,
+                playback = playback,
+                modifier = Modifier.width(96.dp),
+            )
+        } else {
+            Box(
+                Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(palette.accentSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                AppGlyphIcon(AppIcon.FILE, palette.accent, Modifier.size(22.dp), 1.7f)
+            }
         }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                video.title,
+                color = palette.ink,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val meta = videoMetaParts(video, playback, settings)
+            if (meta.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                MetaText(meta, fontSize = 11.sp, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** 设置弹窗里的紧凑文件夹预览行。 */
+@Composable
+internal fun CompactFolderRow(
+    folder: LocalVideoFolder,
+    settings: LocalVideoSettings,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalLibraryPalette.current
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        FolderCoverTile(folder, settings, Modifier.width(96.dp))
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                folder.name,
+                color = palette.ink,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val meta = folderMetaParts(folder, settings)
+            if (meta.isNotEmpty()) {
+                Spacer(Modifier.height(3.dp))
+                MetaText(meta, fontSize = 11.sp, maxLines = 1)
+            }
+            if (settings.folderFields.duration && folder.totalDurationMs > 0L) {
+                Spacer(Modifier.height(3.dp))
+                MetaText(
+                    listOf(MetaPart("总时长 ${formatVideoDuration(folder.totalDurationMs)}")),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FileGlyphTile() {
+    val palette = LocalLibraryPalette.current
+    Box(
+        Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(palette.accentSoft),
+        contentAlignment = Alignment.Center,
+    ) {
+        AppGlyphIcon(AppIcon.FILE, palette.accent, Modifier.size(23.dp), 1.7f)
     }
 }
 
@@ -349,25 +485,35 @@ internal fun VideoMoreMenu(
     onInfo: () -> Unit,
     onThumbnail: Boolean = false,
 ) {
+    val palette = LocalLibraryPalette.current
     var expanded by remember { mutableStateOf(false) }
     Box {
         Box(
-            Modifier.size(28.dp)
+            Modifier.size(26.dp)
                 .clip(CircleShape)
                 .background(if (onThumbnail) Color.Black.copy(alpha = .3f) else Color.Transparent)
                 .semantics { contentDescription = "更多操作" }
-                .clickable { expanded = true },
+                .pressFeedback(onClick = { expanded = true }, shape = CircleShape, scaleTo = .88f),
             contentAlignment = Alignment.Center,
         ) {
-            AppGlyphIcon(AppIcon.MORE, if (onThumbnail) Color.White else Muted, Modifier.size(16.dp), 1.8f)
+            AppGlyphIcon(
+                AppIcon.MORE,
+                if (onThumbnail) Color.White else palette.ink3,
+                Modifier.size(15.dp),
+                2f,
+            )
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = palette.card,
+        ) {
             DropdownMenuItem(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppGlyphIcon(AppIcon.PLAY, Pink, Modifier.size(15.dp), 1.8f)
+                        AppGlyphIcon(AppIcon.PLAY, palette.accent, Modifier.size(15.dp), 1.8f)
                         Spacer(Modifier.width(9.dp))
-                        Text("播放", color = Ink, fontSize = 13.sp)
+                        Text("播放", color = palette.ink, fontSize = 13.sp)
                     }
                 },
                 onClick = {
@@ -378,9 +524,9 @@ internal fun VideoMoreMenu(
             DropdownMenuItem(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppGlyphIcon(AppIcon.SHARE, LibrarySecondary, Modifier.size(15.dp), 1.7f)
+                        AppGlyphIcon(AppIcon.SHARE, palette.ink2, Modifier.size(15.dp), 1.7f)
                         Spacer(Modifier.width(9.dp))
-                        Text("分享", color = Ink, fontSize = 13.sp)
+                        Text("分享", color = palette.ink, fontSize = 13.sp)
                     }
                 },
                 onClick = {
@@ -391,9 +537,9 @@ internal fun VideoMoreMenu(
             DropdownMenuItem(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppGlyphIcon(AppIcon.INFO, LibrarySecondary, Modifier.size(15.dp), 1.7f)
+                        AppGlyphIcon(AppIcon.INFO, palette.ink2, Modifier.size(15.dp), 1.7f)
                         Spacer(Modifier.width(9.dp))
-                        Text("文件信息", color = Ink, fontSize = 13.sp)
+                        Text("文件信息", color = palette.ink, fontSize = 13.sp)
                     }
                 },
                 onClick = {
@@ -412,107 +558,93 @@ internal fun VideoThumbnail(
     playback: LocalVideoPlayback,
     modifier: Modifier = Modifier,
     showStatus: Boolean = true,
+    showDuration: Boolean = true,
 ) {
+    val palette = LocalLibraryPalette.current
     val bitmap = rememberVideoThumbnail(video.key, cachedVideoThumbnail(video.key)) { context ->
         loadVideoThumbnail(context, video.uri, video.key)
     }
-    Box(modifier.clip(RoundedCornerShape(8.dp)).background(coverBrush(video.title))) {
-        bitmap?.let { frame ->
+    Box(
+        modifier.aspectRatio(16f / 9f)
+            .clip(CoverShape)
+            .background(coverBrush(video.title)),
+    ) {
+        if (bitmap != null) {
             Image(
-                bitmap = frame.asImageBitmap(),
+                bitmap = bitmap.asImageBitmap(),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-        }
-        Canvas(Modifier.fillMaxSize()) {
-            drawCircle(
-                Color.White.copy(alpha = .07f),
-                radius = size.minDimension * .52f,
-                center = Offset(size.width * .78f, size.height * .28f),
-            )
-            drawCircle(
-                Color.Black.copy(alpha = .05f),
-                radius = size.minDimension * .46f,
-                center = Offset(size.width * .12f, size.height * .9f),
-            )
+        } else {
+            VideoCoverPlaceholder(Modifier.fillMaxSize())
         }
         if (showStatus) {
             when (playback.state) {
-                LocalVideoPlaybackState.Unplayed -> ThumbBadge("NEW", Pink, Modifier.align(Alignment.TopStart))
-                LocalVideoPlaybackState.Watched -> ThumbBadge("已看完", Color(0xFF4B5560), Modifier.align(Alignment.TopStart))
+                LocalVideoPlaybackState.Unplayed -> UnreadDot(
+                    Modifier.align(Alignment.TopStart).padding(6.dp),
+                )
+
+                LocalVideoPlaybackState.Watched -> Unit
+
                 is LocalVideoPlaybackState.Watching -> Unit
             }
         }
-        if (settings.fields.duration && settings.durationOnThumbnail && video.durationMs > 0L) {
+        if (showDuration && settings.fields.duration && settings.durationOnThumbnail && video.durationMs > 0L) {
             Text(
                 formatVideoDuration(video.durationMs),
                 color = Color.White,
-                fontSize = 9.5.sp,
+                fontSize = 10.sp,
                 lineHeight = 12.sp,
+                fontWeight = FontWeight.Medium,
                 modifier = Modifier.align(Alignment.BottomEnd)
-                    .padding(end = 4.dp, bottom = if (playback.state is LocalVideoPlaybackState.Watching) 7.dp else 4.dp)
-                    .background(Color.Black.copy(alpha = .55f), RoundedCornerShape(3.dp))
-                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                    .padding(end = 5.dp, bottom = if (playback.state is LocalVideoPlaybackState.Watching) 6.dp else 5.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(Color.Black.copy(alpha = .5f))
+                    .padding(horizontal = 5.dp, vertical = 1.dp),
             )
         }
         if (playback.state is LocalVideoPlaybackState.Watching) {
-            val fraction = playback.state.fraction
+            val fraction = playback.state.fraction.coerceIn(0f, 1f)
             Box(
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp)
-                    .background(Color.White.copy(alpha = .38f)),
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.5.dp)
+                    .background(Color.White.copy(alpha = .32f)),
             ) {
                 Box(
-                    Modifier.fillMaxHeight().fillMaxWidth(fraction.coerceIn(0f, 1f))
-                        .background(Pink),
+                    Modifier.fillMaxHeight().fillMaxWidth(fraction).background(palette.accent),
                 )
             }
         }
     }
 }
 
-@Composable
-internal fun ThumbBadge(text: String, background: Color, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        color = Color.White,
-        fontSize = 9.sp,
-        lineHeight = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        modifier = modifier.padding(4.dp)
-            .background(background, RoundedCornerShape(3.dp))
-            .padding(horizontal = 4.dp, vertical = 1.dp),
-    )
-}
-
-@Composable
-internal fun ExtensionBadge(extension: String) {
-    if (extension.isBlank()) return
-    Text(
-        extension.uppercase(),
-        color = Muted,
-        fontSize = 8.5.sp,
-        lineHeight = 12.sp,
-        modifier = Modifier.padding(start = 5.dp, top = 2.dp)
-            .border(1.dp, LibraryLine, RoundedCornerShape(3.dp))
-            .padding(horizontal = 3.dp, vertical = 1.dp),
-    )
-}
-
 internal data class MetaPart(val text: String, val highlight: Boolean = false)
 
 @Composable
-internal fun MetaText(parts: List<MetaPart>, maxLines: Int = 2) {
+internal fun MetaText(
+    parts: List<MetaPart>,
+    fontSize: TextUnit = 12.sp,
+    maxLines: Int = 2,
+) {
     if (parts.isEmpty()) return
+    val palette = LocalLibraryPalette.current
     val text = buildAnnotatedString {
         parts.forEachIndexed { index, part ->
             if (index > 0) {
-                withStyle(SpanStyle(color = Muted.copy(alpha = .65f))) { append("  ·  ") }
+                withStyle(SpanStyle(color = palette.ink3.copy(alpha = .75f))) { append(" · ") }
             }
-            withStyle(SpanStyle(color = if (part.highlight) Pink else Muted)) { append(part.text) }
+            withStyle(SpanStyle(color = if (part.highlight) palette.accent else palette.ink3)) {
+                append(part.text)
+            }
         }
     }
-    Text(text, fontSize = 10.5.sp, lineHeight = 15.sp, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
+    Text(
+        text,
+        fontSize = fontSize,
+        lineHeight = fontSize * 1.4f,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
@@ -520,57 +652,47 @@ internal fun VideoCard(
     video: LocalVideo,
     settings: LocalVideoSettings,
     playback: LocalVideoPlayback,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onShare: () -> Unit,
     onInfo: () -> Unit,
 ) {
+    val palette = LocalLibraryPalette.current
     val watched = playback.state == LocalVideoPlaybackState.Watched
     Column(
-        Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(LibraryCard)
-            .clickable(onClick = onClick),
+        modifier.libraryCard()
+            .pressFeedback(onClick = onClick, shape = LibraryCardShape)
+            .padding(8.dp),
     ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 10f)) {
+        Box(Modifier.fillMaxWidth()) {
             if (settings.fields.thumbnail) {
-                VideoThumbnail(video, settings, playback, Modifier.fillMaxSize())
+                VideoThumbnail(video, settings, playback, Modifier.fillMaxWidth())
             } else {
-                Box(Modifier.fillMaxSize().background(coverBrush(video.title)), contentAlignment = Alignment.Center) {
-                    AppGlyphIcon(AppIcon.FILE, Color.White.copy(alpha = .9f), Modifier.size(28.dp), 1.5f)
+                Box(
+                    Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                        .clip(CoverShape)
+                        .background(coverBrush(video.title)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AppGlyphIcon(AppIcon.FILE, Color.White.copy(alpha = .9f), Modifier.size(26.dp), 1.5f)
                 }
             }
-            Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
-                VideoMoreMenu(onPlay = onClick, onShare = onShare, onInfo = onInfo, onThumbnail = true)
-            }
         }
-        Column(Modifier.fillMaxWidth().padding(start = 9.dp, end = 9.dp, top = 7.dp, bottom = 9.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Text(
-                    video.title,
-                    color = if (watched) Muted else Ink,
-                    fontSize = 13.sp,
-                    lineHeight = 17.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).heightIn(min = 34.dp),
-                )
-                if (settings.fields.extension) ExtensionBadge(video.extension)
-            }
+        Column(Modifier.fillMaxWidth().padding(start = 2.dp, end = 2.dp, top = 8.dp, bottom = 4.dp)) {
+            Text(
+                video.title,
+                color = if (watched) palette.ink2 else palette.ink,
+                fontSize = 13.5.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.heightIn(min = 36.dp),
+            )
             val meta = videoMetaParts(video, playback, settings)
             if (meta.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                MetaText(meta, maxLines = 1)
-            }
-            if (settings.fields.path) {
                 Spacer(Modifier.height(3.dp))
-                Text(
-                    "内部存储 / ${video.relativeDirectory.ifBlank { "根目录" }}",
-                    color = Muted,
-                    fontSize = 9.5.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                MetaText(meta, fontSize = 11.sp, maxLines = 1)
             }
         }
     }
@@ -580,111 +702,38 @@ internal fun VideoCard(
 internal fun FolderCard(
     folder: LocalVideoFolder,
     settings: LocalVideoSettings,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    val palette = LocalLibraryPalette.current
     Column(
-        Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(LibraryCard)
-            .clickable(onClick = onClick),
+        modifier.libraryCard()
+            .pressFeedback(onClick = onClick, shape = LibraryCardShape)
+            .padding(8.dp),
     ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 10f)) {
-            if (settings.fields.thumbnail) {
-                FolderCover(folder)
-            } else {
-                Box(
-                    Modifier.fillMaxSize().background(coverBrush(folder.path)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(
-                        Modifier.size(46.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.White.copy(alpha = .82f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        AppGlyphIcon(AppIcon.FOLDER, Pink, Modifier.size(26.dp), 1.7f)
-                    }
-                }
-            }
-            if (folder.unplayedCount > 0) {
-                ThumbBadge("${folder.unplayedCount} 新", Pink, Modifier.align(Alignment.TopStart))
-            }
-            Row(
-                Modifier.align(Alignment.BottomEnd).padding(5.dp)
-                    .background(Color.Black.copy(alpha = .52f), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 5.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppGlyphIcon(AppIcon.FOLDER, Color.White, Modifier.size(11.dp), 2f)
-                Spacer(Modifier.width(3.dp))
-                Text("${folder.count}", color = Color.White, fontSize = 9.5.sp)
-            }
-        }
-        Column(Modifier.fillMaxWidth().padding(start = 9.dp, end = 9.dp, top = 7.dp, bottom = 9.dp)) {
+        FolderCoverTile(folder, settings, Modifier.fillMaxWidth())
+        Column(Modifier.fillMaxWidth().padding(start = 2.dp, end = 2.dp, top = 8.dp, bottom = 4.dp)) {
             Text(
                 folder.name,
-                color = Ink,
-                fontSize = 13.sp,
-                lineHeight = 17.sp,
-                fontWeight = FontWeight.Medium,
+                color = palette.ink,
+                fontSize = 14.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(4.dp))
-            MetaText(folderMetaParts(folder, settings, includeDuration = false), maxLines = 1)
-            if (settings.fields.path) {
+            val meta = folderMetaParts(folder, settings)
+            if (meta.isNotEmpty()) {
                 Spacer(Modifier.height(3.dp))
-                Text(
-                    "内部存储 / ${folder.path}",
-                    color = Muted,
-                    fontSize = 9.5.sp,
+                MetaText(meta, fontSize = 11.sp, maxLines = 1)
+            }
+            if (settings.folderFields.duration && folder.totalDurationMs > 0L) {
+                Spacer(Modifier.height(3.dp))
+                MetaText(
+                    listOf(MetaPart("总时长 ${formatVideoDuration(folder.totalDurationMs)}")),
+                    fontSize = 11.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun FolderCover(folder: LocalVideoFolder) {
-    val cover = folder.cover
-    val bitmap = cover?.let { video ->
-        rememberVideoThumbnail(video.key, cachedVideoThumbnail(video.key)) { context ->
-            loadVideoThumbnail(context, video.uri, video.key)
-        }
-    }
-    Box(Modifier.fillMaxSize().background(coverBrush(folder.path))) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-            Canvas(Modifier.fillMaxSize()) {
-                drawRect(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = .32f)),
-                        startY = size.height * .4f,
-                    )
-                )
-            }
-        } else {
-            Canvas(Modifier.fillMaxSize()) {
-                drawCircle(
-                    Color.White.copy(alpha = .1f),
-                    radius = size.minDimension * .5f,
-                    center = Offset(size.width * .76f, size.height * .3f),
-                )
-            }
-            Box(
-                Modifier.align(Alignment.Center).size(46.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.White.copy(alpha = .82f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                AppGlyphIcon(AppIcon.FOLDER, Pink, Modifier.size(26.dp), 1.7f)
             }
         }
     }
@@ -698,49 +747,56 @@ internal fun ContinueWatchingBar(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val palette = LocalLibraryPalette.current
     Row(
-        modifier.fillMaxWidth().height(60.dp)
-            .shadow(16.dp, RoundedCornerShape(30.dp), ambientColor = Color(0xFF5D7288).copy(alpha = .22f), spotColor = Color(0xFF5D7288).copy(alpha = .22f))
-            .clip(RoundedCornerShape(30.dp))
-            .background(Color.White.copy(alpha = .94f))
-            .border(1.dp, Color.White, RoundedCornerShape(30.dp))
-            .clickable(onClick = onClick)
+        modifier.fillMaxWidth().height(58.dp)
+            .shadow(
+                12.dp,
+                RoundedCornerShape(24.dp),
+                ambientColor = Color(0xFF101215).copy(alpha = .10f),
+                spotColor = Color(0xFF101215).copy(alpha = .12f),
+            )
+            .clip(RoundedCornerShape(24.dp))
+            .background(palette.card)
+            .pressFeedback(onClick = onClick, shape = RoundedCornerShape(24.dp), scaleTo = .985f)
             .padding(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.width(68.dp).height(48.dp).clip(RoundedCornerShape(24.dp)),
-        ) {
-            VideoThumbnail(video, settings, LocalVideoPlayback(playback), Modifier.fillMaxSize(), showStatus = false)
+        Box(Modifier.width(56.dp).height(46.dp).clip(RoundedCornerShape(16.dp))) {
+            VideoThumbnail(
+                video = video,
+                settings = settings,
+                playback = LocalVideoPlayback(playback),
+                modifier = Modifier.fillMaxSize(),
+                showStatus = false,
+                showDuration = false,
+            )
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 video.title,
-                color = Ink,
-                fontSize = 12.5.sp,
-                lineHeight = 16.sp,
+                color = palette.ink,
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                "继续观看 · ${formatVideoDuration(playback.positionMs)} / ${formatVideoDuration(video.durationMs)}",
-                color = Muted,
-                fontSize = 10.sp,
+                "继续观看 ${formatVideoDuration(playback.positionMs)} / ${formatVideoDuration(video.durationMs)}",
+                color = palette.ink3,
+                fontSize = 11.sp,
                 maxLines = 1,
             )
         }
         Spacer(Modifier.width(8.dp))
         Box(
-            Modifier.size(40.dp)
-                .shadow(8.dp, CircleShape, spotColor = Pink.copy(alpha = .4f))
-                .clip(CircleShape)
-                .background(Pink),
+            Modifier.size(36.dp).clip(CircleShape).background(palette.accent),
             contentAlignment = Alignment.Center,
         ) {
-            AppGlyphIcon(AppIcon.PLAY, Color.White, Modifier.size(18.dp), 1.8f)
+            AppGlyphIcon(AppIcon.PLAY, palette.onAccent, Modifier.size(16.dp), 1.8f)
         }
         Spacer(Modifier.width(4.dp))
     }

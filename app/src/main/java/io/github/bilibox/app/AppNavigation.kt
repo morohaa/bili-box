@@ -130,7 +130,6 @@ internal fun AppNavigation(
                     refreshToken = appState.libraryRefresh,
                     darkMode = darkMode,
                     initialFilter = appState.libraryFilter,
-                    onToggleDarkMode = onToggleDarkMode,
                     onVideoSelected = appState::openLocalVideo,
                 )
 

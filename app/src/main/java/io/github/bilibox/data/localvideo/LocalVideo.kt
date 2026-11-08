@@ -120,6 +120,9 @@ internal data class LocalVideoDisplayFields(
         LocalVideoField.SIZE -> copy(size = enabled)
         LocalVideoField.DATE -> copy(date = enabled)
     }
+
+    /** 已开启的字段数量，用于设置面板的分组角标。 */
+    val enabledCount: Int get() = LocalVideoField.entries.count(::isEnabled)
 }
 
 internal enum class LocalVideoField(val label: String) {
@@ -134,12 +137,45 @@ internal enum class LocalVideoField(val label: String) {
     DATE("日期"),
 }
 
+/** 文件夹卡片上可独立开关的信息位，与视频字段分开设置。 */
+internal data class LocalVideoFolderFields(
+    val size: Boolean = true,
+    val date: Boolean = true,
+    val duration: Boolean = true,
+    val status: Boolean = true,
+) {
+    fun isEnabled(field: LocalVideoFolderField): Boolean = when (field) {
+        LocalVideoFolderField.SIZE -> size
+        LocalVideoFolderField.DATE -> date
+        LocalVideoFolderField.DURATION -> duration
+        LocalVideoFolderField.STATUS -> status
+    }
+
+    fun with(field: LocalVideoFolderField, enabled: Boolean): LocalVideoFolderFields = when (field) {
+        LocalVideoFolderField.SIZE -> copy(size = enabled)
+        LocalVideoFolderField.DATE -> copy(date = enabled)
+        LocalVideoFolderField.DURATION -> copy(duration = enabled)
+        LocalVideoFolderField.STATUS -> copy(status = enabled)
+    }
+
+    /** 已开启的字段数量，用于设置面板的分组角标。 */
+    val enabledCount: Int get() = LocalVideoFolderField.entries.count(::isEnabled)
+}
+
+internal enum class LocalVideoFolderField(val label: String) {
+    SIZE("文件大小"),
+    DATE("添加日期"),
+    DURATION("视频时长"),
+    STATUS("播放状态"),
+}
+
 internal data class LocalVideoSettings(
     val mode: LocalVideoViewMode = LocalVideoViewMode.ALL_FOLDERS,
     val layout: LocalVideoLayout = LocalVideoLayout.LIST,
     val sort: LocalVideoSort = LocalVideoSort.TITLE,
     val ascending: Boolean = true,
     val fields: LocalVideoDisplayFields = LocalVideoDisplayFields(),
+    val folderFields: LocalVideoFolderFields = LocalVideoFolderFields(),
     val durationOnThumbnail: Boolean = true,
     val showHidden: Boolean = false,
     val recognizeNomedia: Boolean = true,
