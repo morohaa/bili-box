@@ -62,14 +62,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.bilibox.core.ui.theme.OnlineCardGray
-import io.github.bilibox.core.ui.theme.OnlineDivider
-import io.github.bilibox.core.ui.theme.OnlineMuted
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.OnlinePinkSoft
-import io.github.bilibox.core.ui.theme.OnlineSecondary
-import io.github.bilibox.core.ui.theme.OnlineStroke
-import io.github.bilibox.core.ui.theme.OnlineText
+import io.github.bilibox.core.ui.theme.PlaybackCard
+import io.github.bilibox.core.ui.theme.PlaybackDivider
+import io.github.bilibox.core.ui.theme.PlaybackMuted
+import io.github.bilibox.core.ui.theme.PlaybackSecondary
+import io.github.bilibox.core.ui.theme.PlaybackStroke
+import io.github.bilibox.core.ui.theme.PlaybackSurface
+import io.github.bilibox.core.ui.theme.PlaybackText
 import io.github.bilibox.core.util.formatPlaybackTime
 import io.github.bilibox.data.bili.Page
 
@@ -83,8 +84,8 @@ internal fun OnlineEpisodeCard(
     Row(
         Modifier.width(148.dp).height(58.dp)
             .clip(shape)
-            .background(if (selected) OnlinePinkSoft else OnlineCardGray)
-            .border(1.dp, if (selected) OnlinePink else OnlineStroke, shape)
+            .background(if (selected) OnlinePinkSoft else PlaybackCard)
+            .border(1.dp, if (selected) OnlinePink else PlaybackStroke, shape)
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -95,7 +96,7 @@ internal fun OnlineEpisodeCard(
         }
         Text(
             page.part.ifBlank { "第 ${page.page} 部分" },
-            color = if (selected) OnlinePink else OnlineText,
+            color = if (selected) OnlinePink else PlaybackText,
             fontSize = 11.sp,
             lineHeight = 14.sp,
             fontWeight = FontWeight.SemiBold,
@@ -126,7 +127,7 @@ internal fun OnlineEpisodesBottomSheet(
     Column(
         Modifier.fillMaxSize()
             .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-            .background(Color.White)
+            .background(PlaybackSurface)
     ) {
         EpisodesSheetHeader(
             fraction = if (selectedIndex >= 0) selectedIndex + 1 else selectedPage,
@@ -137,7 +138,7 @@ internal fun OnlineEpisodesBottomSheet(
             onGridViewChange = onGridViewChange,
             onDismiss = onDismiss,
         )
-        HorizontalDivider(color = OnlineDivider)
+        HorizontalDivider(color = PlaybackDivider)
         if (gridView) {
             val gridState = rememberLazyGridState(
                 initialFirstVisibleItemIndex = selectedIndex.coerceAtLeast(0)
@@ -196,11 +197,11 @@ private fun EpisodesSheetHeader(
         Modifier.fillMaxWidth().height(48.dp).padding(start = 16.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("视频选集", color = OnlineText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        Text("视频选集", color = PlaybackText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.width(5.dp))
         Text(
             "($fraction/$total)",
-            color = OnlineMuted,
+            color = PlaybackMuted,
             fontSize = 12.sp,
             style = TextStyle(fontFeatureSettings = "tnum"),
             maxLines = 1,
@@ -220,7 +221,7 @@ private fun AutoPlayNextToggle(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val trackColor by animateColorAsState(
-        targetValue = if (checked) OnlinePink else OnlineStroke,
+        targetValue = if (checked) OnlinePink else PlaybackStroke,
         animationSpec = tween(180),
         label = "自动连播开关颜色",
     )
@@ -237,7 +238,7 @@ private fun AutoPlayNextToggle(
             .padding(horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("自动连播", color = OnlineSecondary, fontSize = 11.5.sp, maxLines = 1)
+        Text("自动连播", color = PlaybackSecondary, fontSize = 11.5.sp, maxLines = 1)
         Spacer(Modifier.width(5.dp))
         Box(Modifier.width(28.dp).height(16.dp).clip(CircleShape).background(trackColor)) {
             Box(
@@ -258,7 +259,7 @@ private fun EpisodeLayoutToggle(
 ) {
     Row(
         Modifier.clip(RoundedCornerShape(8.dp))
-            .background(OnlineDivider)
+            .background(PlaybackDivider)
             .clickable(role = Role.Button) { onToggle(!gridView) }
             .semantics { contentDescription = if (gridView) "切换为列表视图" else "切换为宫格视图" }
             .padding(horizontal = 8.dp, vertical = 5.dp),
@@ -268,7 +269,7 @@ private fun EpisodeLayoutToggle(
         Spacer(Modifier.width(4.dp))
         Text(
             if (gridView) "列表视图" else "宫格视图",
-            color = OnlineText,
+            color = PlaybackText,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -299,18 +300,19 @@ private fun EpisodeGridIcon(modifier: Modifier = Modifier, color: Color = Online
 
 @Composable
 private fun EpisodesSheetCloseButton(onDismiss: () -> Unit) {
+    val closeTint = PlaybackSecondary
     Box(
         Modifier.size(28.dp)
             .clip(CircleShape)
-            .background(OnlineDivider)
+            .background(PlaybackDivider)
             .clickable(role = Role.Button, onClick = onDismiss)
             .semantics { contentDescription = "关闭选集" },
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.size(11.dp)) {
             val stroke = 1.5.dp.toPx()
-            drawLine(OnlineSecondary, Offset.Zero, Offset(size.width, size.height), stroke, StrokeCap.Round)
-            drawLine(OnlineSecondary, Offset(size.width, 0f), Offset(0f, size.height), stroke, StrokeCap.Round)
+            drawLine(closeTint, Offset.Zero, Offset(size.width, size.height), stroke, StrokeCap.Round)
+            drawLine(closeTint, Offset(size.width, 0f), Offset(0f, size.height), stroke, StrokeCap.Round)
         }
     }
 }
@@ -323,7 +325,7 @@ private fun OnlineSheetEpisodeRow(
 ) {
     val shape = RoundedCornerShape(12.dp)
     val background by animateColorAsState(
-        targetValue = if (selected) OnlinePinkSoft else OnlineCardGray,
+        targetValue = if (selected) OnlinePinkSoft else PlaybackCard,
         animationSpec = tween(160),
         label = "分P行背景",
     )
@@ -347,7 +349,7 @@ private fun OnlineSheetEpisodeRow(
             } else {
                 Text(
                     "P${page.page}",
-                    color = OnlineMuted,
+                    color = PlaybackMuted,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     style = TextStyle(fontFeatureSettings = "tnum"),
@@ -361,7 +363,7 @@ private fun OnlineSheetEpisodeRow(
             // The leading column already identifies the part, so the title is
             // never prefixed with a second "Pn".
             partTitle,
-            color = if (selected) OnlinePink else OnlineText,
+            color = if (selected) OnlinePink else PlaybackText,
             fontSize = 13.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             maxLines = 1,
@@ -371,7 +373,7 @@ private fun OnlineSheetEpisodeRow(
         Spacer(Modifier.width(8.dp))
         Text(
             formatPlaybackTime(page.duration * 1_000L),
-            color = if (selected) OnlinePink else OnlineMuted,
+            color = if (selected) OnlinePink else PlaybackMuted,
             fontSize = 11.5.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             style = TextStyle(fontFeatureSettings = "tnum"),
@@ -388,12 +390,12 @@ private fun OnlineSheetEpisodeCell(
 ) {
     val shape = RoundedCornerShape(12.dp)
     val background by animateColorAsState(
-        targetValue = if (selected) OnlinePinkSoft else OnlineCardGray,
+        targetValue = if (selected) OnlinePinkSoft else PlaybackCard,
         animationSpec = tween(160),
         label = "分P宫格背景",
     )
     val outline by animateColorAsState(
-        targetValue = if (selected) OnlinePink else OnlineStroke,
+        targetValue = if (selected) OnlinePink else PlaybackStroke,
         animationSpec = tween(160),
         label = "分P宫格描边",
     )
@@ -414,7 +416,7 @@ private fun OnlineSheetEpisodeCell(
             }
             Text(
                 "P${page.page}",
-                color = if (selected) OnlinePink else OnlineText,
+                color = if (selected) OnlinePink else PlaybackText,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 style = TextStyle(fontFeatureSettings = "tnum"),
@@ -424,7 +426,7 @@ private fun OnlineSheetEpisodeCell(
         Spacer(Modifier.height(3.dp))
         Text(
             page.part.ifBlank { "第 ${page.page} 部分" },
-            color = OnlineMuted,
+            color = PlaybackMuted,
             fontSize = 10.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

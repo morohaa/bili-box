@@ -42,9 +42,10 @@ import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.playback.LocalQueueMode
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
-import io.github.bilibox.core.ui.theme.Ink
-import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.core.ui.theme.PlaybackInk
+import io.github.bilibox.core.ui.theme.PlaybackMuted
+import io.github.bilibox.core.ui.theme.PlaybackSurface
 import io.github.bilibox.core.util.formatBytes
 import io.github.bilibox.core.util.formatRelativeDate
 import io.github.bilibox.core.util.formatSpeedBadge
@@ -105,7 +106,7 @@ internal fun LocalVideoIntro(
             }
             Text(
                 video.title,
-                color = Ink,
+                color = PlaybackInk,
                 fontSize = 16.5.sp,
                 lineHeight = 23.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -126,7 +127,7 @@ internal fun LocalVideoIntro(
                 )
                 AppGlyphIcon(
                     AppIcon.CHEVRON_DOWN,
-                    Muted,
+                    PlaybackMuted,
                     Modifier.padding(start = 4.dp, top = 4.dp).size(16.dp).rotate(chevron),
                     2f,
                 )
@@ -157,6 +158,7 @@ internal fun LocalVideoIntro(
                 icon = AppIcon.CAMERA,
                 label = "截图",
                 enabled = actions?.screenshotEnabled == true,
+                dimWhenDisabled = false,
                 onClick = { actions?.takeScreenshot?.invoke() },
             )
             LocalDetailAction(
@@ -192,11 +194,11 @@ internal fun LocalVideoIntro(
                 Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("同文件夹", color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text("同文件夹", color = PlaybackInk, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.width(6.dp))
-                Text("${playlist.size} 个视频", color = Muted, fontSize = 11.sp)
+                Text("${playlist.size} 个视频", color = PlaybackMuted, fontSize = 11.sp)
                 Spacer(Modifier.weight(1f))
-                Text("按文件顺序", color = Muted, fontSize = 10.5.sp)
+                Text("按文件顺序", color = PlaybackMuted, fontSize = 10.5.sp)
             }
             // Keep the inline queue bounded; folders with hundreds of clips would
             // otherwise eagerly compose a thumbnail for every row.
@@ -214,14 +216,14 @@ internal fun LocalVideoIntro(
             if (playlist.size == 1) {
                 Text(
                     "这个文件夹里只有这一个视频",
-                    color = Muted,
+                    color = PlaybackMuted,
                     fontSize = 11.sp,
                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 )
             } else if (playlist.size > shown.size) {
                 Text(
                     "还有 ${playlist.size - shown.size} 个视频，返回文件夹可以查看全部",
-                    color = Muted,
+                    color = PlaybackMuted,
                     fontSize = 11.sp,
                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 )
@@ -241,7 +243,7 @@ private fun LocalSourceHeader(video: LocalVideo) {
             if (video.isBiliCache) {
                 Box(
                     Modifier.align(Alignment.BottomEnd).offset(x = 4.dp, y = 4.dp).size(16.dp)
-                        .clip(CircleShape).background(DetailBlue).border(2.dp, Color.White, CircleShape),
+                        .clip(CircleShape).background(DetailBlue).border(2.dp, PlaybackSurface, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text("B", color = Color.White, fontSize = 9.sp, lineHeight = 10.sp, fontWeight = FontWeight.Bold)
@@ -259,7 +261,7 @@ private fun LocalSourceHeader(video: LocalVideo) {
             Spacer(Modifier.height(2.dp))
             Text(
                 localVideoFolderPath(video),
-                color = Muted,
+                color = PlaybackMuted,
                 fontSize = 11.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -304,9 +306,9 @@ private fun LocalMetaRow(video: LocalVideo, durationMs: Long) {
 @Composable
 private fun DetailMeta(icon: AppIcon, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        AppGlyphIcon(icon, Muted, Modifier.size(13.dp), 1.8f)
+        AppGlyphIcon(icon, PlaybackMuted, Modifier.size(13.dp), 1.8f)
         Spacer(Modifier.width(3.dp))
-        Text(text, color = Muted, fontSize = 11.5.sp, maxLines = 1)
+        Text(text, color = PlaybackMuted, fontSize = 11.5.sp, maxLines = 1)
     }
 }
 
@@ -317,11 +319,12 @@ private fun LocalDetailAction(
     label: String,
     active: Boolean = false,
     enabled: Boolean = true,
+    dimWhenDisabled: Boolean = true,
     filled: Boolean = false,
     onClick: () -> Unit,
 ) {
     val tint = when {
-        !enabled -> Muted.copy(alpha = .38f)
+        !enabled && dimWhenDisabled -> PlaybackMuted.copy(alpha = .38f)
         active -> OnlinePink
         else -> DetailSecondary
     }

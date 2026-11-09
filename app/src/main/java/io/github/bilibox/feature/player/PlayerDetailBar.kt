@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,8 +45,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
-import io.github.bilibox.core.ui.theme.OnlineMuted
 import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.core.ui.theme.PlaybackMuted
+import io.github.bilibox.core.ui.theme.PlaybackSurface
+import io.github.bilibox.core.ui.theme.playbackColor
 import io.github.bilibox.data.player.LightsOffMode
 import io.github.bilibox.feature.danmaku.DanmakuStateIcon
 
@@ -57,11 +60,21 @@ import io.github.bilibox.feature.danmaku.DanmakuStateIcon
  * the same grey capsule base, and only the active tab/badge carries colour.
  */
 
-private val BarButtonBackground = Color(0xFFEAECEF)
-private val BarInactiveText = Color(0xFF61666D)
-private val BarActiveText = Color(0xFF18191C)
-private val BarSourcePill = Color(0xFFF6F7F8)
-private val BarSourceStroke = Color(0xFFE3E5E7)
+private val BarButtonBackground: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFFEAECEF), Color(0xFF353A43))
+private val BarInactiveText: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFF61666D), Color(0xFFB6BDC7))
+private val BarActiveText: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFF18191C), Color(0xFFE7E9ED))
+private val BarSourcePill: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFFF6F7F8), Color(0xFF30343C))
+private val BarSourceStroke: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFFE3E5E7), Color(0xFF454B55))
 private val DanmakuPillExpandedWidth = 116.dp
 private val DanmakuPillCollapsedWidth = 30.dp
 private val DanmakuPillEasing = CubicBezierEasing(.25f, .46f, .45f, .94f)
@@ -102,7 +115,7 @@ internal fun PlayerDetailBar(
                     Modifier.fillMaxHeight()
                         .then(if (selected) Modifier.shadow(2.dp, shape) else Modifier)
                         .clip(shape)
-                        .background(if (selected) Color.White else Color.Transparent)
+                        .background(if (selected) PlaybackSurface else Color.Transparent)
                         .clickable(role = Role.Tab) { onSelectTab(index) }
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center,
@@ -136,7 +149,7 @@ internal fun PlayerDetailBar(
         } else if (sourcePill) {
             SourcePill(sourceLabel)
         } else if (sourceLabel.isNotBlank()) {
-            Text(sourceLabel, color = OnlineMuted, fontSize = 12.sp, maxLines = 1)
+            Text(sourceLabel, color = PlaybackMuted, fontSize = 12.sp, maxLines = 1)
         }
     }
 }
@@ -260,10 +273,10 @@ private fun SourcePill(label: String) {
             .padding(start = 10.dp, end = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = OnlineMuted, fontSize = 11.sp, maxLines = 1)
+        Text(label, color = PlaybackMuted, fontSize = 11.sp, maxLines = 1)
         Spacer(Modifier.width(6.dp))
         Box(
-            Modifier.size(24.dp).clip(CircleShape).background(Color.White)
+            Modifier.size(24.dp).clip(CircleShape).background(PlaybackSurface)
                 .border(1.dp, BarSourceStroke, CircleShape),
             contentAlignment = Alignment.Center,
         ) {

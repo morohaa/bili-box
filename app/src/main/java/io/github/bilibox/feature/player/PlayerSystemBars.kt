@@ -8,6 +8,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -41,7 +42,7 @@ internal fun PlayerSystemBarsEffects(
             WindowCompat.getInsetsController(it.window, it.window.decorView).apply {
                 isAppearanceLightStatusBars = false
                 isAppearanceLightNavigationBars =
-                    !fullScreen && !verticalFullScreen && detailsBackground == Color.White
+                    !fullScreen && !verticalFullScreen && detailsBackground.luminance() > .5f
                 systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 if (fullScreen) {
                     hide(WindowInsetsCompat.Type.systemBars())
@@ -71,10 +72,10 @@ internal fun PlayerSystemBarsEffects(
 
     // Runs after the effect above, so the dark 听视频 page keeps light nav icons
     // even when opening it rotates the screen back to portrait.
-    LaunchedEffect(activity, fullScreen, verticalFullScreen, listenVisible) {
+    LaunchedEffect(activity, fullScreen, verticalFullScreen, listenVisible, detailsBackground) {
         activity?.let {
             WindowCompat.getInsetsController(it.window, it.window.decorView).isAppearanceLightNavigationBars =
-                !listenVisible && !fullScreen && !verticalFullScreen && detailsBackground == Color.White
+                !listenVisible && !fullScreen && !verticalFullScreen && detailsBackground.luminance() > .5f
         }
     }
 }

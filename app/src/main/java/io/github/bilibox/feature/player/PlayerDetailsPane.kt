@@ -19,14 +19,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.playback.SpeedPanel
 import io.github.bilibox.core.ui.component.playback.SpeedPanelMode
-import io.github.bilibox.core.ui.theme.Ink
-import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.Pink
+import io.github.bilibox.core.ui.theme.PlaybackDivider
+import io.github.bilibox.core.ui.theme.PlaybackInk
+import io.github.bilibox.core.ui.theme.PlaybackMuted
 import io.github.bilibox.data.player.LightsOffMode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,7 +83,7 @@ internal fun PlayerDetailsPane(
         label = "关灯模糊半径",
     )
     Box(
-        modifier.fillMaxWidth().background(detailsBackground)
+        modifier.testTag("playerDetails").fillMaxWidth().background(detailsBackground)
             .navigationBarsPadding().clipToBounds()
     ) {
         Column(
@@ -103,7 +105,7 @@ internal fun PlayerDetailsPane(
                     onToggleLights = onToggleLights,
                     onSelectLightsOffMode = onSelectLightsOffMode,
                 )
-                HorizontalDivider(color = if (detailsBackground == Color.White) Color(0xFFE3E5E7) else Color.White.copy(alpha = .08f), thickness = 1.dp)
+                HorizontalDivider(color = PlaybackDivider, thickness = 1.dp)
             }
 
             val detailActions = PlayerDetailActions(
@@ -141,7 +143,7 @@ internal fun PlayerDetailsPane(
                             details(duration)
                             playbackError?.let { message ->
                                 Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                                    Text("播放失败：$message", color = Color(0xFFB42318), fontSize = 12.sp)
+                                    Text("播放失败：$message", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                                     TextButton(onClick = onRetry) { Text("重试", color = Pink) }
                                 }
                             }
@@ -151,9 +153,9 @@ internal fun PlayerDetailsPane(
 
                         else -> {
                             Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
-                                Text(detailTabs.getOrNull(1) ?: "评论", color = Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                Text(detailTabs.getOrNull(1) ?: "评论", color = PlaybackInk, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                 Spacer(Modifier.height(8.dp))
-                                Text(commentMessage, color = Muted, fontSize = 13.sp)
+                                Text(commentMessage, color = PlaybackMuted, fontSize = 13.sp)
                             }
                         }
                     }

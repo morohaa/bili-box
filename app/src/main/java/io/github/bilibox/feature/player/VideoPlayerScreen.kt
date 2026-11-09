@@ -43,6 +43,7 @@ import io.github.bilibox.core.ui.component.playback.SleepTimerSheet
 import io.github.bilibox.core.ui.component.playback.SpeedPanel
 import io.github.bilibox.core.ui.component.playback.SpeedPanelMode
 import io.github.bilibox.core.ui.theme.Pink
+import io.github.bilibox.core.ui.theme.PlaybackSurface
 import io.github.bilibox.data.danmaku.Danmaku
 import io.github.bilibox.data.danmaku.DanmakuSettings
 import io.github.bilibox.data.player.LightsOffMode
@@ -91,7 +92,7 @@ internal fun VideoPlayerScreen(
     danmakuError: String? = null,
     onDanmakuSettingsChange: (DanmakuSettings) -> Unit = {},
     onSendDanmaku: (suspend (text: String, progressMs: Long) -> Result<Unit>)? = null,
-    detailsBackground: Color = Color.White,
+    detailsBackground: Color = PlaybackSurface,
     showDetailTabs: Boolean = true,
     detailTabs: List<String> = listOf("简介", "评论"),
     sourcePill: Boolean = false,
@@ -672,7 +673,7 @@ internal fun VideoPlayerScreen(
                 if (fullScreen && controlsVisible && !speedMenuExpanded) {
                     PlayerSideTools(
                         locked = screenLocked,
-                        screenshotEnabled = hasVideoFrame && playbackError == null && !screenshot.saving,
+                        screenshotEnabled = hasVideoFrame && playbackError == null,
                         onScreenshot = takeScreenshot,
                         onToggleLock = { toggleScreenLock() },
                         modifier = Modifier.align(Alignment.CenterEnd).displayCutoutPadding()
@@ -798,7 +799,8 @@ internal fun VideoPlayerScreen(
                     duration = duration,
                     positionMs = if (scrubbing) scrubPosition.toLong() else position,
                     speed = speed,
-                    screenshotEnabled = hasVideoFrame && playbackError == null && !screenshot.saving,
+                    // 保存期间由截图控制器拦截重复点击，避免按钮短暂切成灰色禁用态。
+                    screenshotEnabled = hasVideoFrame && playbackError == null,
                     sleepTimerActive = sleepTimer.active,
                     onOpenSpeedPanel = {
                         playbackModeExpanded = false

@@ -45,9 +45,11 @@ import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.EqualizerBars
 import io.github.bilibox.core.ui.component.coverBrush
 import io.github.bilibox.core.ui.component.rememberVideoThumbnail
-import io.github.bilibox.core.ui.theme.Ink
-import io.github.bilibox.core.ui.theme.Muted
 import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.core.ui.theme.PlaybackInk
+import io.github.bilibox.core.ui.theme.PlaybackMuted
+import io.github.bilibox.core.ui.theme.PlaybackStroke
+import io.github.bilibox.core.ui.theme.PlaybackSurface
 import io.github.bilibox.core.util.formatBytes
 import io.github.bilibox.core.util.formatVideoDuration
 import io.github.bilibox.core.util.resolutionLabel
@@ -78,21 +80,21 @@ internal fun PlaybackModeSheet(
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
-                .background(Color.White)
+                .background(PlaybackSurface)
                 .pointerInput(Unit) { detectTapGestures { } }
                 .padding(top = 8.dp, bottom = 24.dp),
         ) {
             Box(
                 Modifier.align(Alignment.CenterHorizontally).width(36.dp).height(4.dp)
-                    .clip(CircleShape).background(Color(0xFFDADCE0))
+                    .clip(CircleShape).background(PlaybackStroke)
             )
             Row(
                 Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("播放顺序", color = Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text("播放顺序", color = PlaybackInk, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(8.dp))
-                Text("同文件夹", color = Muted, fontSize = 12.sp)
+                Text("同文件夹", color = PlaybackMuted, fontSize = 12.sp)
             }
             LocalQueueMode.entries.forEach { mode ->
                 val active = mode == selected
@@ -105,14 +107,14 @@ internal fun PlaybackModeSheet(
                 ) {
                     AppGlyphIcon(
                         mode.icon,
-                        if (active) OnlinePink else Color(0xFF61666D),
+                        if (active) OnlinePink else DetailSecondary,
                         Modifier.size(21.dp),
                         1.8f,
                     )
                     Spacer(Modifier.width(14.dp))
                     Text(
                         mode.label,
-                        color = if (active) OnlinePink else Ink,
+                        color = if (active) OnlinePink else PlaybackInk,
                         fontSize = 15.sp,
                         fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
                     )
@@ -206,7 +208,7 @@ internal fun LocalQueueRow(
         Column(Modifier.weight(1f)) {
             Text(
                 item.title,
-                color = if (isCurrent) OnlinePink else Ink,
+                color = if (isCurrent) OnlinePink else PlaybackInk,
                 fontSize = 13.5.sp,
                 lineHeight = 18.sp,
                 fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
@@ -218,7 +220,7 @@ internal fun LocalQueueRow(
                 if (item.extension.isNotBlank()) {
                     Text(
                         item.extension.uppercase(),
-                        color = Muted,
+                        color = PlaybackMuted,
                         fontSize = 8.5.sp,
                         lineHeight = 11.sp,
                         modifier = Modifier.border(1.dp, DetailLine, RoundedCornerShape(3.dp))
@@ -238,7 +240,7 @@ internal fun LocalQueueRow(
         if (!isCurrent) {
             AppGlyphIcon(
                 AppIcon.CHEVRON_RIGHT,
-                Muted.copy(alpha = .55f),
+                PlaybackMuted.copy(alpha = .55f),
                 Modifier.padding(start = 2.dp).size(14.dp),
                 1.8f,
             )
@@ -265,15 +267,16 @@ internal fun QueueMeta(
         else -> null
     }
     val accent = OnlinePink
-    val text = remember(item.key, progress, isCurrent, parts, accent) {
+    val muted = PlaybackMuted
+    val text = remember(item.key, progress, isCurrent, parts, accent, muted) {
         buildAnnotatedString {
             parts.forEachIndexed { index, part ->
-                if (index > 0) withStyle(SpanStyle(color = Muted.copy(alpha = .6f))) { append("  ·  ") }
-                withStyle(SpanStyle(color = Muted)) { append(part) }
+                if (index > 0) withStyle(SpanStyle(color = muted.copy(alpha = .6f))) { append("  ·  ") }
+                withStyle(SpanStyle(color = muted)) { append(part) }
             }
             if (progress != null) {
-                if (parts.isNotEmpty()) withStyle(SpanStyle(color = Muted.copy(alpha = .6f))) { append("  ·  ") }
-                withStyle(SpanStyle(color = if (isCurrent || watching != null) accent else Muted)) { append(progress) }
+                if (parts.isNotEmpty()) withStyle(SpanStyle(color = muted.copy(alpha = .6f))) { append("  ·  ") }
+                withStyle(SpanStyle(color = if (isCurrent || watching != null) accent else muted)) { append(progress) }
             }
         }
     }

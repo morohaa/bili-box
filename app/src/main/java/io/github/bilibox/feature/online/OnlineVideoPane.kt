@@ -44,14 +44,13 @@ import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.VideoMetaIcon
-import io.github.bilibox.core.ui.theme.Muted
-import io.github.bilibox.core.ui.theme.OnlineDivider
-import io.github.bilibox.core.ui.theme.OnlineMuted
 import io.github.bilibox.core.ui.theme.OnlinePink
-import io.github.bilibox.core.ui.theme.OnlineSecondary
-import io.github.bilibox.core.ui.theme.OnlineSurface
-import io.github.bilibox.core.ui.theme.OnlineText
 import io.github.bilibox.core.ui.theme.Pink
+import io.github.bilibox.core.ui.theme.PlaybackDivider
+import io.github.bilibox.core.ui.theme.PlaybackMuted
+import io.github.bilibox.core.ui.theme.PlaybackSecondary
+import io.github.bilibox.core.ui.theme.PlaybackSurface
+import io.github.bilibox.core.ui.theme.PlaybackText
 import io.github.bilibox.core.util.formatPlaybackTime
 import io.github.bilibox.data.bili.Page
 import io.github.bilibox.data.bili.UserCardData
@@ -93,7 +92,7 @@ internal fun OnlineVideoDetails(
     val duration = info?.duration?.takeIf { it > 0 }?.let { formatPlaybackTime(it * 1_000L) }
         ?: video.duration
 
-    Column(Modifier.fillMaxWidth().background(OnlineSurface)) {
+    Column(Modifier.fillMaxWidth().background(PlaybackSurface)) {
         OnlineCreatorCard(
             name = ownerName,
             avatar = avatar,
@@ -111,7 +110,7 @@ internal fun OnlineVideoDetails(
                 verticalAlignment = Alignment.Top
             ) {
                 Text(
-                    title, color = OnlineText, fontSize = 15.5.sp, lineHeight = 22.sp, letterSpacing = (-0.15).sp,
+                    title, color = PlaybackText, fontSize = 15.5.sp, lineHeight = 22.sp, letterSpacing = (-0.15).sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = if (expanded) Int.MAX_VALUE else 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
@@ -122,7 +121,7 @@ internal fun OnlineVideoDetails(
                         .semantics { contentDescription = if (expanded) "收起简介" else "展开简介" },
                     contentAlignment = Alignment.Center
                 ) {
-                    ChevronDownIcon(Modifier.size(18.dp).rotate(if (expanded) 180f else 0f), OnlineMuted)
+                    ChevronDownIcon(Modifier.size(18.dp).rotate(if (expanded) 180f else 0f), PlaybackMuted)
                 }
             }
             Row(
@@ -134,17 +133,17 @@ internal fun OnlineVideoDetails(
                 OnlineMetric("comment", (stat?.danmaku ?: video.commentCount).toString())
                 Text(
                     formatPublishDateTime(publishedAt),
-                    color = OnlineMuted,
+                    color = PlaybackMuted,
                     fontSize = 11.5.sp,
                     lineHeight = 16.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                Text(duration, color = OnlineMuted, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 1)
+                Text(duration, color = PlaybackMuted, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 1)
             }
             if (expanded) {
-                HorizontalDivider(Modifier.padding(top = 10.dp), color = OnlineDivider)
+                HorizontalDivider(Modifier.padding(top = 10.dp), color = PlaybackDivider)
                 Row(
                     Modifier.padding(top = 2.dp)
                         .clip(RoundedCornerShape(4.dp))
@@ -161,18 +160,18 @@ internal fun OnlineVideoDetails(
                 ) {
                     Text(
                         bvId,
-                        color = OnlineMuted,
+                        color = PlaybackMuted,
                         fontSize = 11.5.sp,
                         lineHeight = 16.sp,
                         maxLines = 1,
                     )
                     Spacer(Modifier.width(5.dp))
-                    AppGlyphIcon(AppIcon.COPY, OnlineMuted, Modifier.size(12.dp))
+                    AppGlyphIcon(AppIcon.COPY, PlaybackMuted, Modifier.size(12.dp))
                 }
                 info?.desc?.takeIf { it.isNotBlank() }?.let { description ->
                     Text(
                         description,
-                        color = OnlineSecondary,
+                        color = PlaybackSecondary,
                         fontSize = 12.sp,
                         lineHeight = 19.sp,
                         modifier = Modifier.padding(top = 6.dp)
@@ -181,7 +180,7 @@ internal fun OnlineVideoDetails(
             }
         }
 
-        Column(Modifier.fillMaxWidth().background(OnlineSurface)) {
+        Column(Modifier.fillMaxWidth().background(PlaybackSurface)) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.Top
@@ -231,7 +230,7 @@ internal fun OnlineVideoDetails(
                 onOpenEpisodes = onOpenEpisodes,
             )
         }
-        HorizontalDivider(color = OnlineDivider)
+        HorizontalDivider(color = PlaybackDivider)
     }
 }
 
@@ -250,11 +249,11 @@ internal fun OnlineEpisodesSection(
         Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("正片", color = OnlineText, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+        Text("正片", color = PlaybackText, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.width(5.dp))
         Text(
             "(${if (pageIndex >= 0) pageIndex + 1 else selectedPage}/${pages.size})",
-            color = OnlineMuted,
+            color = PlaybackMuted,
             fontSize = 12.sp,
             style = TextStyle(fontFeatureSettings = "tnum"),
             maxLines = 1,
@@ -271,12 +270,12 @@ internal fun OnlineEpisodesSection(
         ) {
             Text(
                 "共${pages.size}P · 查看全部",
-                color = OnlineMuted,
+                color = PlaybackMuted,
                 fontSize = 11.5.sp,
                 maxLines = 1,
             )
             Spacer(Modifier.width(2.dp))
-            OnlineChevronRight(color = OnlineMuted, modifier = Modifier.size(12.dp))
+            OnlineChevronRight(color = PlaybackMuted, modifier = Modifier.size(12.dp))
         }
     }
     val listState = rememberLazyListState(
@@ -307,7 +306,7 @@ internal fun OnlineAutoPlayChip(checked: Boolean, onCheckedChange: (Boolean) -> 
     Row(
         Modifier.height(24.dp)
             .clip(CircleShape)
-            .background(OnlineDivider)
+            .background(PlaybackDivider)
             .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
             .semantics { contentDescription = "自动连播" }
             .padding(horizontal = 8.dp),
@@ -318,7 +317,7 @@ internal fun OnlineAutoPlayChip(checked: Boolean, onCheckedChange: (Boolean) -> 
                 .background(if (checked) OnlinePink else Color(0xFFB9BEC5))
         )
         Spacer(Modifier.width(4.dp))
-        Text("自动连播", color = OnlineSecondary, fontSize = 10.5.sp, maxLines = 1)
+        Text("自动连播", color = PlaybackSecondary, fontSize = 10.5.sp, maxLines = 1)
     }
 }
 
@@ -354,12 +353,12 @@ internal fun RowScope.OnlineAction(
     val scope = rememberCoroutineScope()
     val iconScale = remember { Animatable(1f) }
     val iconTint by animateColorAsState(
-        targetValue = if (selected) OnlinePink else OnlineSecondary,
+        targetValue = if (selected) OnlinePink else PlaybackSecondary,
         animationSpec = tween(180),
         label = "$kind 图标颜色"
     )
     val textTint by animateColorAsState(
-        targetValue = if (selected) OnlinePink else OnlineMuted,
+        targetValue = if (selected) OnlinePink else PlaybackMuted,
         animationSpec = tween(180),
         label = "$kind 文字颜色"
     )
@@ -411,9 +410,9 @@ internal fun RowScope.OnlineAction(
 @Composable
 internal fun OnlineMetric(kind: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        VideoMetaIcon(kind, Modifier.size(14.dp), OnlineMuted)
+        VideoMetaIcon(kind, Modifier.size(14.dp), PlaybackMuted)
         Spacer(Modifier.width(4.dp))
-        Text(value, color = OnlineMuted, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 1)
+        Text(value, color = PlaybackMuted, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 1)
     }
 }
 
@@ -453,7 +452,7 @@ internal fun normalizeImageUrl(url: String): String = when {
 
 @Composable
 internal fun RowScope.VideoAction(index: Int, label: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
-    val tint = if (selected) Pink else Color(0xFF62666D).copy(alpha = if (enabled) 1f else .4f)
+    val tint = if (selected) Pink else PlaybackSecondary.copy(alpha = if (enabled) 1f else .4f)
     Column(
         Modifier.weight(1f).clickable(enabled = enabled, onClick = onClick).padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -516,7 +515,7 @@ internal fun RowScope.VideoAction(index: Int, label: String, selected: Boolean, 
             }
         }
         Spacer(Modifier.height(7.dp))
-        Text(label, color = if (selected) Pink else Muted, fontSize = 11.sp)
+        Text(label, color = if (selected) Pink else PlaybackMuted, fontSize = 11.sp)
     }
 }
 

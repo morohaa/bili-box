@@ -27,7 +27,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.playback.ListenPlaybackBridge
 import io.github.bilibox.core.playback.ListenQueue
-import io.github.bilibox.core.ui.theme.OnlineSurface
+import io.github.bilibox.core.ui.theme.PlaybackSurface
 import io.github.bilibox.data.auth.BiliSession
 import io.github.bilibox.data.auth.hasLoginCookies
 import io.github.bilibox.data.bili.BiliClient
@@ -678,7 +678,7 @@ internal fun OnlineVideoScreen(
         } else {
             null
         },
-        detailsBackground = OnlineSurface,
+        detailsBackground = PlaybackSurface,
         listenInfo = ListenInfo(
             subtitle = listenSubtitle(selectedPage),
             online = true,

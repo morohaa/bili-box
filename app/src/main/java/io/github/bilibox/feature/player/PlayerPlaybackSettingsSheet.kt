@@ -28,6 +28,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +52,8 @@ import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.OnlinePink
+import io.github.bilibox.core.ui.theme.PlaybackSurface
+import io.github.bilibox.core.ui.theme.playbackColor
 import io.github.bilibox.core.util.formatSpeedBadge
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -95,15 +99,33 @@ internal class PlayerSettingsActions(
     val onMoreSettings: () -> Unit,
 )
 
-private val SettingsSheetSurface = Color(0xFFF6F7F8)
-private val SettingsCardSurface = Color.White
-private val SettingsLine = Color(0xFFE7E8EA)
-private val SettingsInk = Color(0xFF17191B)
-private val SettingsSecondary = Color(0xFF5F6266)
-private val SettingsMuted = Color(0xFF9499A0)
-private val SettingsIdleTrack = Color(0xFFE1E4E6)
-private val SettingsGrabber = Color(0xFFC8CBD0)
-private val SettingsGlyphTint = Color(0xFF111315)
+private val SettingsSheetSurface: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFFF6F7F8), Color(0xFF1B1E23))
+private val SettingsCardSurface: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color.White, Color(0xFF292D34))
+private val SettingsLine: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFFE7E8EA), Color(0xFF3C424B))
+private val SettingsInk: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFF17191B), Color(0xFFE7E9ED))
+private val SettingsSecondary: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFF5F6266), Color(0xFFB6BDC7))
+private val SettingsMuted: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFF9499A0), Color(0xFF9CA3AD))
+private val SettingsIdleTrack: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFFE1E4E6), Color(0xFF4A515C))
+private val SettingsGrabber: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFFC8CBD0), Color(0xFF66707D))
+private val SettingsGlyphTint: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFF111315), Color(0xFFE7E9ED))
 
 @Composable
 internal fun PlayerPlaybackSettingsHost(
@@ -360,7 +382,7 @@ private fun QuickAction(
         Box(
             Modifier.fillMaxWidth().height(62.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color.White.copy(alpha = .78f)),
+                .background(SettingsCardSurface.copy(alpha = .78f)),
             contentAlignment = Alignment.Center,
         ) {
             glyph()
@@ -493,7 +515,7 @@ private fun LoopSettingRow(
                         PlayerLoopMode.LIST_LOOP -> "列表循环"
                         PlayerLoopMode.NONE -> "不循环"
                     },
-                    color = if (active) OnlinePink else Color(0xFF73777B),
+                    color = if (active) OnlinePink else SettingsSecondary,
                     fontSize = 11.5.sp,
                     fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
                     maxLines = 1,
@@ -605,7 +627,7 @@ internal fun PlayerQualitySheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color.White,
+        containerColor = PlaybackSurface,
         scrimColor = Color.Black.copy(alpha = .34f),
         shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
         dragHandle = {
@@ -637,7 +659,7 @@ internal fun PlayerQualitySheet(
                 Row(
                     Modifier.fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (active) Color(0xFFFFF1F5) else Color(0xFFF6F7F8))
+                        .background(if (active) OnlinePink.copy(alpha = .12f) else SettingsSheetSurface)
                         .clickable(role = Role.RadioButton) { onQualitySelected(option.qn) }
                         .semantics(mergeDescendants = true) { contentDescription = "选择清晰度 ${option.label}" }
                         .padding(horizontal = 14.dp, vertical = 11.dp),

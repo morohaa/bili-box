@@ -38,10 +38,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.R
 import io.github.bilibox.core.ui.component.RemoteCover
-import io.github.bilibox.core.ui.theme.OnlineDivider
-import io.github.bilibox.core.ui.theme.OnlineMuted
 import io.github.bilibox.core.ui.theme.OnlinePink
-import io.github.bilibox.core.ui.theme.OnlineText
+import io.github.bilibox.core.ui.theme.PlaybackDivider
+import io.github.bilibox.core.ui.theme.PlaybackMuted
+import io.github.bilibox.core.ui.theme.PlaybackSurface
+import io.github.bilibox.core.ui.theme.PlaybackText
 
 /** Creator card with the reference design's pink accent line on the left. */
 @Composable
@@ -69,7 +70,7 @@ internal fun OnlineCreatorCard(
             avatar,
             Modifier.size(42.dp)
                 .shadow(4.dp, CircleShape, clip = false)
-                .border(2.dp, Color.White, CircleShape),
+                .border(2.dp, PlaybackSurface, CircleShape),
             shape = CircleShape,
         )
         Spacer(Modifier.width(10.dp))
@@ -77,7 +78,7 @@ internal fun OnlineCreatorCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     name,
-                    color = OnlineText,
+                    color = PlaybackText,
                     fontSize = 15.sp,
                     lineHeight = 20.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -106,7 +107,7 @@ private fun CreatorStats(fans: Long?, archiveCount: Long?) {
     if (fans == null || archiveCount == null) {
         Text(
             "哔哩哔哩 UP 主",
-            color = OnlineMuted,
+            color = PlaybackMuted,
             fontSize = 12.5.sp,
             lineHeight = 16.sp,
             maxLines = 1,
@@ -117,7 +118,7 @@ private fun CreatorStats(fans: Long?, archiveCount: Long?) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             "${formatCompactCount(fans)} 粉丝",
-            color = OnlineMuted,
+            color = PlaybackMuted,
             fontSize = 12.5.sp,
             lineHeight = 16.sp,
             maxLines = 1,
@@ -127,7 +128,7 @@ private fun CreatorStats(fans: Long?, archiveCount: Long?) {
         Spacer(Modifier.width(8.dp))
         Text(
             "${formatCompactCount(archiveCount)} 视频",
-            color = OnlineMuted,
+            color = PlaybackMuted,
             fontSize = 12.5.sp,
             lineHeight = 16.sp,
             maxLines = 1,
@@ -144,7 +145,7 @@ private fun FollowButton(following: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         val pill = if (following) {
-            Modifier.background(OnlineDivider, CircleShape)
+            Modifier.background(PlaybackDivider, CircleShape)
         } else {
             Modifier.background(
                 Brush.linearGradient(listOf(Color(0xFFFF7EA6), Color(0xFFFF6699))),
@@ -180,7 +181,7 @@ private fun FollowButton(following: Boolean, onClick: () -> Unit) {
             }
             Text(
                 if (following) "已关注" else "关注",
-                color = if (following) OnlineMuted else Color.White,
+                color = if (following) PlaybackMuted else Color.White,
                 fontSize = 13.sp,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight.Medium,

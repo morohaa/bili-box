@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -30,6 +31,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -215,7 +217,9 @@ class VideoPlayerScreenTest {
 
         compose.onNodeWithContentDescription("单集循环").performClick()
         compose.onNodeWithContentDescription("镜像翻转").performClick()
-        compose.onNodeWithContentDescription("关闭播放设置").performClick()
+        // The scrim covers the whole root; its center is underneath the card.
+        // Tap its exposed video area to exercise the actual dismiss gesture.
+        compose.onNodeWithTag("player-touch-surface").performTouchInput { click(center) }
         compose.waitForIdle()
         compose.onNodeWithText("自动连播").assertDoesNotExist()
         // 关掉卡片后视频仍可正常操作。

@@ -31,8 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
-import io.github.bilibox.core.ui.theme.Ink
-import io.github.bilibox.core.ui.theme.Muted
+import io.github.bilibox.core.ui.theme.PlaybackInk
+import io.github.bilibox.core.ui.theme.PlaybackMuted
 import io.github.bilibox.core.util.formatVideoDuration
 import io.github.bilibox.core.util.frameRateLabel
 import io.github.bilibox.core.util.resolutionLabel
@@ -137,9 +137,9 @@ private fun MediaInfoSection(
         Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AppGlyphIcon(icon, Muted, Modifier.size(14.dp), 1.8f)
+        AppGlyphIcon(icon, PlaybackMuted, Modifier.size(14.dp), 1.8f)
         Spacer(Modifier.width(5.dp))
-        Text(title, color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text(title, color = PlaybackMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(DetailCard)) {
         visible.forEachIndexed { index, row ->
@@ -147,10 +147,10 @@ private fun MediaInfoSection(
                 Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.Top,
             ) {
-                Text(row.first, color = Muted, fontSize = 11.5.sp, modifier = Modifier.width(64.dp))
+                Text(row.first, color = PlaybackMuted, fontSize = 11.5.sp, modifier = Modifier.width(64.dp))
                 Text(
                     row.second,
-                    color = Ink,
+                    color = PlaybackInk,
                     fontSize = 12.5.sp,
                     lineHeight = 18.sp,
                     modifier = Modifier.weight(1f),
@@ -159,7 +159,7 @@ private fun MediaInfoSection(
             if (index != visible.lastIndex) {
                 HorizontalDivider(
                     modifier = Modifier.padding(start = 12.dp),
-                    color = Color(0xFFEDEEF0),
+                    color = DetailLine,
                     thickness = 1.dp,
                 )
             }
