@@ -168,7 +168,7 @@ internal fun SearchGridCard(
 }
 
 /**
- * 卡片外壳：白底（深色为主题卡片色）、大圆角、轻阴影，按下时轻微收缩。
+ * 卡片外壳：半透明底色、大圆角、轻阴影，按下时轻微收缩。
  * 阴影只在高亮模式开启，深色模式改用极淡描边区分卡片与页面底色。
  */
 @Composable
@@ -199,7 +199,7 @@ private fun VideoCardSurface(
                 spotColor = Color.Black.copy(alpha = .10f),
             )
             .clip(CardShape)
-            .background(palette.surface)
+            .background(palette.surface.copy(alpha = .78f))
             .border(1.dp, palette.edge, CardShape)
             .clickable(
                 interactionSource = interactionSource,

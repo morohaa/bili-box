@@ -329,7 +329,7 @@ private fun SearchBarRow(
                     spotShadowColor = if (darkMode) Color.Black.copy(alpha = .5f) else colors.pink.copy(alpha = .45f)
                 }
                 .clip(RoundedCornerShape(22.dp))
-                .background(colors.card)
+                .background(colors.card.copy(alpha = .78f))
                 .border(1.5.dp, if (focused) colors.pink else Color.Transparent, RoundedCornerShape(22.dp))
                 .padding(start = 16.dp, end = if (query.isNotEmpty()) 8.dp else 16.dp),
             contentAlignment = Alignment.Center,
@@ -529,7 +529,7 @@ private fun HistoryChip(
         }
             .height(34.dp)
             .clip(RoundedCornerShape(17.dp))
-            .background(colors.chip)
+            .background(colors.chip.copy(alpha = .78f))
             .border(1.dp, colors.chipBorder, RoundedCornerShape(17.dp))
             .clickable(enabled = !clearing, role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),

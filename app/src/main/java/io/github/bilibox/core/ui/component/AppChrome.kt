@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -185,9 +186,9 @@ private fun GlassSurface(
     val tint = if (supportsBlur) {
         listOf(colors.navGlassTop, colors.navGlassBottom)
     } else if (darkMode) {
-        listOf(Color(0xFF24272B).copy(alpha = .97f), Color(0xFF1C1E21).copy(alpha = .97f))
+        listOf(Color(0xFF24272B).copy(alpha = .78f), Color(0xFF1C1E21).copy(alpha = .78f))
     } else {
-        listOf(Color.White.copy(alpha = .94f), Color(0xFFF2F4F6).copy(alpha = .92f))
+        listOf(Color.White.copy(alpha = .72f), Color(0xFFF2F4F6).copy(alpha = .68f))
     }
     Box(
         modifier.onGloballyPositioned { position = it.positionInRoot() }
@@ -246,7 +247,13 @@ private fun NavigationItem(
         label = "navigation tint",
     )
     Column(
-        modifier.fillMaxHeight().clip(CircleShape).selectable(selected, onClick = onClick, role = Role.Tab),
+        modifier.fillMaxHeight().clip(CircleShape).selectable(
+            selected = selected,
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            role = Role.Tab,
+            onClick = onClick,
+        ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

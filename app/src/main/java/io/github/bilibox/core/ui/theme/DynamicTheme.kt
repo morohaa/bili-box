@@ -50,8 +50,8 @@ internal fun dynamicColors(darkMode: Boolean, accent: Color = OnlinePinkBrand): 
             brandPink = accent,
             roseGold = Color(0xFFFFCBA4),
             navIdle = Color(0xFFA2A7AE),
-            navGlassTop = Color(0xFF202225).copy(alpha = .72f),
-            navGlassBottom = Color(0xFF1A1C1E).copy(alpha = .82f),
+            navGlassTop = Color(0xFF202225).copy(alpha = .52f),
+            navGlassBottom = Color(0xFF1A1C1E).copy(alpha = .62f),
             navEdge = Color.White.copy(alpha = .08f),
             navShadow = Color.Black.copy(alpha = .5f),
         )
@@ -71,8 +71,8 @@ internal fun dynamicColors(darkMode: Boolean, accent: Color = OnlinePinkBrand): 
             brandPink = accent,
             roseGold = Color(0xFFE5A87B),
             navIdle = Color(0xFF61666D),
-            navGlassTop = Color.White.copy(alpha = .72f),
-            navGlassBottom = Color(0xFFF7F8FA).copy(alpha = .55f),
+            navGlassTop = Color.White.copy(alpha = .48f),
+            navGlassBottom = Color(0xFFF7F8FA).copy(alpha = .34f),
             navEdge = Color.White.copy(alpha = .6f),
             navShadow = Color(0xFF18191C).copy(alpha = .16f),
         )
