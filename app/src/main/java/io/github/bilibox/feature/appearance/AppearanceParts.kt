@@ -19,6 +19,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -27,15 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.R
 import io.github.bilibox.core.ui.theme.AppearanceMode
 import io.github.bilibox.core.ui.theme.ThemeOption
 
@@ -240,21 +241,12 @@ internal fun SettingRow(
 
 @Composable
 internal fun TvGlyph(tint: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        val unit = size.minDimension / 24f
-        val stroke = Stroke(width = 2.1f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        drawLine(tint, Offset(5f * unit, 3.2f * unit), Offset(8.4f * unit, 6.7f * unit), stroke.width, StrokeCap.Round)
-        drawLine(tint, Offset(19f * unit, 3.2f * unit), Offset(15.6f * unit, 6.7f * unit), stroke.width, StrokeCap.Round)
-        drawRoundRect(
-            color = tint,
-            topLeft = Offset(1.5f * unit, 6.7f * unit),
-            size = Size(21f * unit, 15.3f * unit),
-            cornerRadius = CornerRadius(4.4f * unit, 4.4f * unit),
-            style = stroke,
-        )
-        drawCircle(tint, radius = 1.35f * unit, center = Offset(7.6f * unit, 13.6f * unit))
-        drawCircle(tint, radius = 1.35f * unit, center = Offset(16.4f * unit, 13.6f * unit))
-    }
+    Icon(
+        painter = painterResource(R.drawable.ic_bilibili_tv),
+        contentDescription = null,
+        tint = tint,
+        modifier = modifier,
+    )
 }
 
 @Composable

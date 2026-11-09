@@ -246,10 +246,9 @@ internal fun AppearanceScreen(
             Column(
                 Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())
             ) {
-                ThemeHero(theme, darkMode, palette)
-                ThemeGrid(
-                    selectedId = theme.id,
-                    accent = accent,
+                ThemePaletteCard(
+                    theme = theme,
+                    darkMode = darkMode,
                     palette = palette,
                     onSelect = { option ->
                         if (option.custom) {
@@ -439,21 +438,22 @@ private fun ThemeHero(theme: ThemeOption, darkMode: Boolean, palette: Appearance
 // ----------------------------------------------------------------- grid ---
 
 @Composable
-private fun ThemeGrid(
-    selectedId: String,
-    accent: Color,
+private fun ThemePaletteCard(
+    theme: ThemeOption,
+    darkMode: Boolean,
     palette: AppearancePalette,
     onSelect: (ThemeOption) -> Unit,
 ) {
     AppearanceCard(palette) {
+        ThemeHero(theme, darkMode, palette)
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 20.dp).selectableGroup()) {
             ThemeCatalog.chunked(4).forEachIndexed { rowIndex, row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { option ->
                         ThemeTile(
                             option = option,
-                            selected = option.id == selectedId,
-                            accent = accent,
+                            selected = option.id == theme.id,
+                            accent = theme.base,
                             palette = palette,
                             modifier = Modifier.weight(1f),
                             onClick = { onSelect(option) },
