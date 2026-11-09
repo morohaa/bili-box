@@ -62,6 +62,16 @@ object BiliPlayback {
 
     fun candidateCount(data: PlayData, preferredQn: Int = BiliQn.P1080): Int = candidates(data, preferredQn).size
 
+    /** 预览优先取最低清晰度的 AVC 视频轨，不加载音频或影响主画质。 */
+    fun previewVideoUrl(data: PlayData): String? {
+        val videos = data.dash?.video.orEmpty().filter { it.url.isNotBlank() }
+        val compatible = videos.filter { it.codecs.startsWith("avc") }.ifEmpty { videos }
+        val video = compatible.minWithOrNull(compareBy({ it.id }, { it.bandwidth }))
+        val urls = video?.let { listOf(it.url) + it.backups }
+            ?: data.durl.firstOrNull()?.let { listOf(it.url) + it.backupUrl.orEmpty() }.orEmpty()
+        return BiliCdn.prioritize(urls).firstOrNull()
+    }
+
     fun buildMediaSource(
         data: PlayData,
         preferredQn: Int = BiliQn.P1080,

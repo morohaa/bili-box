@@ -1,5 +1,6 @@
 package io.github.bilibox.feature.player
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -80,6 +81,7 @@ internal data class PlayerSettingsState(
     val subtitleEnabled: Boolean,
     val mirrorEnabled: Boolean,
     val cacheLabel: String = "",
+    val seekPreviewEnabled: Boolean = true,
 )
 
 internal class PlayerSettingsActions(
@@ -102,16 +104,16 @@ internal class PlayerSettingsActions(
 private val SettingsSheetSurface: Color
     @Composable @ReadOnlyComposable
     get() = playbackColor(Color(0xFFF6F7F8), Color(0xFF1B1E23))
-private val SettingsCardSurface: Color
+internal val SettingsCardSurface: Color
     @Composable @ReadOnlyComposable
     get() = playbackColor(Color.White, Color(0xFF292D34))
 private val SettingsLine: Color
     @Composable @ReadOnlyComposable
     get() = playbackColor(Color(0xFFE7E8EA), Color(0xFF3C424B))
-private val SettingsInk: Color
+internal val SettingsInk: Color
     @Composable @ReadOnlyComposable
     get() = playbackColor(Color(0xFF17191B), Color(0xFFE7E9ED))
-private val SettingsSecondary: Color
+internal val SettingsSecondary: Color
     @Composable @ReadOnlyComposable
     get() = playbackColor(Color(0xFF5F6266), Color(0xFFB6BDC7))
 private val SettingsMuted: Color
@@ -146,9 +148,12 @@ internal fun PlayerPlaybackSettingsHost(
     onLoopModeChange: (PlayerLoopMode) -> Unit,
     onSubtitleChange: (Boolean) -> Unit,
     onMirrorChange: (Boolean) -> Unit,
+    onSeekPreviewChange: (Boolean) -> Unit,
     onCache: (() -> Unit)?,
     onUnavailable: (String) -> Unit,
 ) {
+    var moreSettingsOpen by remember(visible) { mutableStateOf(false) }
+    BackHandler(enabled = visible && moreSettingsOpen) { moreSettingsOpen = false }
     fun dismissThen(action: () -> Unit) {
         onDismiss()
         action()
@@ -158,6 +163,22 @@ internal fun PlayerPlaybackSettingsHost(
         visible = visible,
         topInset = topInset,
         state = state,
+        moreSettings = if (moreSettingsOpen) {
+            {
+                MorePlaybackSettingsContent(
+                    previewEnabled = state.seekPreviewEnabled,
+                    onPreviewChange = onSeekPreviewChange,
+                    onBack = { moreSettingsOpen = false },
+                    onQueueSettings = if (moreSettingsAvailable) {
+                        { dismissThen(onMoreSettings) }
+                    } else {
+                        null
+                    },
+                )
+            }
+        } else {
+            null
+        },
         actions = PlayerSettingsActions(
             onDismiss = onDismiss,
             onSpeed = { dismissThen(onSpeed) },
@@ -184,11 +205,7 @@ internal fun PlayerPlaybackSettingsHost(
             },
             onSubtitleChange = onSubtitleChange,
             onMirrorChange = onMirrorChange,
-            onMoreSettings = {
-                dismissThen {
-                    if (moreSettingsAvailable) onMoreSettings() else onUnavailable("更多播放设置暂未支持")
-                }
-            },
+            onMoreSettings = { moreSettingsOpen = true },
         ),
     )
 }
@@ -199,6 +216,7 @@ internal fun PlayerPlaybackSettingsSheet(
     topInset: Dp,
     state: PlayerSettingsState,
     actions: PlayerSettingsActions,
+    moreSettings: (@Composable () -> Unit)? = null,
 ) {
     val scrim = remember { MutableInteractionSource() }
     AnimatedVisibility(
@@ -230,7 +248,7 @@ internal fun PlayerPlaybackSettingsSheet(
             targetOffsetY = { it },
         ),
     ) {
-        PlaybackSettingsCard(state, actions)
+        PlaybackSettingsCard(state, actions, moreSettings)
     }
 }
 
@@ -238,12 +256,15 @@ internal fun PlayerPlaybackSettingsSheet(
 private fun PlaybackSettingsCard(
     state: PlayerSettingsState,
     actions: PlayerSettingsActions,
+    moreSettings: (@Composable () -> Unit)?,
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val dismissThreshold = with(density) { 72.dp.toPx() }
     var dragOffset by remember { mutableFloatStateOf(0f) }
     val shape = RoundedCornerShape(topStart = 25.dp, topEnd = 25.dp)
+    val scrollState = rememberScrollState()
+    LaunchedEffect(moreSettings != null) { scrollState.scrollTo(0) }
 
     Column(
         Modifier.fillMaxSize()
@@ -287,13 +308,17 @@ private fun PlaybackSettingsCard(
         }
         Column(
             Modifier.fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .navigationBarsPadding()
                 .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
         ) {
-            QuickActions(state, actions)
-            Spacer(Modifier.height(16.dp))
-            SettingsList(state, actions)
+            if (moreSettings != null) {
+                moreSettings()
+            } else {
+                QuickActions(state, actions)
+                Spacer(Modifier.height(16.dp))
+                SettingsList(state, actions)
+            }
         }
     }
 }
@@ -461,7 +486,7 @@ private fun SettingsList(state: PlayerSettingsState, actions: PlayerSettingsActi
 }
 
 @Composable
-private fun ToggleSettingRow(
+internal fun ToggleSettingRow(
     label: String,
     checked: Boolean,
     icon: PlayerSettingsIcon,
@@ -541,7 +566,7 @@ private fun LoopSettingRow(
 }
 
 @Composable
-private fun ActionSettingRow(
+internal fun ActionSettingRow(
     label: String,
     icon: PlayerSettingsIcon,
     value: String = "",
@@ -584,7 +609,7 @@ private fun ActionSettingRow(
 }
 
 @Composable
-private fun SettingsDivider() {
+internal fun SettingsDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = 14.dp),
         color = SettingsLine,

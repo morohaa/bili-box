@@ -61,8 +61,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** A selectable video stream quality shown in the fullscreen quality drawer. */
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun VideoPlayerScreen(
@@ -117,6 +115,7 @@ internal fun VideoPlayerScreen(
     remainingVideos: Int = 1,
     // Changes when the same player switches to another file; per-file UI resets.
     mediaKey: Any? = null,
+    previewSource: PlayerPreviewSource? = null,
     details: @Composable (duration: Long) -> Unit,
 ) {
     val context = LocalContext.current
@@ -128,8 +127,9 @@ internal fun VideoPlayerScreen(
     var duration by remember(player) { mutableLongStateOf(defaultDurationMs) }
     var isPlaying by remember(player) { mutableStateOf(player.isPlaying) }
     var playWhenReady by remember(player) { mutableStateOf(player.playWhenReady) }
-    var scrubbing by remember(player) { mutableStateOf(false) }
-    var scrubPosition by remember(player) { mutableFloatStateOf(0f) }
+    val scrub = remember(player) { PlayerScrubState() }
+    val previewPreference = rememberSeekPreviewPreference()
+    val seekPreview = rememberPlayerSeekPreview(player, previewSource, previewPreference.enabled)
     var speed by remember(player) { mutableFloatStateOf(1f) }
     var speedMenuExpanded by remember(player) { mutableStateOf(false) }
     var settingsSheetOpen by remember(player) { mutableStateOf(false) }
@@ -338,7 +338,7 @@ internal fun VideoPlayerScreen(
     LaunchedEffect(player) {
         while (true) {
             duration = player.duration.takeIf { it > 0 } ?: latestDefaultDuration
-            if (!scrubbing) position = player.currentPosition.coerceAtLeast(0L)
+            if (!scrub.active) position = player.currentPosition.coerceAtLeast(0L)
             bufferedPosition = player.bufferedPosition.coerceAtLeast(0L)
             isPlaying = player.isPlaying
             speed = player.playbackParameters.speed
@@ -362,7 +362,7 @@ internal fun VideoPlayerScreen(
         lastMediaKey = mediaKey
         detailsTab = 0
         controlsVisible = true
-        scrubbing = false
+        scrub.cancel()
         speedMenuExpanded = false
         settingsSheetOpen = false
         playbackModeExpanded = false
@@ -373,8 +373,8 @@ internal fun VideoPlayerScreen(
         duration = defaultDurationMs
         position = player.currentPosition.coerceAtLeast(0L)
     }
-    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, settingsSheetOpen, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded, cacheSheetVisible, verticalFullScreen, danmakuSettingsOpen) {
-        if (controlsVisible && (isPlaying || screenLocked) && !scrubbing &&
+    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrub.active, speedMenuExpanded, settingsSheetOpen, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded, cacheSheetVisible, verticalFullScreen, danmakuSettingsOpen) {
+        if (controlsVisible && (isPlaying || screenLocked) && !scrub.active &&
             !speedMenuExpanded && !settingsSheetOpen && !playbackModeExpanded && !sleepTimerOpen &&
             !episodesExpanded && !qualityMenuExpanded && !cacheSheetVisible && !danmakuSettingsOpen
         ) {
@@ -549,13 +549,14 @@ internal fun VideoPlayerScreen(
                             )
                     )
                     PlayerBottomBar(
+                        preview = seekPreview,
                         state = PlayerBottomBarState(
                             fullScreen = fullScreen,
                             position = position,
                             duration = duration,
                             bufferedPosition = bufferedPosition,
-                            scrubbing = scrubbing,
-                            scrubPosition = scrubPosition,
+                            scrubbing = scrub.active,
+                            scrubPosition = scrub.position,
                             playWhenReady = playWhenReady,
                             playbackState = playbackState,
                             danmakuSupported = danmakuSupported,
@@ -570,14 +571,13 @@ internal fun VideoPlayerScreen(
                             verticalFullScreen = verticalFullScreen,
                         ),
                         actions = PlayerBottomBarActions(
-                            onSeekStart = {
-                                scrubbing = true
-                                scrubPosition = it
-                            },
+                            onSeekStart = scrub::update,
+                            onSeekCanceled = scrub::cancel,
                             onSeekFinished = {
-                                player.seekTo(scrubPosition.toLong())
-                                position = scrubPosition.toLong()
-                                scrubbing = false
+                                scrub.finish(duration)?.let {
+                                    player.seekTo(it)
+                                    position = it
+                                }
                             },
                             onTogglePlayback = { togglePlayback() },
                             onNextEpisode = {
@@ -796,7 +796,7 @@ internal fun VideoPlayerScreen(
                     onRetry = onRetry,
                     commentMessage = commentMessage,
                     duration = duration,
-                    positionMs = if (scrubbing) scrubPosition.toLong() else position,
+                    positionMs = if (scrub.active) scrub.position.toLong() else position,
                     speed = speed,
                     // 保存期间由截图控制器拦截重复点击，避免按钮短暂切成灰色禁用态。
                     screenshotEnabled = hasVideoFrame && playbackError == null,
@@ -850,6 +850,7 @@ internal fun VideoPlayerScreen(
                     subtitleEnabled = subtitleEnabled,
                     mirrorEnabled = mirrorEnabled,
                     cacheLabel = cacheLabel.orEmpty(),
+                    seekPreviewEnabled = previewPreference.enabled,
                 ),
                 qualityAvailable = qualityOptions.isNotEmpty(),
                 danmakuAvailable = danmakuSupported,
@@ -865,6 +866,7 @@ internal fun VideoPlayerScreen(
                 onLoopModeChange = { onLoopModeChange?.invoke(it) ?: run { localLoopMode = it } },
                 onSubtitleChange = { subtitleEnabled = it },
                 onMirrorChange = { mirrorEnabled = it },
+                onSeekPreviewChange = previewPreference::update,
                 onCache = onCache,
                 onUnavailable = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() },
             )

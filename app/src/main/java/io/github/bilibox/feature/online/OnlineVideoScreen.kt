@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
@@ -42,6 +43,7 @@ import io.github.bilibox.data.danmaku.DanmakuPreferences
 import io.github.bilibox.data.danmaku.DanmakuSettings
 import io.github.bilibox.data.online.OnlineVideoCacheStore
 import io.github.bilibox.feature.listen.ListenInfo
+import io.github.bilibox.feature.player.PlayerPreviewSource
 import io.github.bilibox.feature.player.VideoPlayerScreen
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -63,8 +65,10 @@ internal fun OnlineVideoScreen(
     val client = remember(video.bvid, session?.cookie) {
         BiliClient().also { it.cookieHeader = session?.cookie }
     }
+    val dataSourceFactory = remember(video.bvid, session?.cookie, context) {
+        DefaultDataSource.Factory(context, BiliPlayback.dataSourceFactory(session?.cookie, video.bvid))
+    }
     val exoPlayer = remember(video.bvid, session?.cookie) {
-        val dataSourceFactory = DefaultDataSource.Factory(context, BiliPlayback.dataSourceFactory(session?.cookie, video.bvid))
         val renderersFactory = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
         ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
@@ -618,6 +622,9 @@ internal fun OnlineVideoScreen(
     val commentTabLabel = if (replyCount > 0) "评论 ${formatCompactCount(replyCount)}" else "评论"
     VideoPlayerScreen(
         player = exoPlayer,
+        previewSource = remember(playbackData, dataSourceFactory) {
+            playbackData?.let { BiliPlayback.previewVideoUrl(it) }?.let { PlayerPreviewSource(MediaItem.fromUri(it), dataSourceFactory) }
+        },
         title = video.title,
         playbackError = (playbackState as? OnlinePlaybackState.Error)?.message,
         loadingMessage = if (playbackState == OnlinePlaybackState.Loading) {

@@ -74,6 +74,7 @@ internal class PlayerBottomBarActions(
     val onQuality: () -> Unit,
     val onToggleOrientation: () -> Unit,
     val onToggleVerticalFullScreen: () -> Unit,
+    val onSeekCanceled: () -> Unit = {},
 )
 
 @Composable
@@ -81,6 +82,7 @@ internal fun PlayerBottomBar(
     state: PlayerBottomBarState,
     actions: PlayerBottomBarActions,
     modifier: Modifier = Modifier,
+    preview: PlayerSeekPreviewController? = null,
 ) {
     val showPause = state.playWhenReady && state.playbackState != Player.STATE_ENDED
     val seekBar: @Composable (Modifier) -> Unit = { seekModifier ->
@@ -91,6 +93,9 @@ internal fun PlayerBottomBar(
             onSeek = actions.onSeekStart,
             onSeekFinished = actions.onSeekFinished,
             modifier = seekModifier,
+            scrubbing = state.scrubbing,
+            preview = preview,
+            onSeekCanceled = actions.onSeekCanceled,
         )
     }
 
