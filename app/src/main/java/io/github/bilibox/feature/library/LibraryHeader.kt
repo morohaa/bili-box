@@ -1,5 +1,6 @@
 package io.github.bilibox.feature.library
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -8,6 +9,7 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -42,6 +45,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -55,6 +59,10 @@ import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.data.localvideo.LocalVideoFolder
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
 import io.github.bilibox.data.localvideo.localVideoFolderLabel
+
+private val HeaderControlHeight = 48.dp
+private val SearchFieldHeight = 36.dp
+private val HeaderControlShape = RoundedCornerShape(24.dp)
 
 /**
  * 本地视频页头部：渐变底 + 顶部搜索框 + 筛选胶囊。
@@ -89,23 +97,16 @@ internal fun LibraryTopBar(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
-            Modifier.fillMaxWidth().height(44.dp),
+            Modifier.fillMaxWidth().height(HeaderControlHeight),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             AnimatedVisibility(
                 visible = inFolder && !searchOpen,
                 enter = fadeIn(tween(160)) + expandHorizontally(tween(180)),
                 exit = fadeOut(tween(120)) + shrinkHorizontally(tween(150)),
             ) {
-                Box(
-                    Modifier.size(36.dp).clip(CircleShape)
-                        .semantics { contentDescription = "返回上一级" }
-                        .pressFeedback(onClick = onBack, shape = CircleShape, scaleTo = .9f),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AppGlyphIcon(AppIcon.BACK, style.content, Modifier.size(21.dp), 2.2f)
-                }
+                HeaderIconButton(style, AppIcon.BACK, "返回上一级", onBack)
             }
             LibrarySearchField(
                 style = style,
@@ -115,35 +116,24 @@ internal fun LibraryTopBar(
                 onQueryChange = onQueryChange,
                 modifier = Modifier.weight(1f),
             )
-            AnimatedVisibility(
-                visible = searchOpen,
-                enter = fadeIn(tween(160)) + expandHorizontally(tween(180)),
-                exit = fadeOut(tween(120)) + shrinkHorizontally(tween(150)),
+            // 固定右侧占位，避免「设置」退出与「取消」进入时反复挤压搜索框。
+            AnimatedContent(
+                targetState = searchOpen,
+                modifier = Modifier.size(HeaderControlHeight),
+                transitionSpec = { fadeIn(tween(140)).togetherWith(fadeOut(tween(90))) },
+                contentAlignment = Alignment.Center,
+                label = "header action",
             ) {
-                Text(
-                    "取消",
-                    color = style.content,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .pressFeedback(onClick = onSearchClose)
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                )
-            }
-            AnimatedVisibility(
-                visible = !searchOpen,
-                enter = fadeIn(tween(160)) + expandHorizontally(tween(180)),
-                exit = fadeOut(tween(120)) + shrinkHorizontally(tween(150)),
-            ) {
-                Box(
-                    Modifier.size(40.dp)
-                        .clip(CircleShape)
-                        .semantics { contentDescription = "显示与排序设置" }
-                        .pressFeedback(onClick = onSettings, shape = CircleShape, scaleTo = .9f),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AppGlyphIcon(AppIcon.TUNE, style.content, Modifier.size(20.dp), 1.9f)
+                if (it) {
+                    Box(
+                        Modifier.fillMaxSize().clip(HeaderControlShape)
+                            .pressFeedback(onClick = onSearchClose, shape = HeaderControlShape, scaleTo = .96f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("取消", color = style.content, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                    }
+                } else {
+                    HeaderIconButton(style, AppIcon.TUNE, "显示与排序设置", onSettings)
                 }
             }
         }
@@ -163,6 +153,19 @@ internal fun LibraryTopBar(
 }
 
 @Composable
+private fun HeaderIconButton(style: LibraryHeaderStyle, icon: AppIcon, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(HeaderControlHeight)
+            .clip(HeaderControlShape)
+            .semantics { contentDescription = description }
+            .pressFeedback(onClick = onClick, shape = HeaderControlShape, scaleTo = .94f),
+        contentAlignment = Alignment.Center,
+    ) {
+        AppGlyphIcon(icon, style.content, Modifier.size(20.dp), 2f)
+    }
+}
+
+@Composable
 private fun LibrarySearchField(
     style: LibraryHeaderStyle,
     searchOpen: Boolean,
@@ -177,17 +180,12 @@ private fun LibrarySearchField(
     LaunchedEffect(searchOpen) {
         if (searchOpen) runCatching { focusRequester.requestFocus() }
     }
-    val background by animateColorAsState(
-        if (searchOpen) Color.White else style.searchBackground,
-        animationSpec = tween(180),
-        label = "search background",
-    )
-
     Row(
-        modifier.height(44.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(background)
-            .then(if (searchOpen) Modifier else Modifier.pressFeedback(onClick = onOpen, shape = RoundedCornerShape(14.dp)))
+        modifier.height(SearchFieldHeight)
+            .testTag("library-search-field")
+            .clip(HeaderControlShape)
+            .background(style.searchBackground)
+            .then(if (searchOpen) Modifier else Modifier.pressFeedback(onClick = onOpen, shape = HeaderControlShape, scaleTo = 1f))
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -206,7 +204,13 @@ private fun LibrarySearchField(
                 decorationBox = { inner ->
                     Box {
                         if (query.isEmpty()) {
-                            Text("搜索视频或文件夹", color = style.searchHint, fontSize = 14.5.sp)
+                            Text(
+                                "搜索视频或文件夹",
+                                color = style.searchHint,
+                                fontSize = 14.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                         inner()
                     }
