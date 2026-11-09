@@ -3,7 +3,9 @@ package io.github.bilibox.feature.profile
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -19,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import io.github.bilibox.data.auth.BiliSession
 
 internal sealed interface LoginUiState {
@@ -32,7 +36,30 @@ internal sealed interface LoginUiState {
 internal enum class MySheet { LoginMethods, Session, About, Help, Update }
 
 @Composable
-internal fun LoginCard(
+internal fun ProfileLoginDialog(
+    state: LoginUiState,
+    darkMode: Boolean,
+    onDismiss: () -> Unit,
+    onLogin: () -> Unit,
+    onRetry: () -> Unit,
+    onCredentialLogin: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        LoginCard(
+            state = state,
+            darkMode = darkMode,
+            onLogin = onLogin,
+            onRetry = onRetry,
+            onCredentialLogin = onCredentialLogin,
+        )
+    }
+}
+
+@Composable
+private fun LoginCard(
     state: LoginUiState,
     darkMode: Boolean,
     onLogin: () -> Unit,
@@ -43,8 +70,9 @@ internal fun LoginCard(
     val ink = if (darkMode) MyInkDark else MyInkLight
     val muted = if (darkMode) MySubDark else MySubLight
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 14.dp)
-            .clip(RoundedCornerShape(20.dp)).background(card).padding(20.dp),
+        Modifier.widthIn(max = 420.dp).fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp)
+            .clip(RoundedCornerShape(20.dp)).background(card)
+            .verticalScroll(rememberScrollState()).padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text("登录哔哩哔哩", color = ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)

@@ -77,6 +77,7 @@ internal fun ProfileHeader(
     darkMode: Boolean,
     onToggleDarkMode: () -> Unit,
     onBannerClick: () -> Unit,
+    onAvatarClick: () -> Unit,
     bannerHeight: Dp,
     bannerAdjustments: BannerAdjustments = BannerAdjustments(),
 ) {
@@ -97,7 +98,14 @@ internal fun ProfileHeader(
             defaultAvatar = defaultAvatar,
             ring = background,
             darkMode = darkMode,
-            modifier = Modifier.align(Alignment.TopStart).offset(x = 20.dp, y = bannerHeight - 45.dp),
+            modifier = Modifier.align(Alignment.TopStart).offset(x = 20.dp, y = bannerHeight - 45.dp)
+                .clip(CircleShape)
+                .clickable(
+                    enabled = session == null,
+                    role = Role.Button,
+                    onClickLabel = "打开登录卡片",
+                    onClick = onAvatarClick,
+                ),
         )
         ThemeToggle(
             darkMode = darkMode,

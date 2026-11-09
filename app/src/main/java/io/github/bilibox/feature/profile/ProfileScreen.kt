@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -83,7 +82,7 @@ private val HeaderFadeHeight = 24.dp
 // 内容底部留白。
 private val ContentBottomGap = 12.dp
 
-// 已登录时内容与头图之间的留白：未登录滚到底后宫格要对齐到同一位置。
+// 内容与头图之间的留白。
 private val ContentTopGap = 12.dp
 
 // 悬浮导航栏高度 66dp + 16dp 间距：内容区预留出来，最后一项不会被挡住。
@@ -111,6 +110,7 @@ internal fun ProfileScreen(
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<LoginUiState>(LoginUiState.SignedOut) }
     var creating by rememberSaveable { mutableIntStateOf(0) }
+    var loginOpen by rememberSaveable { mutableStateOf(false) }
     var webLoginOpen by remember { mutableStateOf(false) }
     var nativeLoginOpen by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf<MySheet?>(null) }
@@ -119,12 +119,13 @@ internal fun ProfileScreen(
         BiliSessionStore.save(context, loggedIn)
         onSessionChange(loggedIn)
         state = LoginUiState.SignedOut
+        loginOpen = false
         webLoginOpen = false
         nativeLoginOpen = false
     }
 
-    LaunchedEffect(creating) {
-        if (creating == 0) return@LaunchedEffect
+    LaunchedEffect(creating, loginOpen, session) {
+        if (creating == 0 || !loginOpen || session != null) return@LaunchedEffect
         state = LoginUiState.CreatingQr
         state = try {
             val ticket = withContext(Dispatchers.IO) { createLoginQr() }
@@ -136,7 +137,8 @@ internal fun ProfileScreen(
         }
     }
 
-    LaunchedEffect(state) {
+    LaunchedEffect(state, loginOpen, session) {
+        if (!loginOpen || session != null) return@LaunchedEffect
         val waiting = state as? LoginUiState.WaitingForScan ?: return@LaunchedEffect
         while (true) {
             delay(2000)
@@ -149,9 +151,8 @@ internal fun ProfileScreen(
                     QrPollResult.Expired -> state = LoginUiState.Failed("二维码已过期，请重新获取")
 
                     is QrPollResult.Success -> {
-                        BiliSessionStore.save(context, result.session)
-                        onSessionChange(result.session)
-                        state = LoginUiState.SignedOut
+                        applySession(result.session)
+                        return@LaunchedEffect
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -163,8 +164,6 @@ internal fun ProfileScreen(
     }
 
     val background = if (darkMode) MyBgDark else MyBgLight
-    val ink = if (darkMode) MyInkDark else MyInkLight
-    val sub = if (darkMode) MySubDark else MySubLight
     val version = remember(context) {
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "1.0"
     }
@@ -198,33 +197,12 @@ internal fun ProfileScreen(
         }
         LaunchedEffect(scrollLimit) { onBannerScrollLimitChange(scrollLimit) }
 
-        // 未登录时补一段尾部空白：登录卡正好能完全滚出，滚到底时宫格落在登录后的位置。
-        var viewportPx by remember { mutableIntStateOf(0) }
-        var gridHeightPx by remember { mutableIntStateOf(0) }
         val density = LocalDensity.current
-        val trailingSpace = if (!compact && session == null && viewportPx > 0) {
-            with(density) {
-                (viewportPx - gridHeightPx - ContentBottomGap.roundToPx() - ContentTopGap.roundToPx())
-                    .coerceAtLeast(0).toDp()
-            }
-        } else {
-            0.dp
-        }
 
         val content: @Composable () -> Unit = {
-            if (session == null) {
-                LoginCard(
-                    state = state,
-                    darkMode = darkMode,
-                    onLogin = { creating++ },
-                    onRetry = { creating++ },
-                    onCredentialLogin = { nativeLoginOpen = true },
-                )
-            }
+            Spacer(Modifier.height(ContentTopGap))
 
-            Spacer(Modifier.height(if (session == null) 18.dp else ContentTopGap))
-
-            Box(Modifier.onSizeChanged { gridHeightPx = it.height }) {
+            Box {
                 ActionGrid(
                     darkMode = darkMode,
                     background = background,
@@ -261,7 +239,6 @@ internal fun ProfileScreen(
                 }
             }
             Spacer(Modifier.height(ContentBottomGap))
-            Spacer(Modifier.height(trailingSpace))
         }
 
         val header: @Composable () -> Unit = {
@@ -273,6 +250,11 @@ internal fun ProfileScreen(
                 darkMode = darkMode,
                 onToggleDarkMode = onToggleDarkMode,
                 onBannerClick = onBannerClick,
+                onAvatarClick = {
+                    state = LoginUiState.SignedOut
+                    creating = 0
+                    loginOpen = true
+                },
                 bannerHeight = bannerHeight,
                 bannerAdjustments = bannerAdjustments,
             )
@@ -295,7 +277,6 @@ internal fun ProfileScreen(
                         Modifier.fillMaxSize()
                             .navigationBarsPadding()
                             .padding(bottom = NavigationBarClearance)
-                            .onSizeChanged { viewportPx = it.height }
                             .verticalScroll(scrollState)
                     ) { content() }
                     // 内容滚到头部下沿时渐隐到背景色：透明度跟着滚动距离走，静止时不压暗首项。
@@ -313,6 +294,24 @@ internal fun ProfileScreen(
                 }
             }
         }
+    }
+
+    if (loginOpen && session == null) {
+        ProfileLoginDialog(
+            state = state,
+            darkMode = darkMode,
+            onDismiss = {
+                loginOpen = false
+                state = LoginUiState.SignedOut
+            },
+            onLogin = { creating++ },
+            onRetry = { creating++ },
+            onCredentialLogin = {
+                loginOpen = false
+                state = LoginUiState.SignedOut
+                nativeLoginOpen = true
+            },
+        )
     }
 
     if (nativeLoginOpen) {
