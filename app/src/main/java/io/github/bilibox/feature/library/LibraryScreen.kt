@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -42,7 +43,10 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.theme.AppearanceBackdrop
+import io.github.bilibox.core.ui.theme.HomeBackground
 import io.github.bilibox.core.ui.theme.LocalAccentColor
+import io.github.bilibox.core.ui.theme.PageBackgroundSettings
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoLayout
 import io.github.bilibox.data.localvideo.LocalVideoPlayback
@@ -67,6 +71,8 @@ import kotlinx.coroutines.withContext
 internal fun LibraryScreen(
     refreshToken: Int = 0,
     darkMode: Boolean = false,
+    backgroundSettings: PageBackgroundSettings = PageBackgroundSettings(),
+    backgroundImage: ImageBitmap? = null,
     initialFilter: LocalVideoQuickFilter? = null,
     onVideoSelected: (LocalVideo, List<LocalVideo>) -> Unit,
 ) {
@@ -256,6 +262,14 @@ internal fun LibraryScreen(
 
     CompositionLocalProvider(LocalLibraryPalette provides palette) {
         Box(Modifier.fillMaxSize().background(palette.background)) {
+            AppearanceBackdrop(
+                style = backgroundSettings.style,
+                accent = LocalAccentColor.current,
+                darkMode = darkMode,
+                image = backgroundImage,
+                blur = backgroundSettings.blur,
+                darkness = backgroundSettings.darkness,
+            )
             Column(Modifier.fillMaxSize()) {
                 LibraryTopBar(
                     inFolder = nav.isNotEmpty(),
@@ -350,11 +364,13 @@ internal fun LibraryScreen(
                 }
             }
 
-            // 底部渐隐：让滚动内容在悬浮导航与继续观看条之前自然淡出。
-            Box(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(190.dp)
-                    .bottomFade(palette.background),
-            )
+            // 自定义壁纸延伸到悬浮导航下方，避免纯色渐隐遮住图片底部。
+            if (backgroundSettings.style != HomeBackground.CUSTOM) {
+                Box(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(190.dp)
+                        .bottomFade(palette.background),
+                )
+            }
 
             AnimatedVisibility(
                 visible = toastMessage != null,

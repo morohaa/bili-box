@@ -42,10 +42,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 自定义首页背景的壁纸预览：整屏铺图，顶栏可换图 / 关闭，底部面板可调暗化与模糊。
+ * 自定义页面背景的壁纸预览：整屏铺图，顶栏可换图 / 关闭，底部面板可调暗化与模糊。
  *
  * 只有点「应用」才会把当前图片与调节值交给调用方落盘；直接关闭等于放弃这次选择。
- * 「下载壁纸」抓取的是画面层（不含浮层），与首页实际铺法一致。
+ * 「下载壁纸」抓取的是画面层（不含浮层），与页面实际铺法一致。
  */
 @Composable
 internal fun WallpaperPreviewOverlay(
@@ -172,7 +172,7 @@ internal fun WallpaperPreviewOverlay(
                     }
                 },
             )
-            // 与首页实际渲染保持一致：固定可读性蒙层 + 用户选择的暗化。
+            // 与页面实际渲染保持一致：固定可读性蒙层 + 用户选择的暗化。
             Box(Modifier.fillMaxSize().background(homeBackgroundScrim(darkMode)))
             if (darkness > 0) {
                 Box(

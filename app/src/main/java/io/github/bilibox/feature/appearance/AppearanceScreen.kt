@@ -51,6 +51,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,10 +75,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.theme.AppearanceBackdrop
 import io.github.bilibox.core.ui.theme.AppearanceSettings
+import io.github.bilibox.core.ui.theme.BackgroundPage
 import io.github.bilibox.core.ui.theme.HomeBackground
+import io.github.bilibox.core.ui.theme.PageBackgroundSettings
 import io.github.bilibox.core.ui.theme.ThemeCatalog
 import io.github.bilibox.core.ui.theme.ThemeOption
-import io.github.bilibox.data.appearance.HomeBackgroundImageStore
+import io.github.bilibox.data.appearance.BackgroundImageStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -89,7 +92,7 @@ private val ApplyBarGap = 150.dp
 private val SheetEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
 
 /**
- * 「主题外观」页：大图预览 + 12 套主题 + 明暗模式与首页背景设置。
+ * 「主题外观」页：大图预览 + 12 套主题 + 明暗模式与各页面背景设置。
  *
  * 所有设置都是即时生效并持久化的：点选主题立刻刷新本页预览与全局强调色，
  * 底部「立即应用」只做一次确认提示（与设计稿的 Toast 行为一致）。
@@ -98,9 +101,9 @@ private val SheetEasing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
 internal fun AppearanceScreen(
     appearance: AppearanceSettings,
     darkMode: Boolean,
-    backgroundImage: ImageBitmap?,
-    backgroundStore: HomeBackgroundImageStore,
-    onBackgroundImageChange: (ImageBitmap?) -> Unit,
+    backgroundImages: Map<BackgroundPage, ImageBitmap>,
+    backgroundStores: Map<BackgroundPage, BackgroundImageStore>,
+    onBackgroundImageChange: (BackgroundPage, ImageBitmap?) -> Unit,
     onBack: () -> Unit,
     onChange: (AppearanceSettings) -> Unit,
 ) {
@@ -110,6 +113,10 @@ internal fun AppearanceScreen(
     val scope = rememberCoroutineScope()
 
     var sheetOpen by remember { mutableStateOf(false) }
+    var backgroundPage by rememberSaveable { mutableStateOf(BackgroundPage.HOME) }
+    val backgroundSettings = appearance.backgroundFor(backgroundPage)
+    val backgroundImage = backgroundImages[backgroundPage]
+    val backgroundStore = backgroundStores.getValue(backgroundPage)
     var moreOpen by remember { mutableStateOf(false) }
     var toastText by remember { mutableStateOf("") }
     var toastVisible by remember { mutableStateOf(false) }
@@ -169,6 +176,7 @@ internal fun AppearanceScreen(
     fun confirmBackground(image: ImageBitmap, darkness: Int, blur: Int) {
         if (savingBackground) return
         savingBackground = true
+        val page = backgroundPage
         scope.launch {
             try {
                 val saved = withContext(Dispatchers.IO) { backgroundStore.save(image.asAndroidBitmap()) }
@@ -176,15 +184,11 @@ internal fun AppearanceScreen(
                     showToast("背景保存失败，请稍后重试")
                     return@launch
                 }
-                onBackgroundImageChange(image)
+                onBackgroundImageChange(page, image)
                 onChange(
-                    appearance.copy(
-                        background = HomeBackground.CUSTOM,
-                        backgroundDarkness = darkness,
-                        backgroundBlur = blur,
-                    )
+                    appearance.withBackground(page, PageBackgroundSettings(HomeBackground.CUSTOM, darkness, blur))
                 )
-                showToast("已应用为壁纸")
+                showToast("已应用${page.label}")
             } finally {
                 savingBackground = false
             }
@@ -192,23 +196,27 @@ internal fun AppearanceScreen(
     }
 
     fun resetBackground() {
+        if (savingBackground) return
+        savingBackground = true
+        val page = backgroundPage
         scope.launch {
-            withContext(Dispatchers.IO) { backgroundStore.clear() }
-            onBackgroundImageChange(null)
-            onChange(
-                appearance.copy(
-                    background = HomeBackground.GRADIENT,
-                    backgroundDarkness = 0,
-                    backgroundBlur = 0,
+            try {
+                withContext(Dispatchers.IO) { backgroundStore.clear() }
+                onBackgroundImageChange(page, null)
+                onChange(
+                    appearance.withBackground(page, PageBackgroundSettings())
                 )
-            )
-            candidate = null
-            showToast("已恢复默认壁纸")
+                candidate = null
+                showToast("已恢复默认${page.label}")
+            } finally {
+                savingBackground = false
+            }
         }
     }
 
     BackHandler {
         when {
+            savingBackground || readingImage -> Unit
             candidate != null -> candidate = null
             sheetOpen -> sheetOpen = false
             else -> onBack()
@@ -220,7 +228,7 @@ internal fun AppearanceScreen(
             style = appearance.background,
             accent = accent,
             darkMode = darkMode,
-            image = backgroundImage,
+            image = backgroundImages[BackgroundPage.HOME],
             blur = appearance.backgroundBlur,
             darkness = appearance.backgroundDarkness,
         )
@@ -257,9 +265,14 @@ internal fun AppearanceScreen(
                             onChange(appearance.copy(mode = mode))
                         }
                     }
-                    HorizontalDivider(color = palette.line)
-                    SettingRow("首页背景", palette, onClick = { sheetOpen = true }) {
-                        RightChevron(palette.ink3, Modifier.size(14.dp))
+                    BackgroundPage.entries.forEach { page ->
+                        HorizontalDivider(color = palette.line)
+                        SettingRow(page.label, palette, onClick = {
+                            backgroundPage = page
+                            sheetOpen = true
+                        }) {
+                            RightChevron(palette.ink3, Modifier.size(14.dp))
+                        }
                     }
                 }
                 Spacer(Modifier.height(ApplyBarGap))
@@ -270,12 +283,12 @@ internal fun AppearanceScreen(
 
         BackgroundSheetOverlay(
             open = sheetOpen,
-            selected = appearance.background,
+            selected = backgroundSettings.style,
             backgroundImage = backgroundImage,
             accent = accent,
             palette = palette,
             onSelect = { background ->
-                onChange(appearance.copy(background = background))
+                onChange(appearance.withBackground(backgroundPage, backgroundSettings.copy(style = background)))
                 sheetOpen = false
             },
             onCustom = { openCustomBackground() },
@@ -287,8 +300,8 @@ internal fun AppearanceScreen(
                 image = image,
                 accent = accent,
                 darkMode = darkMode,
-                initialDarkness = appearance.backgroundDarkness,
-                initialBlur = appearance.backgroundBlur,
+                initialDarkness = backgroundSettings.darkness,
+                initialBlur = backgroundSettings.blur,
                 toastText = toastText,
                 toastVisible = toastVisible,
                 onShowToast = { showToast(it) },
@@ -299,16 +312,17 @@ internal fun AppearanceScreen(
             )
         }
 
-        if (readingImage) {
+        if (readingImage || savingBackground) {
             Box(
-                Modifier.fillMaxSize().background(Color.Black.copy(alpha = .32f)),
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = .32f))
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
                     Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xE61A1B1F))
                         .padding(horizontal = 18.dp, vertical = 12.dp)
                 ) {
-                    Text("正在读取图片…", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text(if (readingImage) "正在读取图片…" else "正在保存背景…", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -536,9 +550,9 @@ private fun BoxScope.BackgroundSheetOverlay(
 }
 
 /**
- * 首页背景弹层：不再写标题，只留右上角「完成」；三项依次是渐变、纯色、自定义。
+ * 页面背景弹层：不再写标题，只留右上角「完成」；三项依次是渐变、纯色、自定义。
  *
- * 「自定义」不走即时生效：先选图，再进入首页预览，确认后才写入设置。
+ * 「自定义」不走即时生效：先选图，再进入壁纸预览，确认后才写入设置。
  */
 @Composable
 private fun BackgroundSheet(

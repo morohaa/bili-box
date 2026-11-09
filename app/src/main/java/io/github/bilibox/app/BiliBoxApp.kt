@@ -10,10 +10,11 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import io.github.bilibox.core.ui.theme.AppearanceMode
 import io.github.bilibox.core.ui.theme.AppearanceSettings
+import io.github.bilibox.core.ui.theme.BackgroundPage
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.core.ui.theme.resolveDark
 import io.github.bilibox.data.appearance.AppearanceStore
-import io.github.bilibox.data.appearance.HomeBackgroundImageStore
+import io.github.bilibox.data.appearance.BackgroundImageStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -23,11 +24,16 @@ internal fun BiliBoxApp() {
     val context = LocalContext.current
     val store = remember(context) { AppearanceStore(context) }
     var appearance by remember(store) { mutableStateOf(store.load()) }
-    // 自定义首页背景是本地图片，启动时异步读回；没读完前按渐变绘制，不会白屏。
-    val backgroundStore = remember(context) { HomeBackgroundImageStore(context) }
-    var backgroundImage by remember { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(backgroundStore) {
-        backgroundImage = withContext(Dispatchers.IO) { backgroundStore.load()?.asImageBitmap() }
+    // 三个页面的壁纸分别存储；启动时异步读回，读取前显示渐变。
+    val backgroundStores = remember(context) {
+        BackgroundPage.entries.associateWith { BackgroundImageStore(context, it) }
+    }
+    var backgroundImages by remember { mutableStateOf<Map<BackgroundPage, ImageBitmap>>(emptyMap()) }
+    LaunchedEffect(backgroundStores) {
+        backgroundStores.forEach { (page, imageStore) ->
+            val image = withContext(Dispatchers.IO) { imageStore.load()?.asImageBitmap() }
+            if (image != null) backgroundImages = backgroundImages + (page to image)
+        }
     }
     val systemDark = isSystemInDarkTheme()
     val darkMode = appearance.mode.resolveDark(systemDark)
@@ -44,9 +50,11 @@ internal fun BiliBoxApp() {
             appState = appState,
             darkMode = darkMode,
             appearance = appearance,
-            backgroundImage = backgroundImage,
-            backgroundStore = backgroundStore,
-            onBackgroundImageChange = { backgroundImage = it },
+            backgroundImages = backgroundImages,
+            backgroundStores = backgroundStores,
+            onBackgroundImageChange = { page, image ->
+                backgroundImages = if (image == null) backgroundImages - page else backgroundImages + (page to image)
+            },
             onAppearanceChange = ::updateAppearance,
             onToggleDarkMode = {
                 updateAppearance(

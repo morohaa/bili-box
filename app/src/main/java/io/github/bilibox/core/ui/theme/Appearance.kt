@@ -10,7 +10,7 @@ internal enum class AppearanceMode(val label: String) {
 }
 
 /**
- * 首页背景样式，「主题外观」页的底部弹层直接映射到这个枚举，顺序即展示顺序。
+ * 页面背景样式，「主题外观」页的底部弹层直接映射到这个枚举，顺序即展示顺序。
  *
  * [CUSTOM] 使用用户自己上传的图片，图片缺失时退回 [GRADIENT] 的渐变光晕。
  */
@@ -58,7 +58,20 @@ internal val ThemeCatalog: List<ThemeOption> = listOf(
     ThemeOption("custom", "自定义", "自定义 · 专属", Color(0xFFFB7299), Color(0xFFFB7299), Color(0xFFFFA7C0), custom = true),
 )
 
-/** 主题偏好：主题色、明暗模式与首页背景。 */
+/** 三个主页面的背景独立设置，存储标识保持稳定以兼容已有首页壁纸。 */
+internal enum class BackgroundPage(val label: String, val storageKey: String) {
+    HOME("首页背景", "home_background"),
+    VIDEO("视频背景", "video_background"),
+    PROFILE("我的背景", "profile_background"),
+}
+
+internal data class PageBackgroundSettings(
+    val style: HomeBackground = HomeBackground.GRADIENT,
+    val darkness: Int = 0,
+    val blur: Int = 0,
+)
+
+/** 主题偏好：主题色、明暗模式与三个主页面各自的背景。 */
 internal data class AppearanceSettings(
     val themeId: String = DefaultThemeId,
     val mode: AppearanceMode = AppearanceMode.LIGHT,
@@ -66,8 +79,22 @@ internal data class AppearanceSettings(
     // 自定义背景的暗化与模糊，只对 HomeBackground.CUSTOM 生效；0 表示保持原样。
     val backgroundDarkness: Int = 0,
     val backgroundBlur: Int = 0,
+    val videoBackground: PageBackgroundSettings = PageBackgroundSettings(),
+    val profileBackground: PageBackgroundSettings = PageBackgroundSettings(),
 ) {
     val theme: ThemeOption get() = themeById(themeId)
+
+    fun backgroundFor(page: BackgroundPage): PageBackgroundSettings = when (page) {
+        BackgroundPage.HOME -> PageBackgroundSettings(background, backgroundDarkness, backgroundBlur)
+        BackgroundPage.VIDEO -> videoBackground
+        BackgroundPage.PROFILE -> profileBackground
+    }
+
+    fun withBackground(page: BackgroundPage, value: PageBackgroundSettings): AppearanceSettings = when (page) {
+        BackgroundPage.HOME -> copy(background = value.style, backgroundDarkness = value.darkness, backgroundBlur = value.blur)
+        BackgroundPage.VIDEO -> copy(videoBackground = value)
+        BackgroundPage.PROFILE -> copy(profileBackground = value)
+    }
 }
 
 internal fun themeById(id: String): ThemeOption = ThemeCatalog.firstOrNull { it.id == id } ?: ThemeCatalog.first { it.id == DefaultThemeId }

@@ -5,29 +5,30 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.net.Uri
+import io.github.bilibox.core.ui.theme.BackgroundPage
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-// 首页背景最长边限制在 2160px：足够覆盖 2K 屏，又不会让每次启动都解码超大图。
+// 页面背景最长边限制在 2160px：足够覆盖 2K 屏，又不会让每次启动都解码超大图。
 private const val MaxEdge = 2160
 private const val JpegQuality = 92
 
 /**
- * 「首页背景 → 自定义」的本地图片存储。
+ * 「页面背景 → 自定义」的本地图片存储。
  *
  * 相册只负责提供一次源图，选中的图片会被缩放到 [MaxEdge] 以内并以 JPEG 写入
  * 应用私有目录，之后不再依赖相册 URI 的临时读权限，应用重启后仍能直接展示。
  */
-internal class HomeBackgroundImageStore(context: Context) {
+internal class BackgroundImageStore(context: Context, page: BackgroundPage) {
     private val appContext = context.applicationContext
     private val directory = File(appContext.filesDir, "appearance")
-    private val imageFile = File(directory, "home_background.jpg")
-    private val tempFile = File(directory, "home_background.tmp")
+    private val imageFile = File(directory, "${page.storageKey}.jpg")
+    private val tempFile = File(directory, "${page.storageKey}.tmp")
 
-    /** 读取已保存的首页背景；界面层再转换成 Compose 位图。 */
+    /** 读取已保存的页面背景；界面层再转换成 Compose 位图。 */
     fun load(): Bitmap? = runCatching {
         if (imageFile.isFile) BitmapFactory.decodeFile(imageFile.absolutePath) else null
     }.getOrNull()

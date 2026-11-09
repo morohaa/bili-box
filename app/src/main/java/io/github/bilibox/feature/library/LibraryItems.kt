@@ -88,7 +88,6 @@ internal fun VideoList(
     onShare: (LocalVideo) -> Unit,
     onInfo: (LocalVideo) -> Unit,
 ) {
-    val palette = LocalLibraryPalette.current
     val state = rememberLazyListState()
     ResetScroll(
         state,
@@ -101,7 +100,7 @@ internal fun VideoList(
         view.videos.size,
     )
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(palette.background),
+        modifier = Modifier.fillMaxSize(),
         state = state,
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = bottomPadding),
     ) {
@@ -140,7 +139,6 @@ internal fun VideoGrid(
     onShare: (LocalVideo) -> Unit,
     onInfo: (LocalVideo) -> Unit,
 ) {
-    val palette = LocalLibraryPalette.current
     val state = rememberLazyGridState()
     ResetScroll(
         state,
@@ -154,7 +152,7 @@ internal fun VideoGrid(
     )
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
-        modifier = Modifier.fillMaxSize().background(palette.background),
+        modifier = Modifier.fillMaxSize(),
         state = state,
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 22.dp, bottom = bottomPadding),
         horizontalArrangement = Arrangement.spacedBy(16.dp),

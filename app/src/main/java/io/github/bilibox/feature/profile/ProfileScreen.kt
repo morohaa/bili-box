@@ -27,7 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
+import io.github.bilibox.core.ui.theme.AppearanceBackdrop
 import io.github.bilibox.core.ui.theme.LocalAccentColor
+import io.github.bilibox.core.ui.theme.PageBackgroundSettings
 import io.github.bilibox.data.auth.BiliSession
 import io.github.bilibox.data.auth.BiliSessionStore
 import io.github.bilibox.data.auth.biliLoginRequest
@@ -95,6 +97,8 @@ internal fun ProfileScreen(
     customBanner: ImageBitmap?,
     bannerAdjustments: BannerAdjustments = BannerAdjustments(),
     darkMode: Boolean = false,
+    backgroundSettings: PageBackgroundSettings = PageBackgroundSettings(),
+    backgroundImage: ImageBitmap? = null,
     onToggleDarkMode: () -> Unit = {},
     onOpenThemeAppearance: () -> Unit = {},
     onOpenLibrary: (LocalVideoQuickFilter?) -> Unit = {},
@@ -172,6 +176,14 @@ internal fun ProfileScreen(
     // 头图固定在页面顶部，只让下方内容滚动：背景图始终完整露出，不随滚动被裁掉。
     // 视口太矮（手机横屏、分屏）时固定头部会把内容挤没，那时退化成整页滚动。
     BoxWithConstraints(Modifier.fillMaxSize().background(background)) {
+        AppearanceBackdrop(
+            style = backgroundSettings.style,
+            accent = LocalAccentColor.current,
+            darkMode = darkMode,
+            image = backgroundImage,
+            blur = backgroundSettings.blur,
+            darkness = backgroundSettings.darkness,
+        )
         val bannerHeight = profileBannerHeight(maxWidth, maxHeight)
         val compact = maxHeight < CompactHeightThreshold
         // 整页滚动时头图会滚走，滚过状态栏后要把图标换回深色；固定头图时永远不需要。

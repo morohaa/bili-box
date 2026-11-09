@@ -18,15 +18,15 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 
-/** 自定义背景图上的蒙层：保证首页文字在任何图片上都可读。 */
+/** 自定义背景图上的蒙层：保证页面文字在任何图片上都可读。 */
 private const val CustomScrimLight = 0.30f
 private const val CustomScrimDark = 0.44f
 
-/** 自定义背景图与首页文字之间的固定可读性蒙层；用户可在壁纸编辑器里再叠一层暗化。 */
+/** 自定义背景图与页面文字之间的固定可读性蒙层；用户可在壁纸编辑器里再叠一层暗化。 */
 internal fun homeBackgroundScrim(darkMode: Boolean): Color = if (darkMode) Color.Black.copy(alpha = CustomScrimDark) else Color.White.copy(alpha = CustomScrimLight)
 
 /**
- * 首页背景：把「主题外观」里选择的首页背景画在页面底色之上。
+ * 页面背景：把「主题外观」里选择的背景画在页面底色之上。
  *
  * 纯色不追加任何内容；渐变是角落光晕；自定义把用户上传的图片铺满整页，
  * 并叠上可读性蒙层与用户在壁纸编辑器里选定的暗化 / 模糊。
