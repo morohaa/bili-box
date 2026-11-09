@@ -15,6 +15,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
@@ -61,9 +62,11 @@ internal fun DanmakuOverlay(
     val textMeasurer = rememberTextMeasurer()
     var positionMs by remember(player) { mutableLongStateOf(player.currentPosition.coerceAtLeast(0L)) }
 
-    val measured = remember(visible, settings.fontScale, density, localDensity.fontScale) {
+    // 按原始字号测量一次；用户字号在绘制时缩放，同时参与轨道宽高计算。
+    // 滑杆每次变化都重新测量整个视频的弹幕，会长时间占用主线程。
+    val measured = remember(visible, density, localDensity.fontScale) {
         visible.map { item ->
-            val fontSize = (item.fontSize.coerceIn(12, 36) * settings.fontScale).sp
+            val fontSize = item.fontSize.coerceIn(12, 36).sp
             item to textMeasurer.measure(
                 text = AnnotatedString(item.text),
                 style = TextStyle(
@@ -80,9 +83,9 @@ internal fun DanmakuOverlay(
         }
     }
     val layouts: Map<Danmaku, TextLayoutResult> = remember(measured) { measured.toMap() }
-    val maxFontPx = remember(visible, settings.fontScale, density, localDensity.fontScale) {
+    val maxFontPx = remember(visible, density, localDensity.fontScale) {
         val largest = visible.maxOfOrNull { it.fontSize.coerceIn(12, 36) } ?: 25
-        largest * settings.fontScale * localDensity.fontScale * density
+        largest * localDensity.fontScale * density
     }
 
     BoxWithConstraints(
@@ -90,7 +93,7 @@ internal fun DanmakuOverlay(
     ) {
         val widthPx = constraints.maxWidth.toFloat()
         val heightPx = constraints.maxHeight.toFloat()
-        val laneHeightPx = maxFontPx * 1.35f
+        val laneHeightPx = maxFontPx * settings.fontScale * 1.35f
         val areaHeightPx = (heightPx * settings.areaFraction).coerceAtLeast(laneHeightPx)
         val tracks = remember(visible, layouts, widthPx, areaHeightPx, laneHeightPx, density, settings.speedScale) {
             DanmakuTrackBuilder.build(
@@ -100,7 +103,7 @@ internal fun DanmakuOverlay(
                 laneHeightPx = laneHeightPx,
                 density = density,
                 speedScale = settings.speedScale,
-                textWidthPx = { item -> layouts[item]?.size?.width?.toFloat() ?: 1f },
+                textWidthPx = { item -> (layouts[item]?.size?.width ?: 1) * settings.fontScale },
             )
         }
 
@@ -125,8 +128,8 @@ internal fun DanmakuOverlay(
             tracks.forEach { track ->
                 if (!track.isVisibleAt(now)) return@forEach
                 val layout = layouts[track.item] ?: return@forEach
-                val textWidth = layout.size.width.toFloat()
-                val textHeight = layout.size.height.toFloat()
+                val textWidth = layout.size.width * settings.fontScale
+                val textHeight = layout.size.height * settings.fontScale
                 val x = when (track.item.mode) {
                     Danmaku.Mode.SCROLL -> track.leftEdgeAt(now, widthPx)
 
@@ -147,11 +150,14 @@ internal fun DanmakuOverlay(
                 }
                 val color = Color(track.item.color or 0xFF000000.toInt())
                     .copy(alpha = settings.opacity)
-                drawText(
-                    textLayoutResult = layout,
-                    color = color,
-                    topLeft = Offset(x, y),
-                )
+                val origin = Offset(x, y)
+                scale(settings.fontScale, pivot = origin) {
+                    drawText(
+                        textLayoutResult = layout,
+                        color = color,
+                        topLeft = origin,
+                    )
+                }
             }
         }
     }

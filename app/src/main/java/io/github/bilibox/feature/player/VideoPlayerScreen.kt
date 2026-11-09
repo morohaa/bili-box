@@ -51,7 +51,6 @@ import io.github.bilibox.data.player.LightsOffPreferences
 import io.github.bilibox.feature.danmaku.DanmakuAreaGuide
 import io.github.bilibox.feature.danmaku.DanmakuComposerDialog
 import io.github.bilibox.feature.danmaku.DanmakuOverlay
-import io.github.bilibox.feature.danmaku.DanmakuSettingsSheet
 import io.github.bilibox.feature.listen.CollapsedListenOverlay
 import io.github.bilibox.feature.listen.ListenControls
 import io.github.bilibox.feature.listen.ListenInfo
@@ -374,10 +373,10 @@ internal fun VideoPlayerScreen(
         duration = defaultDurationMs
         position = player.currentPosition.coerceAtLeast(0L)
     }
-    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, settingsSheetOpen, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded, cacheSheetVisible, verticalFullScreen) {
+    LaunchedEffect(controlsVisible, isPlaying, screenLocked, scrubbing, speedMenuExpanded, settingsSheetOpen, playbackModeExpanded, sleepTimerOpen, episodesExpanded, qualityMenuExpanded, cacheSheetVisible, verticalFullScreen, danmakuSettingsOpen) {
         if (controlsVisible && (isPlaying || screenLocked) && !scrubbing &&
             !speedMenuExpanded && !settingsSheetOpen && !playbackModeExpanded && !sleepTimerOpen &&
-            !episodesExpanded && !qualityMenuExpanded && !cacheSheetVisible
+            !episodesExpanded && !qualityMenuExpanded && !cacheSheetVisible && !danmakuSettingsOpen
         ) {
             delay(4_000)
             controlsVisible = false
@@ -940,8 +939,9 @@ internal fun VideoPlayerScreen(
             }
         }
         if (danmakuSupported) {
-            DanmakuSettingsSheet(
+            PlayerDanmakuSettings(
                 visible = danmakuSettingsOpen,
+                fullScreen = fullScreen,
                 settings = danmakuSettings,
                 topInset = if (fullScreen || verticalFullScreen) null else videoBottom,
                 onDismiss = { danmakuSettingsOpen = false },

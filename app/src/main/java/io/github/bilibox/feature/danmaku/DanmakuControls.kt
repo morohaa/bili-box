@@ -1,25 +1,14 @@
 package io.github.bilibox.feature.danmaku
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -28,19 +17,14 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
@@ -56,7 +40,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,9 +58,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -85,8 +66,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -96,34 +75,19 @@ import io.github.bilibox.data.danmaku.DanmakuSettings
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 private val DanmakuPink = Color(0xFFFB7299)
 
 // 设置面板按设计稿用更亮的粉色，和底栏的品牌粉区分开。
 private val DanmakuAccent = Color(0xFFFF759C)
-private val DanmakuPinkSoft = Color(0xFFFFE8EF)
-private val DanmakuPinkTrack = Color(0xFFFFB3C6)
 private val DanmakuDanger = Color(0xFFFF4D4F)
 private val DanmakuSheet = Color(0xFF1B1E23)
 private val DanmakuSub = Color(0xFFB8BEC8)
 
-// 设置面板改成浅色卡片后使用的一组中性色，取值与播放器设置面板保持一致。
-private val DanmakuSheetSurface = Color(0xFFF6F7F8)
-private val DanmakuCard = Color.White
-private val DanmakuInk = Color(0xFF17191B)
-private val DanmakuMuted = Color(0xFF9499A0)
-private val DanmakuIdleTrack = Color(0xFFE1E4E6)
-private val DanmakuGrabber = Color(0xFFC8CBD0)
-private val DanmakuIconIdle = Color(0xFFF4F5F7)
-private val DanmakuGlyphTint = Color(0xFF111315)
-
 private const val DANMAKU_VALUE_HIGHLIGHT_MS = 900L
 private const val DANMAKU_RESET_CONFIRM_MS = 3_000L
 private const val DANMAKU_RESET_CONFIRM_DONE_MS = 1_600L
-private const val DANMAKU_SHEET_MAX_FRACTION = .92f
 private const val DANMAKU_AREA_GUIDE_MS = 900L
-private val DANMAKU_MIN_SHEET_HEIGHT = 260.dp
 
 /** 滑杆上的三个等分白点：两端被圆头轨道盖住，和设计稿一样只画中间三个。 */
 private val DANMAKU_SLIDER_TICKS = listOf(.25f, .5f, .75f)
@@ -305,143 +269,28 @@ internal fun DanmakuComposerDialog(
     }
 }
 
-/**
- * 弹幕设置面板。
- *
- * [topInset] 是视频画面下沿：传入时卡片从这里铺到屏幕底部，画面始终露在上方；
- * 横屏 / 竖屏全屏时视频占满舞台，传 null 退回屏幕底部弹层并限制最大高度。
- */
+/** 横屏侧栏和竖屏弹层共用的设置项。 */
 @Composable
-internal fun DanmakuSettingsSheet(
-    visible: Boolean,
-    settings: DanmakuSettings,
-    topInset: Dp?,
-    onDismiss: () -> Unit,
-    onSettingsChange: (DanmakuSettings) -> Unit,
-) {
-    val scrim = remember { MutableInteractionSource() }
-    AnimatedVisibility(
-        visible = visible,
-        modifier = Modifier.fillMaxSize(),
-        enter = fadeIn(tween(180)),
-        exit = fadeOut(tween(150)),
-    ) {
-        Box(
-            Modifier.fillMaxSize()
-                .background(Color.Black.copy(alpha = .42f))
-                .clickable(
-                    interactionSource = scrim,
-                    indication = null,
-                    onClick = onDismiss,
-                )
-                .semantics { contentDescription = "关闭弹幕设置" }
-        )
-    }
-    AnimatedVisibility(
-        visible = visible,
-        modifier = Modifier.fillMaxSize(),
-        enter = slideInVertically(
-            animationSpec = tween(320, easing = CubicBezierEasing(.22f, .8f, .25f, 1f)),
-            initialOffsetY = { it },
-        ),
-        exit = slideOutVertically(
-            animationSpec = tween(240, easing = FastOutSlowInEasing),
-            targetOffsetY = { it },
-        ),
-    ) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            // 视频下沿之上至少要留出一张卡片的高度，否则说明视频已铺满舞台。
-            val anchored = topInset != null && topInset <= maxHeight - DANMAKU_MIN_SHEET_HEIGHT
-            DanmakuSettingsPanel(
-                settings = settings,
-                onSettingsChange = onSettingsChange,
-                onDismiss = onDismiss,
-                modifier = if (anchored) {
-                    Modifier.fillMaxSize().padding(top = topInset ?: 0.dp)
-                } else {
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .heightIn(max = maxHeight * DANMAKU_SHEET_MAX_FRACTION)
-                },
-            )
-        }
-    }
-}
-
-/** 面板外壳：顶部拖拽条可点按 / 下拉关闭，内容超长时整体滚动。 */
-@Composable
-private fun DanmakuSettingsPanel(
+internal fun DanmakuSettingsContent(
     settings: DanmakuSettings,
     onSettingsChange: (DanmakuSettings) -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
-    val dismissThreshold = with(density) { 72.dp.toPx() }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-    val shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
+    DanmakuPreview(settings = settings)
+    Spacer(Modifier.height(16.dp))
+    DanmakuSliderCard(settings = settings, onSettingsChange = onSettingsChange)
 
-    Column(
-        modifier
-            .offset { IntOffset(0, dragOffset.roundToInt()) }
-            .shadow(16.dp, shape)
-            .clip(shape)
-            .background(DanmakuSheetSurface)
-            .testTag("danmaku-settings-sheet"),
-    ) {
-        Box(
-            Modifier.fillMaxWidth().height(30.dp)
-                .pointerInput(Unit) { detectTapGestures(onTap = { onDismiss() }) }
-                .pointerInput(Unit) {
-                    detectVerticalDragGestures(
-                        onVerticalDrag = { change, amount ->
-                            change.consume()
-                            dragOffset = (dragOffset + amount).coerceAtLeast(0f)
-                        },
-                        onDragEnd = {
-                            if (dragOffset > dismissThreshold) {
-                                onDismiss()
-                            } else {
-                                scope.launch { animate(dragOffset, 0f) { value, _ -> dragOffset = value } }
-                            }
-                        },
-                        onDragCancel = {
-                            scope.launch { animate(dragOffset, 0f) { value, _ -> dragOffset = value } }
-                        },
-                    )
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(Modifier.width(36.dp).height(4.dp).clip(CircleShape).background(DanmakuGrabber))
-        }
+    Spacer(Modifier.height(20.dp))
+    DanmakuSectionTitle("画面防挡")
+    Spacer(Modifier.height(10.dp))
+    DanmakuBlockCard(settings = settings, onSettingsChange = onSettingsChange)
 
-        Column(
-            Modifier.weight(1f, fill = false).fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(start = 18.dp, end = 18.dp, bottom = 16.dp)
-        ) {
-            Text("弹幕设置", color = DanmakuInk, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(20.dp))
+    DanmakuSectionTitle("更多工具")
+    Spacer(Modifier.height(10.dp))
+    DanmakuWatchFilterCard(settings = settings, onSettingsChange = onSettingsChange)
 
-            DanmakuPreview(settings = settings)
-            Spacer(Modifier.height(16.dp))
-            DanmakuSliderCard(settings = settings, onSettingsChange = onSettingsChange)
-
-            Spacer(Modifier.height(20.dp))
-            DanmakuSectionTitle("画面防挡")
-            Spacer(Modifier.height(10.dp))
-            DanmakuBlockCard(settings = settings, onSettingsChange = onSettingsChange)
-
-            Spacer(Modifier.height(20.dp))
-            DanmakuSectionTitle("更多工具")
-            Spacer(Modifier.height(10.dp))
-            DanmakuWatchFilterCard(settings = settings, onSettingsChange = onSettingsChange)
-
-            Spacer(Modifier.height(4.dp))
-            DanmakuResetAction(settings = settings, onSettingsChange = onSettingsChange)
-        }
-    }
+    Spacer(Modifier.height(4.dp))
+    DanmakuResetAction(settings = settings, onSettingsChange = onSettingsChange)
 }
 
 /** 面板正文的分组标题，和卡片之间留出呼吸感。 */
@@ -456,7 +305,7 @@ private fun DanmakuSectionTitle(title: String) {
     )
 }
 
-/** 白色圆角分组卡片。 */
+/** 随面板配色切换的圆角分组卡片。 */
 @Composable
 private fun DanmakuCardContainer(content: @Composable ColumnScope.() -> Unit) {
     Column(
@@ -615,7 +464,7 @@ private fun DanmakuPreview(settings: DanmakuSettings) {
     ) {
         Box(
             Modifier.clip(CircleShape)
-                .background(DanmakuInk.copy(alpha = .72f))
+                .background(Color(0xFF17191B).copy(alpha = .72f))
                 .padding(horizontal = 14.dp, vertical = 5.dp)
         ) {
             Text(

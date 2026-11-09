@@ -418,6 +418,26 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("字体大小").assertExists()
         // 显示区域改成连续滑杆后不再有档位按钮，改为断言滑杆本身存在。
         compose.onNodeWithContentDescription("显示区域 滑杆").assertExists()
+
+        compose.onNodeWithTag("danmaku-settings-sheet").assertDoesNotExist()
+        compose.onNodeWithContentDescription("收起弹幕设置").assertExists()
+        val drawer = compose.onNodeWithTag("danmaku-settings-drawer").fetchSemanticsNode().boundsInRoot
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        var panelWidthPx = 0f
+        var horizontalPaddingPx = 0f
+        compose.runOnIdle {
+            val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+            panelWidthPx = 380f * density
+            horizontalPaddingPx = 16f * density
+        }
+        assertEquals(root.right - horizontalPaddingPx, drawer.right, 1f)
+        assertEquals(minOf(root.width, panelWidthPx) - horizontalPaddingPx * 2, drawer.width, 1f)
+
+        compose.onNodeWithContentDescription("收起弹幕设置").performClick()
+        compose.onNodeWithTag("danmaku-settings-drawer").assertDoesNotExist()
+        compose.onNodeWithContentDescription("弹幕设置").performClick()
+        compose.onNodeWithContentDescription("关闭弹幕设置").performClick()
+        compose.onNodeWithTag("danmaku-settings-drawer").assertDoesNotExist()
     }
 
     @Test
