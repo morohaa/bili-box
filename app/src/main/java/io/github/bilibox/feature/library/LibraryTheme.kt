@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -17,7 +16,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -30,9 +29,8 @@ import io.github.bilibox.core.ui.theme.OnlinePinkBrand
 /**
  * 本地视频页的配色与动效令牌。
  *
- * 页面只保留三层：画布（浅灰）、卡片（纯白）、信息（文字与细线）。
- * 颜色只出现在少量语义位置（选中态、进度、强调点），其余交给留白和字重，
- * 这样即使主题色很鲜艳也不会显得廉价。
+ * 媒体列表以连续的近白 / 炭黑画布承载，靠封面、文字和细线区分条目。
+ * 卡片色保留给悬浮续播条和设置面板，强调色用于选中态和播放进度。
  */
 internal data class LibraryPalette(
     val dark: Boolean,
@@ -75,7 +73,7 @@ internal fun libraryPalette(darkMode: Boolean, accent: Color): LibraryPalette {
     } else {
         LibraryPalette(
             dark = false,
-            background = Color(0xFFF2F3F5),
+            background = Color(0xFFFAFAFC),
             card = Color.White,
             cardBorder = Color.Transparent,
             chip = Color(0xFFF3F4F6),
@@ -137,10 +135,7 @@ internal val LocalLibraryPalette = staticCompositionLocalOf {
 }
 
 /**
- * 按下的即时反馈：轻微缩小 + 一层淡淡的压暗，松开后回弹。
- *
- * 相比默认水波纹，这种“整块变暗再回弹”的手感更接近 Telegram，
- * 在卡片、胶囊、图标按钮上表现一致。
+ * 轻微按压与无过冲回弹。蒙层在内容之后绘制，封面也能得到一致的反馈。
  */
 @Composable
 internal fun Modifier.pressFeedback(
@@ -154,7 +149,7 @@ internal fun Modifier.pressFeedback(
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) scaleTo else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         label = "press scale",
     )
     val overlay by animateColorAsState(
@@ -169,7 +164,10 @@ internal fun Modifier.pressFeedback(
         }
     if (shape != null) modifier = modifier.clip(shape)
     return modifier
-        .background(overlay)
+        .drawWithContent {
+            drawContent()
+            drawRect(overlay)
+        }
         .clickable(interactionSource = interaction, indication = null, onClick = onClick)
 }
 

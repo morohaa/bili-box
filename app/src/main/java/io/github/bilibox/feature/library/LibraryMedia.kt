@@ -304,10 +304,7 @@ internal fun videoMetaParts(
     return parts
 }
 
-/**
- * 文件夹卡片的信息行。数量交给封面角标，时长单独做成胶囊，这里只放
- * 「大小 · 日期」，两者都关掉时调用方应跳过整行。
- */
+/** 文件大小与日期作为次要信息，两个字段都关闭时跳过整行。 */
 internal fun folderMetaParts(
     folder: LocalVideoFolder,
     settings: LocalVideoSettings,
@@ -319,19 +316,14 @@ internal fun folderMetaParts(
     return parts
 }
 
-/**
- * 文件夹卡片底部一行：数量 + 总时长。
- *
- * 概览行取消后视频数量没有别处显示，放在这里既不增加行数，也不会把
- * 「大小 · 日期」挤成省略号。
- */
+/** 数量与合计时长是文件夹的主要信息。 */
 internal fun folderFootParts(
     folder: LocalVideoFolder,
     settings: LocalVideoSettings,
 ): List<MetaPart> {
     val parts = mutableListOf(MetaPart("${folder.count} 个视频"))
     if (settings.folderFields.duration && folder.totalDurationMs > 0L) {
-        parts += MetaPart("总时长 ${formatVideoDuration(folder.totalDurationMs)}")
+        parts += MetaPart(formatVideoDuration(folder.totalDurationMs))
     }
     return parts
 }
