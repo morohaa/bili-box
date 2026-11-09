@@ -62,6 +62,14 @@ class BiliClient(
         return response.data ?: throw BiliException(response.code, "card 返回空 data")
     }
 
+    /** 收藏接口沿用当前客户端的登录 Cookie 与请求头。 */
+    internal suspend fun favoriteData(path: String, parameters: Map<String, String> = emptyMap()): JsonObject {
+        val query = parameters.entries.joinToString("&") { (key, value) -> "$key=${encodeQuery(value)}" }
+        val response = getJson<JsonObject>("https://api.bilibili.com$path" + if (query.isEmpty()) "" else "?$query")
+        ensureOk(response)
+        return response.data ?: throw BiliException(-1, "收藏接口返回空数据，请稍后重试")
+    }
+
     /**
      * 拉取一个分 P 的弹幕 XML。接口用 `Content-Encoding: deflate` 返回原始压缩
      * 数据，[decodeDanmakuPayload] 会在交给解析器前统一解压。

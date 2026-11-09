@@ -9,11 +9,14 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -33,8 +36,12 @@ import io.github.bilibox.core.ui.theme.AppearanceSettings
 import io.github.bilibox.core.ui.theme.BackgroundPage
 import io.github.bilibox.core.ui.theme.BrandSpringEasing
 import io.github.bilibox.data.appearance.BackgroundImageStore
+import io.github.bilibox.data.bili.BiliClient
+import io.github.bilibox.data.favorites.BiliFavorites
 import io.github.bilibox.data.profile.ProfileBannerStore
 import io.github.bilibox.feature.appearance.AppearanceScreen
+import io.github.bilibox.feature.favorites.FavoritesScreen
+import io.github.bilibox.feature.favorites.FavoritesStateHolder
 import io.github.bilibox.feature.home.HomeScreen
 import io.github.bilibox.feature.library.LibraryScreen
 import io.github.bilibox.feature.online.OnlineVideoScreen
@@ -73,6 +80,15 @@ internal fun AppNavigation(
     }
     // 个人页与头图预览共用同一份头像位图，避免预览时重复下载。
     val avatar = rememberRemoteBitmap(appState.session?.avatarUrl)
+    val favoritesScope = rememberCoroutineScope()
+    val favorites = remember(appState.session?.cookie) {
+        appState.session?.let { session ->
+            FavoritesStateHolder(BiliFavorites(BiliClient().also { it.cookieHeader = session.cookie }), favoritesScope)
+        }
+    }
+    DisposableEffect(favorites) { onDispose { favorites?.dispose() } }
+    val favoritesFolderScroll = rememberLazyListState()
+    val favoritesVideoScroll = rememberLazyListState()
 
     if (appState.appearanceOpen) {
         AppearanceScreen(
@@ -118,6 +134,18 @@ internal fun AppNavigation(
         return
     }
 
+    if (appState.favoritesOpen) {
+        FavoritesScreen(
+            darkMode = darkMode,
+            holder = favorites,
+            folderListState = favoritesFolderScroll,
+            videoListState = favoritesVideoScroll,
+            onBack = appState::closeFavorites,
+            onVideoClick = appState::openOnlineVideo,
+        )
+        return
+    }
+
     val focusManager = LocalFocusManager.current
     // 搜索态属于首页：系统返回键先退出搜索，再交给外层处理。
     BackHandler(enabled = appState.selectedTab == AppTab.HOME && appState.homeExpanded) {
@@ -155,6 +183,7 @@ internal fun AppNavigation(
                     onToggleDarkMode = onToggleDarkMode,
                     onOpenThemeAppearance = appState::openAppearance,
                     onOpenLibrary = appState::openLibrary,
+                    onOpenFavorites = appState::openFavorites,
                     onBannerClick = appState::openBannerPreview,
                     onSessionChange = appState::updateSession,
                     scrollState = appState.profileScroll,

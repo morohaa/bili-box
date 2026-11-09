@@ -1,6 +1,5 @@
 package io.github.bilibox.core.ui.component
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -25,10 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.theme.Pink
-import java.net.HttpURLConnection
-import java.net.URL
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import io.github.bilibox.core.util.RemoteImageCache
 
 /**
  * 远程封面。图片未就绪（加载中或加载失败）时显示 [placeholder]，
@@ -39,23 +35,12 @@ internal fun RemoteCover(
     url: String,
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(12.dp),
+    imageCache: RemoteImageCache = RemoteImageCache.shared,
     placeholder: @Composable BoxScope.() -> Unit = { BrandLetterPlaceholder() },
 ) {
-    var bitmap by remember(url) { mutableStateOf<android.graphics.Bitmap?>(null) }
-    LaunchedEffect(url) {
-        bitmap = withContext(Dispatchers.IO) {
-            runCatching {
-                val connection = URL(url).openConnection() as HttpURLConnection
-                connection.connectTimeout = 8000
-                connection.readTimeout = 8000
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
-                try {
-                    connection.inputStream.use(BitmapFactory::decodeStream)
-                } finally {
-                    connection.disconnect()
-                }
-            }.getOrNull()
-        }
+    var bitmap by remember(url, imageCache) { mutableStateOf(imageCache.cached(url)) }
+    LaunchedEffect(url, imageCache) {
+        if (bitmap == null) bitmap = imageCache.load(url)
     }
     Box(modifier.clip(shape).background(Color(0xFFE7EDF2)), contentAlignment = Alignment.Center) {
         bitmap?.let { Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }

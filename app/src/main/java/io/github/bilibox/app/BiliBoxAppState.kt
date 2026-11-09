@@ -85,6 +85,16 @@ internal class BiliBoxAppState(
     var bannerPreviewOpen by mutableStateOf(false)
         private set
 
+    var favoritesOpen by mutableStateOf(false)
+        private set
+
+    fun openFavorites() {
+        favoritesOpen = true
+    }
+    fun closeFavorites() {
+        favoritesOpen = false
+    }
+
     // “我的”页头图滚过状态栏的阈值（px）：只在矮视口整页滚动时有效，固定头图时为 Int.MAX_VALUE。
     var profileBannerScrollLimitPx by mutableIntStateOf(Int.MAX_VALUE)
         private set
@@ -121,6 +131,7 @@ internal class BiliBoxAppState(
 
     fun updateSession(value: BiliSession?) {
         if (value?.cookie != session?.cookie) {
+            favoritesOpen = false
             searchHolder.reset()
             searchHolder = createSearchHolder(value)
         }
@@ -203,6 +214,7 @@ internal class BiliBoxAppState(
                     "homeExpanded" to it.homeExpanded,
                     "appearanceOpen" to it.appearanceOpen,
                     "bannerPreviewOpen" to it.bannerPreviewOpen,
+                    "favoritesOpen" to it.favoritesOpen,
                 )
             },
             restore = {
@@ -216,6 +228,7 @@ internal class BiliBoxAppState(
                     homeExpanded = it["homeExpanded"] as Boolean
                     appearanceOpen = it["appearanceOpen"] as Boolean? ?: false
                     bannerPreviewOpen = it["bannerPreviewOpen"] as Boolean? ?: false
+                    favoritesOpen = it["favoritesOpen"] as Boolean? ?: false
                 }
             },
         )

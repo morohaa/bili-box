@@ -1,4 +1,4 @@
-package io.github.bilibox.feature.search
+package io.github.bilibox.core.ui.component
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,16 +43,13 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.model.VideoSummary
-import io.github.bilibox.core.ui.component.RemoteCover
-import io.github.bilibox.core.ui.component.VideoCoverPlaceholder
-import io.github.bilibox.core.ui.component.VideoMetaIcon
 import io.github.bilibox.core.util.formatSearchDuration
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
- * 搜索结果视频卡片的两种形态：列表卡片与宫格卡片。
+ * 搜索与收藏共用的视频卡片：列表卡片与宫格卡片。
  *
  * 列表卡片把封面放在左侧，标题与两行元信息在右侧；宫格卡片把 16:10 封面放在上方，
  * 元信息只保留 UP 主与播放 / 弹幕，避免在窄卡片里挤入日期。两者共用同一套
@@ -63,15 +61,18 @@ private val ListCardHeight = 100.dp
 
 /** 列表布局：左封面 + 右信息，整卡可点。 */
 @Composable
-internal fun SearchResultCard(
+internal fun VideoListCard(
     video: VideoSummary,
     darkMode: Boolean,
     modifier: Modifier = Modifier,
+    additionalInfo: String? = null,
+    statusText: String? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val palette = videoCardPalette(darkMode)
     val publishDate = remember(video.publishTime) { formatPublishDate(video.publishTime) }
-    VideoCardSurface(darkMode, modifier.fillMaxWidth(), onClick) {
+    VideoCardSurface(darkMode, modifier.fillMaxWidth(), onClick, enabled) {
         // 封面作为背景层铺满卡片左缘：matchParentSize 不参与卡高度测量，
         // 因此右栏文字（多行或系统字体放大）决定卡片高度时封面仍能填满。
         Row(Modifier.matchParentSize()) {
@@ -87,7 +88,7 @@ internal fun SearchResultCard(
             Spacer(Modifier.weight(1f))
         }
         Column(
-            Modifier.fillMaxWidth().heightIn(min = ListCardHeight)
+            Modifier.fillMaxWidth().heightIn(min = ListCardHeight + if (additionalInfo == null) 0.dp else 19.dp)
                 .padding(start = CoverWidth + 12.dp, top = 9.dp, end = 10.dp, bottom = 9.dp)
         ) {
             VideoCardTitle(
@@ -106,20 +107,35 @@ internal fun SearchResultCard(
                 iconSize = 12.5.dp,
             )
             Spacer(Modifier.height(5.dp))
-            VideoStatsLine(
-                playCount = video.playCount,
-                commentCount = video.commentCount,
-                color = palette.muted,
-                fontSize = 11.sp,
-                iconSize = 12.5.dp,
-            )
+            if (statusText == null) {
+                VideoStatsLine(
+                    playCount = video.playCount,
+                    commentCount = video.commentCount,
+                    color = palette.muted,
+                    fontSize = 11.sp,
+                    iconSize = 12.5.dp,
+                )
+            } else {
+                Text(statusText, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, lineHeight = metaLineHeight(11.sp))
+            }
+            if (additionalInfo != null) {
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    additionalInfo,
+                    color = palette.muted,
+                    fontSize = 11.sp,
+                    lineHeight = metaLineHeight(11.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
 
 /** 宫格布局：上封面 + 下信息，两列排布。 */
 @Composable
-internal fun SearchGridCard(
+internal fun VideoGridCard(
     video: VideoSummary,
     darkMode: Boolean,
     modifier: Modifier = Modifier,
@@ -176,6 +192,7 @@ private fun VideoCardSurface(
     darkMode: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val palette = videoCardPalette(darkMode)
@@ -184,7 +201,7 @@ private fun VideoCardSurface(
     val scale by animateFloatAsState(
         targetValue = if (pressed) .985f else 1f,
         animationSpec = tween(durationMillis = 120),
-        label = "search card press",
+        label = "video card press",
     )
     Box(
         modifier
@@ -202,6 +219,7 @@ private fun VideoCardSurface(
             .background(palette.surface.copy(alpha = .78f))
             .border(1.dp, palette.edge, CardShape)
             .clickable(
+                enabled = enabled,
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 onClick = onClick,

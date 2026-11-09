@@ -30,6 +30,7 @@ import com.google.zxing.MultiFormatWriter
 import io.github.bilibox.core.ui.theme.AppearanceBackdrop
 import io.github.bilibox.core.ui.theme.LocalAccentColor
 import io.github.bilibox.core.ui.theme.PageBackgroundSettings
+import io.github.bilibox.core.util.RemoteImageCache
 import io.github.bilibox.data.auth.BiliSession
 import io.github.bilibox.data.auth.BiliSessionStore
 import io.github.bilibox.data.auth.biliLoginRequest
@@ -102,6 +103,7 @@ internal fun ProfileScreen(
     onToggleDarkMode: (Offset) -> Unit = {},
     onOpenThemeAppearance: () -> Unit = {},
     onOpenLibrary: (LocalVideoQuickFilter?) -> Unit = {},
+    onOpenFavorites: () -> Unit = {},
     onBannerClick: () -> Unit = {},
     onSessionChange: (BiliSession?) -> Unit,
     scrollState: ScrollState,
@@ -222,7 +224,9 @@ internal fun ProfileScreen(
                     },
                     onHelp = { sheet = MySheet.Help },
                     onUpdate = { sheet = MySheet.Update },
-                    onFavorites = { toast("「我的收藏」需要 B 站账号数据接口，当前版本暂未接入") },
+                    onFavorites = {
+                        if (session == null) loginOpen = true else onOpenFavorites()
+                    },
                     onWatchLater = { toast("「稍后再看」需要 B 站账号数据接口，当前版本暂未接入") },
                 )
             }
@@ -371,6 +375,7 @@ internal fun rememberRemoteBitmap(url: String?): ImageBitmap? {
 }
 
 private fun clearAppCache(context: Context): Long {
+    RemoteImageCache.shared.clear()
     val directories = listOf(context.cacheDir, context.externalCacheDir)
     var freed = 0L
     directories.filterNotNull().forEach { directory ->

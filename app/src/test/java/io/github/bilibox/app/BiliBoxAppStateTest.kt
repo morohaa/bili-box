@@ -94,6 +94,21 @@ class BiliBoxAppStateTest {
         assertEquals(SearchOrder.MOST_PLAYED, state.searchOrder)
     }
 
+    @Test
+    fun `favorites restores navigation and closes when account changes`() {
+        val session = BiliSession("account", "", "fixture-cookie")
+        val state = newState(session)
+        state.selectTab(AppTab.PROFILE.ordinal)
+        state.openFavorites()
+        val restored = restore(state, session)
+        assertTrue(restored.favoritesOpen)
+        restored.openOnlineVideo(VideoSummary("Video", "Author", "0", 0L, 0L, "1:00", "BV-test", ""))
+        restored.closeOnlineVideo()
+        assertTrue(restored.favoritesOpen)
+        restored.updateSession(null)
+        assertFalse(restored.favoritesOpen)
+    }
+
     private fun newState(session: BiliSession? = null) = BiliBoxAppState(session, scope, ScrollState(0), ScrollState(0))
 
     private fun restore(state: BiliBoxAppState, session: BiliSession? = null): BiliBoxAppState {

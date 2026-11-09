@@ -24,6 +24,10 @@ data         → core
 
 弹幕模型、解析、偏好持久化在 `data/danmaku`；轨道、速度、碰撞与显示时间排布仅服务显示，放在 `feature/danmaku/layout`。
 
+搜索与收藏的视频卡片共用 `core/ui/component/VideoCards` 的封面、排版、元信息与明暗配色；收藏通过附加信息显示收藏时间，并为失效资源传入状态文案与禁用点击。
+
+`RemoteCover` 通过 `core/util/RemoteImageCache` 复用按图片实际内存占用限制的 32 MiB LRU 缓存；创建列表项时同步读取缓存，避免滚动返回先显示占位。相同 URL 的并发加载共享任务，任务不会随单个列表项离开组合而取消；加载最多四路并发，解码最长边限制为 640px，「清除缓存」同时清空这份内存缓存。
+
 ## 播放器与听视频
 
 - `LocalVideoScreen` 创建并管理 `LocalPlaybackQueue`，队列持有 ExoPlayer。同一文件夹会话复用播放器，队列直接切文件，使后台连播无需等待 Compose 重组；页面离开时释放队列。
@@ -38,6 +42,7 @@ data         → core
 |---|---|---|
 | 会话、顶层导航、搜索选项、选中的视频 | `app/BiliBoxAppState` | 组合各功能；会话从加密存储加载。Saver 只恢复标签索引、搜索词、排序 / 时长 / 时间筛选、列表布局、首页展开状态与「主题外观」是否打开 |
 | 搜索结果、加载 / 失败、请求取消 | `feature/search/SearchStateHolder` | 由应用组装层持有；会话 Cookie 改变时重建，结果不经 Saver 恢复 |
+| 收藏夹、收藏视频、搜索 / 排序、分页与请求取消 | `feature/favorites/FavoritesStateHolder` | 由应用组装层按登录 Cookie 创建，切换账号时取消旧请求并丢弃结果；进入播放页保留浏览结果与列表位置，收藏导航开关随应用 Saver 恢复 |
 | 在线分 P、清晰度、加载、弹幕；本地队列与播放状态 | 对应 `feature/online`、`feature/player` 入口 | 跟随播放会话；选中的播放对象、本地播放列表和视频库临时筛选不经应用 Saver 恢复 |
 | 手势、抽屉、弹层等局部 UI 状态 | 最近的页面或组件 | 按需使用 `remember` / `rememberSaveable`，无需提升到应用层 |
 | Cookie、历史、播放进度、弹幕偏好、主题外观、壁纸 / 头图调节、自定义头图与首页背景 | 对应 `data/*` 存储 | 按存储实现持久化；主题外观由 `BiliBoxApp` 通过 `data/appearance/AppearanceStore` 读写 `appearance` SharedPreferences；自定义头图与头图调节由 `data/profile/ProfileBannerStore` 写入应用私有目录与 `profile_banner` SharedPreferences；自定义首页背景由 `data/appearance/HomeBackgroundImageStore` 写入应用私有目录，背景调节随主题外观一起保存 |

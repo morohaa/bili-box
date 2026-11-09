@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.ui.component.EmptyCard
+import io.github.bilibox.core.ui.component.VideoGridCard
+import io.github.bilibox.core.ui.component.VideoListCard
 import io.github.bilibox.core.ui.theme.DarkInkSoft
 import io.github.bilibox.core.ui.theme.Ink
 import io.github.bilibox.core.ui.theme.Muted
@@ -92,7 +94,7 @@ private fun SearchList(items: List<VideoSummary>, darkMode: Boolean, onVideoClic
     Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
         items.forEachIndexed { index, video ->
             if (index > 0) Spacer(Modifier.height(12.dp))
-            SearchResultCard(video, darkMode) { onVideoClick(video) }
+            VideoListCard(video, darkMode) { onVideoClick(video) }
         }
     }
 }
@@ -106,7 +108,7 @@ private fun SearchGrid(items: List<VideoSummary>, darkMode: Boolean, onVideoClic
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 rowItems.forEach { video ->
-                    SearchGridCard(video, darkMode, Modifier.weight(1f)) { onVideoClick(video) }
+                    VideoGridCard(video, darkMode, Modifier.weight(1f)) { onVideoClick(video) }
                 }
                 if (rowItems.size == 1) Spacer(Modifier.weight(1f))
             }
