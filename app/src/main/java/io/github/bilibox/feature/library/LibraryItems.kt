@@ -222,18 +222,6 @@ private fun LibraryRowDivider(inset: Dp = 124.dp) {
     )
 }
 
-/** 视频未播放标记。 */
-@Composable
-private fun UnreadDot(modifier: Modifier = Modifier) {
-    val palette = LocalLibraryPalette.current
-    Box(
-        modifier.size(9.dp)
-            .background(Color.White.copy(alpha = .92f), CircleShape)
-            .padding(1.5.dp)
-            .background(palette.accent, CircleShape),
-    )
-}
-
 @Composable
 internal fun VideoRow(
     video: LocalVideo,
@@ -250,7 +238,7 @@ internal fun VideoRow(
         CompactVideoRow(video, settings, playback, Modifier.padding(horizontal = 10.dp, vertical = 8.dp))
         return
     }
-    val watched = playback.state == LocalVideoPlaybackState.Watched
+    val watched = settings.fields.status && playback.state == LocalVideoPlaybackState.Watched
     Row(
         modifier.fillMaxWidth()
             .pressFeedback(onClick = onClick, shape = LibraryCardShape, scaleTo = .99f)
@@ -278,21 +266,7 @@ internal fun VideoRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            val meta = videoMetaParts(video, playback, settings)
-            if (meta.isNotEmpty()) {
-                Spacer(Modifier.height(5.dp))
-                MetaText(meta, fontSize = 11.sp, maxLines = 2)
-            }
-            if (settings.fields.path) {
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "内部存储 / ${video.relativeDirectory.ifBlank { "根目录" }} / ${video.name}",
-                    color = palette.ink3,
-                    fontSize = 10.5.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            VideoInfoLine(video, playback, settings, modifier = Modifier.padding(top = 6.dp))
         }
         Spacer(Modifier.width(2.dp))
         VideoMoreMenu(onPlay = onClick, onShare = onShare, onInfo = onInfo)
@@ -335,11 +309,14 @@ internal fun CompactVideoRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            val meta = videoMetaParts(video, playback, settings)
-            if (meta.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                MetaText(meta, fontSize = 11.sp, maxLines = 1)
-            }
+            VideoInfoLine(
+                video,
+                playback,
+                settings,
+                metadataMaxLines = Int.MAX_VALUE,
+                pathMaxLines = 2,
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     }
 }
@@ -434,13 +411,14 @@ internal fun VideoThumbnail(
     settings: LocalVideoSettings,
     playback: LocalVideoPlayback,
     modifier: Modifier = Modifier,
-    showStatus: Boolean = true,
+    showProgress: Boolean = true,
     showDuration: Boolean = true,
 ) {
     val palette = LocalLibraryPalette.current
     val bitmap = rememberVideoThumbnail(video.key, cachedVideoThumbnail(video.key)) { context ->
         loadVideoThumbnail(context, video.uri, video.key)
     }
+    val playbackProgressVisible = showProgress && settings.fields.played && playback.state is LocalVideoPlaybackState.Watching
     Box(
         modifier.aspectRatio(16f / 9f)
             .clip(CoverShape)
@@ -456,17 +434,6 @@ internal fun VideoThumbnail(
         } else {
             VideoCoverPlaceholder(Modifier.fillMaxSize())
         }
-        if (showStatus) {
-            when (playback.state) {
-                LocalVideoPlaybackState.Unplayed -> UnreadDot(
-                    Modifier.align(Alignment.TopStart).padding(6.dp),
-                )
-
-                LocalVideoPlaybackState.Watched -> Unit
-
-                is LocalVideoPlaybackState.Watching -> Unit
-            }
-        }
         if (showDuration && settings.fields.duration && settings.durationOnThumbnail && video.durationMs > 0L) {
             Text(
                 formatVideoDuration(video.durationMs),
@@ -475,16 +442,16 @@ internal fun VideoThumbnail(
                 lineHeight = 12.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.align(Alignment.BottomEnd)
-                    .padding(end = 5.dp, bottom = if (playback.state is LocalVideoPlaybackState.Watching) 6.dp else 5.dp)
+                    .padding(end = 5.dp, bottom = if (playbackProgressVisible) 6.dp else 5.dp)
                     .clip(RoundedCornerShape(5.dp))
                     .background(Color.Black.copy(alpha = .5f))
                     .padding(horizontal = 5.dp, vertical = 1.dp),
             )
         }
-        if (playback.state is LocalVideoPlaybackState.Watching) {
+        if (playbackProgressVisible) {
             val fraction = playback.state.fraction.coerceIn(0f, 1f)
             Box(
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.5.dp)
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().height(2.dp)
                     .background(Color.White.copy(alpha = .32f)),
             ) {
                 Box(
@@ -503,6 +470,7 @@ internal fun MetaText(
     fontSize: TextUnit = 12.sp,
     maxLines: Int = 2,
     color: Color = LocalLibraryPalette.current.ink3,
+    modifier: Modifier = Modifier,
 ) {
     if (parts.isEmpty()) return
     val palette = LocalLibraryPalette.current
@@ -518,6 +486,7 @@ internal fun MetaText(
     }
     Text(
         text,
+        modifier = modifier,
         fontSize = fontSize,
         lineHeight = fontSize * 1.4f,
         maxLines = maxLines,
@@ -536,7 +505,7 @@ internal fun VideoCard(
     onInfo: () -> Unit,
 ) {
     val palette = LocalLibraryPalette.current
-    val watched = playback.state == LocalVideoPlaybackState.Watched
+    val watched = settings.fields.status && playback.state == LocalVideoPlaybackState.Watched
     Column(
         modifier.fillMaxWidth()
             .pressFeedback(onClick = onClick, shape = LibraryCardShape, scaleTo = .98f),
@@ -566,11 +535,7 @@ internal fun VideoCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.heightIn(min = 36.dp),
             )
-            val meta = videoMetaParts(video, playback, settings)
-            if (meta.isNotEmpty()) {
-                Spacer(Modifier.height(3.dp))
-                MetaText(meta, fontSize = 11.sp, maxLines = 1)
-            }
+            VideoInfoLine(video, playback, settings, pathMaxLines = 2, modifier = Modifier.padding(top = 6.dp))
         }
     }
 }
@@ -604,7 +569,7 @@ internal fun ContinueWatchingBar(
                 settings = settings,
                 playback = LocalVideoPlayback(playback),
                 modifier = Modifier.fillMaxSize(),
-                showStatus = false,
+                showProgress = false,
                 showDuration = false,
             )
         }

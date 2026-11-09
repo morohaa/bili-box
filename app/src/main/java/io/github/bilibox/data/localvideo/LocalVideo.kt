@@ -96,10 +96,12 @@ internal data class LocalVideoDisplayFields(
     val path: Boolean = false,
     val size: Boolean = true,
     val date: Boolean = true,
+    val status: Boolean = true,
 ) {
     fun isEnabled(field: LocalVideoField): Boolean = when (field) {
         LocalVideoField.THUMBNAIL -> thumbnail
         LocalVideoField.DURATION -> duration
+        LocalVideoField.STATUS -> status
         LocalVideoField.EXTENSION -> extension
         LocalVideoField.PLAYED -> played
         LocalVideoField.RESOLUTION -> resolution
@@ -112,6 +114,7 @@ internal data class LocalVideoDisplayFields(
     fun with(field: LocalVideoField, enabled: Boolean): LocalVideoDisplayFields = when (field) {
         LocalVideoField.THUMBNAIL -> copy(thumbnail = enabled)
         LocalVideoField.DURATION -> copy(duration = enabled)
+        LocalVideoField.STATUS -> copy(status = enabled)
         LocalVideoField.EXTENSION -> copy(extension = enabled)
         LocalVideoField.PLAYED -> copy(played = enabled)
         LocalVideoField.RESOLUTION -> copy(resolution = enabled)
@@ -128,11 +131,12 @@ internal data class LocalVideoDisplayFields(
 internal enum class LocalVideoField(val label: String) {
     THUMBNAIL("缩略图"),
     DURATION("长度"),
-    EXTENSION("扩展名"),
+    STATUS("播放状态"),
     PLAYED("播放进度"),
     RESOLUTION("分辨率"),
     FRAME_RATE("帧率"),
     PATH("路径"),
+    EXTENSION("扩展名"),
     SIZE("大小"),
     DATE("日期"),
 }

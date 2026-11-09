@@ -21,6 +21,7 @@ internal class LocalVideoSettingsStore(context: Context) {
             path = preferences.getBoolean("field_path", false),
             size = preferences.getBoolean("field_size", true),
             date = preferences.getBoolean("field_date", true),
+            status = preferences.getBoolean("field_status", true),
         ),
         folderFields = LocalVideoFolderFields(
             size = preferences.getBoolean("folder_field_size", true),
@@ -50,6 +51,7 @@ internal class LocalVideoSettingsStore(context: Context) {
             .putBoolean("field_path", settings.fields.path)
             .putBoolean("field_size", settings.fields.size)
             .putBoolean("field_date", settings.fields.date)
+            .putBoolean("field_status", settings.fields.status)
             .putBoolean("folder_field_size", settings.folderFields.size)
             .putBoolean("folder_field_date", settings.folderFields.date)
             .putBoolean("folder_field_duration", settings.folderFields.duration)

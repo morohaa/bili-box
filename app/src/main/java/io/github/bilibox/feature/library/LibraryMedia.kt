@@ -269,9 +269,6 @@ internal fun videoMetaParts(
     val parts = mutableListOf<MetaPart>()
     val durationOnThumb = fields.thumbnail && settings.durationOnThumbnail
     val state = playback.state
-    if (state == LocalVideoPlaybackState.Unplayed && !fields.thumbnail) {
-        parts += MetaPart("NEW", highlight = true)
-    }
     if (fields.duration && !durationOnThumb && video.durationMs > 0L) {
         parts += MetaPart(formatVideoDuration(video.durationMs))
     }
@@ -279,9 +276,9 @@ internal fun videoMetaParts(
         when (state) {
             is LocalVideoPlaybackState.Watching -> parts += MetaPart("看到 ${formatVideoDuration(state.positionMs)}", highlight = true)
 
-            LocalVideoPlaybackState.Watched -> parts += MetaPart(
-                if (playback.lastPlayedAtMs > 0L) "看过 ${formatRelativeDate(playback.lastPlayedAtMs)}" else "已看完"
-            )
+            LocalVideoPlaybackState.Watched -> if (playback.lastPlayedAtMs > 0L) {
+                parts += MetaPart("看过 ${formatRelativeDate(playback.lastPlayedAtMs)}")
+            }
 
             LocalVideoPlaybackState.Unplayed -> Unit
         }
@@ -289,8 +286,8 @@ internal fun videoMetaParts(
     if (fields.resolution && video.width > 0 && video.height > 0) {
         parts += MetaPart(resolutionLabel(video.width, video.height))
     }
-    if (fields.frameRate && video.frameRate > 0f) {
-        parts += MetaPart(frameRateLabel(video.frameRate))
+    if (fields.frameRate) {
+        parts += MetaPart(if (video.frameRate.isFinite() && video.frameRate > 0f) frameRateLabel(video.frameRate) else "帧率未知")
     }
     if (fields.size) {
         parts += MetaPart(formatBytes(video.sizeBytes))
