@@ -44,26 +44,28 @@ internal fun BiliBoxApp() {
         store.save(value)
     }
 
-    BiliBoxTheme(darkTheme = darkMode, accent = appearance.theme.base, dynamicColor = false) {
-        AppSystemBars(appState, darkMode)
-        AppNavigation(
-            appState = appState,
-            darkMode = darkMode,
-            appearance = appearance,
-            backgroundImages = backgroundImages,
-            backgroundStores = backgroundStores,
-            onBackgroundImageChange = { page, image ->
-                backgroundImages = if (image == null) backgroundImages - page else backgroundImages + (page to image)
-            },
-            onAppearanceChange = ::updateAppearance,
-            onToggleDarkMode = {
-                updateAppearance(
-                    appearance.copy(
-                        mode = if (darkMode) AppearanceMode.LIGHT else AppearanceMode.DARK,
-                    )
-                )
-            },
-        )
+    ThemeRevealTransition(
+        onToggle = {
+            updateAppearance(
+                appearance.copy(mode = if (darkMode) AppearanceMode.LIGHT else AppearanceMode.DARK)
+            )
+        },
+    ) { toggleTheme ->
+        BiliBoxTheme(darkTheme = darkMode, accent = appearance.theme.base, dynamicColor = false) {
+            AppSystemBars(appState, darkMode)
+            AppNavigation(
+                appState = appState,
+                darkMode = darkMode,
+                appearance = appearance,
+                backgroundImages = backgroundImages,
+                backgroundStores = backgroundStores,
+                onBackgroundImageChange = { page, image ->
+                    backgroundImages = if (image == null) backgroundImages - page else backgroundImages + (page to image)
+                },
+                onAppearanceChange = ::updateAppearance,
+                onToggleDarkMode = toggleTheme,
+            )
+        }
     }
 }
 

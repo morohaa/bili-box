@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -57,7 +58,7 @@ internal fun AppNavigation(
     backgroundStores: Map<BackgroundPage, BackgroundImageStore>,
     onBackgroundImageChange: (BackgroundPage, ImageBitmap?) -> Unit,
     onAppearanceChange: (AppearanceSettings) -> Unit,
-    onToggleDarkMode: () -> Unit,
+    onToggleDarkMode: (Offset) -> Unit,
 ) {
     // 未登录默认头像在一次应用运行内固定：放在根组合里记住，切页、退后台、转屏都不会换脸，
     // 只有完全退出后重新启动（没有可恢复的保存状态）才会重新随机。

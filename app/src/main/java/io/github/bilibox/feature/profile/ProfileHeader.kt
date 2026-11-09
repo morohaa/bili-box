@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -75,7 +76,7 @@ internal fun ProfileHeader(
     defaultAvatar: Int,
     customBanner: ImageBitmap?,
     darkMode: Boolean,
-    onToggleDarkMode: () -> Unit,
+    onToggleDarkMode: (Offset) -> Unit,
     onBannerClick: () -> Unit,
     onAvatarClick: () -> Unit,
     bannerHeight: Dp,
@@ -278,13 +279,19 @@ internal fun ProfileAvatar(
 }
 
 @Composable
-internal fun ThemeToggle(darkMode: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ThemeToggle(darkMode: Boolean, onToggle: (Offset) -> Unit, modifier: Modifier = Modifier) {
+    var centerInRoot by remember { mutableStateOf(Offset.Zero) }
     val sunAlpha by animateFloatAsState(if (darkMode) 0f else 1f, label = "sun")
     val moonAlpha by animateFloatAsState(if (darkMode) 1f else 0f, label = "moon")
     Box(
-        modifier.size(44.dp).clip(CircleShape)
+        modifier.size(44.dp)
+            .onGloballyPositioned {
+                centerInRoot = it.localToRoot(Offset(it.size.width / 2f, it.size.height / 2f))
+            }
+            .clip(CircleShape)
             .focusProperties { canFocus = false }
-            .clickable(onClick = onToggle),
+            .semantics { contentDescription = if (darkMode) "切换浅色模式" else "切换深色模式" }
+            .clickable(role = Role.Button, onClick = { onToggle(centerInRoot) }),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.size(24.dp).graphicsLayer { alpha = sunAlpha }) {

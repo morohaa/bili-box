@@ -15,6 +15,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -98,7 +99,7 @@ internal fun ProfileScreen(
     darkMode: Boolean = false,
     backgroundSettings: PageBackgroundSettings = PageBackgroundSettings(),
     backgroundImage: ImageBitmap? = null,
-    onToggleDarkMode: () -> Unit = {},
+    onToggleDarkMode: (Offset) -> Unit = {},
     onOpenThemeAppearance: () -> Unit = {},
     onOpenLibrary: (LocalVideoQuickFilter?) -> Unit = {},
     onBannerClick: () -> Unit = {},
