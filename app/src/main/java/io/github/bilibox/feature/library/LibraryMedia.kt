@@ -321,7 +321,8 @@ internal fun folderFootParts(
     folder: LocalVideoFolder,
     settings: LocalVideoSettings,
 ): List<MetaPart> {
-    val parts = mutableListOf(MetaPart("${folder.count} 个视频"))
+    val parts = mutableListOf<MetaPart>()
+    if (settings.folderFields.count) parts += MetaPart("${folder.count} 个视频")
     if (settings.folderFields.duration && folder.totalDurationMs > 0L) {
         parts += MetaPart(formatVideoDuration(folder.totalDurationMs))
     }

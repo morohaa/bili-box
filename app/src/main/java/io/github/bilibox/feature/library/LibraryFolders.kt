@@ -69,7 +69,7 @@ internal fun FolderRow(
             MetaText(folderFootParts(folder, settings), fontSize = 11.5.sp, maxLines = 1, color = palette.ink2)
             val meta = folderMetaParts(folder, settings)
             if (meta.isNotEmpty()) MetaText(meta, fontSize = 10.5.sp, maxLines = 1)
-            if (settings.fields.path) FolderPathHint(folder)
+            if (settings.folderFields.path) FolderPathHint(folder)
         }
         Spacer(Modifier.width(8.dp))
         AppGlyphIcon(AppIcon.CHEVRON_RIGHT, palette.ink3.copy(alpha = .6f), Modifier.size(14.dp), 1.7f)
@@ -169,7 +169,7 @@ internal fun FolderCard(
             MetaText(folderFootParts(folder, settings), fontSize = 11.sp, maxLines = 1, color = palette.ink2)
             val meta = folderMetaParts(folder, settings)
             if (meta.isNotEmpty()) MetaText(meta, fontSize = 10.sp, maxLines = 1)
-            if (settings.fields.path) FolderPathHint(folder)
+            if (settings.folderFields.path) FolderPathHint(folder)
         }
     }
 }
@@ -198,7 +198,7 @@ internal fun CompactFolderRow(
             MetaText(folderFootParts(folder, settings), fontSize = 11.sp, maxLines = 1, color = palette.ink2)
             val meta = folderMetaParts(folder, settings)
             if (meta.isNotEmpty()) MetaText(meta, fontSize = 10.sp, maxLines = 1)
-            if (settings.fields.path) FolderPathHint(folder)
+            if (settings.folderFields.path) FolderPathHint(folder)
         }
     }
 }

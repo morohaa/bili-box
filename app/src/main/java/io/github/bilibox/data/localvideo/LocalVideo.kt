@@ -143,19 +143,25 @@ internal data class LocalVideoFolderFields(
     val date: Boolean = true,
     val duration: Boolean = true,
     val status: Boolean = true,
+    val count: Boolean = true,
+    val path: Boolean = false,
 ) {
     fun isEnabled(field: LocalVideoFolderField): Boolean = when (field) {
+        LocalVideoFolderField.COUNT -> count
+        LocalVideoFolderField.DURATION -> duration
         LocalVideoFolderField.SIZE -> size
         LocalVideoFolderField.DATE -> date
-        LocalVideoFolderField.DURATION -> duration
         LocalVideoFolderField.STATUS -> status
+        LocalVideoFolderField.PATH -> path
     }
 
     fun with(field: LocalVideoFolderField, enabled: Boolean): LocalVideoFolderFields = when (field) {
+        LocalVideoFolderField.COUNT -> copy(count = enabled)
+        LocalVideoFolderField.DURATION -> copy(duration = enabled)
         LocalVideoFolderField.SIZE -> copy(size = enabled)
         LocalVideoFolderField.DATE -> copy(date = enabled)
-        LocalVideoFolderField.DURATION -> copy(duration = enabled)
         LocalVideoFolderField.STATUS -> copy(status = enabled)
+        LocalVideoFolderField.PATH -> copy(path = enabled)
     }
 
     /** 已开启的字段数量，用于设置面板的分组角标。 */
@@ -163,10 +169,12 @@ internal data class LocalVideoFolderFields(
 }
 
 internal enum class LocalVideoFolderField(val label: String) {
+    COUNT("视频数量"),
+    DURATION("总时长"),
     SIZE("文件大小"),
     DATE("添加日期"),
-    DURATION("视频时长"),
     STATUS("播放状态"),
+    PATH("文件夹路径"),
 }
 
 internal data class LocalVideoSettings(
