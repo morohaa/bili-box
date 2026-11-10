@@ -1,4 +1,22 @@
-# BiliBox
+<p align="center">
+  <img src="design/icon/icon-512.png" alt="BiliBox 应用图标" width="112" height="112">
+</p>
+
+<h1 align="center">BiliBox</h1>
+
+<p align="center"><strong>在线视频与本地视频，随心播放。</strong></p>
+
+<p align="center">原生 Android 哔哩哔哩客户端，支持视频搜索、在线播放、弹幕、本地视频管理与后台听视频。</p>
+
+<p align="center">
+  <a href="#环境要求"><img src="https://img.shields.io/badge/平台-Android%209%2B-343742?style=for-the-badge" alt="平台：Android 9 及以上"></a>
+  <a href="#技术栈"><img src="https://img.shields.io/badge/UI-Jetpack%20Compose-73B8D5?style=for-the-badge" alt="UI：Jetpack Compose"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-F16C99?style=for-the-badge" alt="许可证：MIT"></a>
+</p>
+
+<p align="center">
+  <a href="#应用截图">应用截图</a> · <a href="#功能">功能介绍</a> · <a href="#构建与运行">构建与运行</a> · <a href="CHANGELOG.md">更新日志</a>
+</p>
 
 BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔哩客户端。项目直接调用 B 站 Web 端公开接口，提供视频搜索、在线播放、弹幕、本地视频管理、后台听视频与账号登录等常用能力，不依赖 WebView 承载主要界面。
 
@@ -7,6 +25,27 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 ## 当前版本
 
 `1.0.0-beta.1` 为首个公开测试候选版，支持 Android 9 及以上系统。功能和限制见 [更新日志](CHANGELOG.md)，实际测试范围见 [发布验证记录](docs/releases/1.0.0-beta.1-validation.md)。
+
+## 应用截图
+
+以下为 `1.0.0-beta.1` Release 实际运行截图，首页使用浅色主题，播放页和个人页使用深色主题。
+
+<table>
+  <thead>
+    <tr>
+      <th align="center">首页搜索</th>
+      <th align="center">在线播放</th>
+      <th align="center">我的</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td align="center"><img src="docs/images/screenshots/home.png" alt="浅色主题首页，包含品牌标识、视频搜索框和底部导航" width="280"></td>
+      <td align="center"><img src="docs/images/screenshots/online-player.png" alt="深色主题在线播放页，展示视频、弹幕、简介和多 P 选集" width="280"></td>
+      <td align="center"><img src="docs/images/screenshots/profile.png" alt="深色主题个人页，展示未登录状态、功能入口和主题外观设置" width="280"></td>
+    </tr>
+  </tbody>
+</table>
 
 ## 功能
 
