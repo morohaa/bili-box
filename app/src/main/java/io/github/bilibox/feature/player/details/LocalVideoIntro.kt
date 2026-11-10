@@ -30,11 +30,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -78,39 +83,28 @@ internal fun LocalVideoIntro(
     var titleExpanded by remember(video.uri) { mutableStateOf(false) }
     var titleOverflows by remember(video.uri) { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 14.dp, bottom = 20.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(top = 8.dp, bottom = 20.dp)) {
         LocalSourceHeader(video)
 
-        // Title + quality tag; tapping anywhere on the row toggles the long title.
+        // Match the online intro's compact title, with the full filename one tap away.
         Row(
-            Modifier.fillMaxWidth().padding(top = 14.dp)
+            Modifier.fillMaxWidth().padding(top = 12.dp)
                 .clickable(enabled = titleExpanded || titleOverflows, role = Role.Button) {
                     titleExpanded = !titleExpanded
+                }
+                .semantics {
+                    stateDescription = if (titleExpanded) "已展开" else "已收起"
                 },
             verticalAlignment = Alignment.Top,
         ) {
-            val quality = if (video.width > 0 && video.height > 0) {
-                resolutionLabel(video.width, video.height)
-            } else {
-                ""
-            }
-            if (quality.isNotBlank()) {
-                Box(
-                    Modifier.padding(top = 1.dp).clip(RoundedCornerShape(4.dp))
-                        .background(DetailBlueSoft)
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                ) {
-                    Text(quality, color = DetailBlue, fontSize = 11.sp, fontWeight = FontWeight.Medium, lineHeight = 14.sp)
-                }
-                Spacer(Modifier.width(6.dp))
-            }
             Text(
                 video.title,
                 color = PlaybackInk,
-                fontSize = 16.5.sp,
-                lineHeight = 23.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = if (titleExpanded) Int.MAX_VALUE else 2,
+                fontSize = 15.5.sp,
+                lineHeight = 22.sp,
+                letterSpacing = (-0.15).sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = if (titleExpanded) Int.MAX_VALUE else 1,
                 overflow = TextOverflow.Ellipsis,
                 onTextLayout = { result ->
                     // Only expose the expand affordance when the collapsed title
@@ -125,12 +119,14 @@ internal fun LocalVideoIntro(
                     animationSpec = tween(180),
                     label = "标题展开箭头",
                 )
-                AppGlyphIcon(
-                    AppIcon.CHEVRON_DOWN,
-                    PlaybackMuted,
-                    Modifier.padding(start = 4.dp, top = 4.dp).size(16.dp).rotate(chevron),
-                    2f,
-                )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier.padding(top = 2.dp).size(24.dp)
+                        .semantics { contentDescription = if (titleExpanded) "收起文件名" else "展开文件名" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AppGlyphIcon(AppIcon.CHEVRON_DOWN, PlaybackMuted, Modifier.size(18.dp).rotate(chevron), 2f)
+                }
             }
         }
 
@@ -234,12 +230,27 @@ internal fun LocalVideoIntro(
 
 @Composable
 private fun LocalSourceHeader(video: LocalVideo) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(DetailPinkSoft),
-            contentAlignment = Alignment.Center,
-        ) {
-            AppGlyphIcon(AppIcon.FOLDER, OnlinePink, Modifier.size(22.dp), 1.7f)
+    val accent = OnlinePink
+    Row(
+        Modifier.fillMaxWidth()
+            .drawBehind { drawRect(accent, size = Size(4.dp.toPx(), size.height)) }
+            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(42.dp)) {
+            Box(
+                Modifier.size(42.dp).shadow(4.dp, CircleShape)
+                    .background(PlaybackSurface, CircleShape)
+                    .border(2.dp, PlaybackSurface, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier.size(36.dp).background(DetailPinkSoft, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AppGlyphIcon(AppIcon.FOLDER, OnlinePink, Modifier.size(22.dp), 1.7f)
+                }
+            }
             if (video.isBiliCache) {
                 Box(
                     Modifier.align(Alignment.BottomEnd).offset(x = 4.dp, y = 4.dp).size(16.dp)
@@ -251,33 +262,58 @@ private fun LocalSourceHeader(video: LocalVideo) {
             }
         }
         Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                if (video.isBiliCache) "哔哩哔哩缓存" else "本机文件",
-                color = OnlinePink,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-            )
-            Spacer(Modifier.height(2.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (video.isBiliCache) "哔哩哔哩缓存" else "本机文件",
+                    color = PlaybackInk,
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (video.extension.isNotBlank()) {
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        video.extension.uppercase(),
+                        color = DetailSecondary,
+                        fontSize = 9.sp,
+                        lineHeight = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        modifier = Modifier.background(DetailCard, RoundedCornerShape(2.dp))
+                            .padding(horizontal = 3.dp, vertical = 1.dp),
+                    )
+                }
+            }
             Text(
                 localVideoFolderPath(video),
                 color = PlaybackMuted,
-                fontSize = 11.sp,
+                fontSize = 12.5.sp,
+                lineHeight = 16.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (video.extension.isNotBlank()) {
+        if (video.width > 0 && video.height > 0) {
+            Spacer(Modifier.width(8.dp))
             Box(
-                Modifier.clip(RoundedCornerShape(4.dp)).background(DetailCard)
-                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                Modifier.height(32.dp)
+                    .background(
+                        Brush.linearGradient(listOf(Color(0xFFFF7EA6), Color(0xFFFF6699))),
+                        CircleShape,
+                    )
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    video.extension.uppercase(),
-                    color = DetailSecondary,
-                    fontSize = 10.sp,
+                    resolutionLabel(video.width, video.height),
+                    color = Color.White,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
-                    lineHeight = 12.sp,
+                    lineHeight = 16.sp,
                 )
             }
         }
