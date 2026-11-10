@@ -7,23 +7,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
@@ -81,23 +71,7 @@ internal fun FavoritesContent(
     val accent = LocalAccentColor.current
     val colors = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().background(colors.background).statusBarsPadding().navigationBarsPadding()) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "返回" }) { AppGlyphIcon(AppIcon.BACK, colors.onBackground) }
-            Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
-                Text(state.folder?.title ?: "我的收藏", color = colors.onBackground, fontWeight = FontWeight.Bold, fontSize = 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    if (state.folder == null) "我创建的收藏夹" else "${state.total} 个收藏 · ${if (state.folder.isPublic) "公开" else "私密"}",
-                    color = colors.onSurfaceVariant,
-                    fontSize = 12.sp,
-                )
-            }
-            IconButton(onClick = onRefresh, enabled = !state.loading && !state.needsLogin, modifier = Modifier.semantics { contentDescription = "刷新收藏" }) {
-                AppGlyphIcon(AppIcon.REFRESH, accent)
-            }
-        }
-        if (state.folder != null && !state.needsLogin) {
-            FavoritesFilters(state, onFilter)
-        }
+        FavoritesTopBar(state, onBack, onFilter)
         HorizontalDivider(color = colors.outlineVariant.copy(alpha = .4f))
         PullToRefreshBox(
             isRefreshing = state.loading,
@@ -151,59 +125,6 @@ internal fun FavoritesContent(
             }
         }
     }
-}
-
-@Composable
-private fun FavoritesFilters(state: FavoritesUiState, onFilter: (String, FavoriteOrder) -> Unit) {
-    var keyword by rememberSaveable(state.folder?.id, state.keyword) { mutableStateOf(state.keyword) }
-    var orderOpen by remember { mutableStateOf(false) }
-    val focus = LocalFocusManager.current
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        OutlinedTextField(
-            value = keyword,
-            onValueChange = { keyword = it },
-            label = { Text("搜索此收藏夹") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = {
-                focus.clearFocus()
-                onFilter(keyword, state.order)
-            }),
-            trailingIcon = {
-                TextButton(onClick = {
-                    focus.clearFocus()
-                    onFilter(keyword, state.order)
-                }) { Text("搜索") }
-            },
-        )
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            if (state.keyword.isNotEmpty()) {
-                TextButton(onClick = { onFilter("", state.order) }) { Text("清除搜索") }
-            }
-            Spacer(Modifier.weight(1f))
-            Box {
-                TextButton(onClick = { orderOpen = true }) {
-                    Text(orderLabel(state.order))
-                    AppGlyphIcon(AppIcon.CHEVRON_DOWN, LocalAccentColor.current, Modifier.padding(start = 4.dp).size(16.dp))
-                }
-                DropdownMenu(expanded = orderOpen, onDismissRequest = { orderOpen = false }) {
-                    FavoriteOrder.entries.forEach { order ->
-                        DropdownMenuItem(text = { Text(orderLabel(order)) }, onClick = {
-                            orderOpen = false
-                            onFilter(state.keyword, order)
-                        })
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun orderLabel(order: FavoriteOrder): String = when (order) {
-    FavoriteOrder.SAVED -> "最近收藏"
-    FavoriteOrder.PUBLISHED -> "最新发布"
-    FavoriteOrder.MOST_PLAYED -> "最多播放"
 }
 
 @Composable
