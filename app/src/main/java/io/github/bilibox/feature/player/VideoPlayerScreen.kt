@@ -449,19 +449,18 @@ internal fun VideoPlayerScreen(
                     adjustmentDp = videoPosition.adjustmentDp,
                     onViewReady = { playerView = it },
                 )
-                PlayerTouchSurface(
+                PlayerGestureSurface(
+                    player = player,
+                    mediaKey = mediaKey,
+                    duration = duration,
+                    scrub = scrub,
+                    gestures = gestures,
                     locked = screenLocked,
                     onToggleControls = { controlsVisible = !controlsVisible },
                     onTogglePlayback = { togglePlayback() },
-                    verticalGesturesEnabled = !screenLocked,
-                    onVerticalGestureStart = { gestures.startVerticalGesture(it) },
-                    onVerticalSwipe = { side, delta -> gestures.adjustVerticalGesture(side, delta) },
-                    onVerticalGestureEnd = { gestures.endVerticalGesture() },
                     speedBoostEnabled = !screenLocked && !speedMenuExpanded &&
                         !playbackModeExpanded && !sleepTimerOpen && playbackError == null,
-                    onSpeedBoostStart = { gestures.startSpeedBoost() },
-                    onSpeedBoostEnd = { gestures.endSpeedBoost() },
-                    modifier = Modifier.fillMaxSize().testTag("player-touch-surface")
+                    onPositionChange = { position = it },
                 )
                 if (danmakuSupported && !listening && !listenPageOpen) {
                     DanmakuOverlay(player, danmakuItems, danmakuSettings, Modifier.fillMaxSize())

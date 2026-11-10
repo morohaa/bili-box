@@ -11,17 +11,11 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,10 +29,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -49,7 +40,6 @@ import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.util.formatSpeedBadge
 import kotlin.math.roundToInt
-import kotlinx.coroutines.withTimeoutOrNull
 
 internal enum class PlayerGestureSide { LEFT, RIGHT }
 
@@ -57,106 +47,6 @@ internal fun setPlayerWindowBrightness(window: Window, level: Float) {
     val attributes = window.attributes
     attributes.screenBrightness = level.coerceIn(.02f, 1f)
     window.attributes = attributes
-}
-
-@Composable
-internal fun PlayerTouchSurface(
-    locked: Boolean,
-    onToggleControls: () -> Unit,
-    onTogglePlayback: () -> Unit,
-    verticalGesturesEnabled: Boolean = true,
-    onVerticalGestureStart: (PlayerGestureSide) -> Unit = {},
-    onVerticalSwipe: (PlayerGestureSide, Float) -> Unit = { _, _ -> },
-    onVerticalGestureEnd: () -> Unit = {},
-    speedBoostEnabled: Boolean = true,
-    onSpeedBoostStart: () -> Unit = {},
-    onSpeedBoostEnd: () -> Unit = {},
-    modifier: Modifier = Modifier,
-) {
-    val toggleControls by rememberUpdatedState(onToggleControls)
-    val togglePlayback by rememberUpdatedState(onTogglePlayback)
-    val startVerticalGesture by rememberUpdatedState(onVerticalGestureStart)
-    val verticalSwipe by rememberUpdatedState(onVerticalSwipe)
-    val endVerticalGesture by rememberUpdatedState(onVerticalGestureEnd)
-    val startSpeedBoost by rememberUpdatedState(onSpeedBoostStart)
-    val endSpeedBoost by rememberUpdatedState(onSpeedBoostEnd)
-    val haptics = LocalHapticFeedback.current
-    // Keep this node in the modifier chain even when disabled: pulling it out
-    // while a long press is in progress would rebuild the chain and cancel the
-    // gesture that is holding the temporary speed boost.
-    val verticalDragModifier = Modifier.pointerInput(verticalGesturesEnabled) {
-        if (!verticalGesturesEnabled) return@pointerInput
-        var gestureSide: PlayerGestureSide? = null
-        detectVerticalDragGestures(
-            onDragStart = { position ->
-                gestureSide = if (position.x < size.width / 2f) PlayerGestureSide.LEFT else PlayerGestureSide.RIGHT
-                gestureSide?.let(startVerticalGesture)
-            },
-            onVerticalDrag = { change, dragAmount ->
-                change.consume()
-                val height = size.height.toFloat()
-                if (height > 0f) gestureSide?.let { verticalSwipe(it, dragAmount / height) }
-            },
-            onDragEnd = {
-                if (gestureSide != null) endVerticalGesture()
-                gestureSide = null
-            },
-            onDragCancel = {
-                if (gestureSide != null) endVerticalGesture()
-                gestureSide = null
-            }
-        )
-    }
-    // Tap / double tap / long press share one detector: a long press must be able
-    // to own the gesture and swallow its release, otherwise letting go would also
-    // toggle the chrome. detectTapGestures cannot report the release of a long
-    // press, hence the hand-rolled gesture below.
-    val tapAndLongPressModifier = Modifier.pointerInput(locked, speedBoostEnabled) {
-        awaitEachGesture {
-            // Do not steal taps that a button or the seek bar already consumed.
-            awaitFirstDown(requireUnconsumed = true)
-            var cancelledBeforeLongPress = false
-            val upBeforeLongPress = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                waitForUpOrCancellation().also { if (it == null) cancelledBeforeLongPress = true }
-            }
-            when {
-                upBeforeLongPress != null -> {
-                    // A short press: keep the previous single / double tap behaviour.
-                    val doubleTap = withTimeoutOrNull(viewConfiguration.doubleTapTimeoutMillis) {
-                        awaitFirstDown(requireUnconsumed = true)
-                        waitForUpOrCancellation() != null
-                    }
-                    if (doubleTap == true) {
-                        if (locked) toggleControls() else togglePlayback()
-                    } else {
-                        toggleControls()
-                    }
-                }
-
-                cancelledBeforeLongPress -> Unit
-
-                else -> {
-                    // The finger stayed down: play at 2x until it is lifted.
-                    if (!locked && speedBoostEnabled) {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        startSpeedBoost()
-                        try {
-                            // Own the rest of the gesture so no tap fires on release
-                            // and a later swipe cannot also change the volume.
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                event.changes.forEach { it.consume() }
-                                if (event.changes.all { !it.pressed }) break
-                            }
-                        } finally {
-                            endSpeedBoost()
-                        }
-                    }
-                }
-            }
-        }
-    }
-    Box(modifier.then(verticalDragModifier).then(tapAndLongPressModifier))
 }
 
 /** Shown while the screen is held down for temporary 2x playback. */
