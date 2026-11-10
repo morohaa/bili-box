@@ -58,6 +58,7 @@ import io.github.bilibox.feature.listen.ListenScreen
 import io.github.bilibox.feature.listen.rememberListenCover
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -163,6 +164,7 @@ internal fun VideoPlayerScreen(
     var screenLocked by remember(player) { mutableStateOf(false) }
     // 竖屏全屏：保持竖屏方向，画面按原比例显示，不放大也不裁切。
     var verticalFullScreen by remember(player) { mutableStateOf(false) }
+    val verticalFullScreenProgress = rememberVerticalFullScreenProgress(fullScreen, verticalFullScreen)
     var orientationBeforeLock by remember(player) { mutableStateOf<Int?>(null) }
     var playerView by remember(player) { mutableStateOf<PlayerView?>(null) }
     var hasVideoFrame by remember(player) { mutableStateOf(false) }
@@ -424,21 +426,13 @@ internal fun VideoPlayerScreen(
     val settingsAutoPlayNext = autoPlayNext ?: localAutoPlayNext
     val settingsLoopMode = loopMode ?: localLoopMode
     Box(Modifier.fillMaxSize().onGloballyPositioned { screenRootOffset = it.positionInRoot() }) {
-        Column(
-            Modifier.fillMaxSize().background(Color.Black)
-                .then(
-                    when {
-                        fullScreen -> Modifier
-
-                        // 状态栏随控件隐藏，但顶部安全区高度不变，画面不会上下跳动。
-                        verticalFullScreen -> Modifier.windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
-
-                        else -> Modifier.statusBarsPadding()
-                    }
-                )
-        ) {
+        PlayerScreenLayout(
+            fullScreen = fullScreen,
+            verticalFullScreen = verticalFullScreen,
+            progress = verticalFullScreenProgress,
+        ) { showDetails ->
             Box(
-                (if (fullScreen || verticalFullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+                Modifier.fillMaxSize()
                     .background(Color.Black)
                     .onGloballyPositioned { coordinates ->
                         videoBottom = with(density) {
@@ -451,7 +445,7 @@ internal fun VideoPlayerScreen(
                     player = player,
                     listening = listening,
                     mirrorEnabled = mirrorEnabled,
-                    verticalFullScreen = verticalFullScreen,
+                    verticalFullScreenProgress = { if (fullScreen) 0f else verticalFullScreenProgress.value },
                     adjustmentDp = videoPosition.adjustmentDp,
                     onViewReady = { playerView = it },
                 )
@@ -634,7 +628,8 @@ internal fun VideoPlayerScreen(
                             if (verticalFullScreen) {
                                 verticalFullScreen = false
                                 screenScope.launch {
-                                    // 下一帧先完成布局与系统栏重置，再展开设置，避免面板被关闭。
+                                    // 等收回动画完成，设置卡片才能贴住最终的视频下沿。
+                                    snapshotFlow { verticalFullScreenProgress.value }.first { it == 0f }
                                     repeat(2) { withFrameNanos { } }
                                     settingsSheetOpen = true
                                 }
@@ -760,10 +755,9 @@ internal fun VideoPlayerScreen(
                     Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = screenshot.flash.value)))
                 }
             }
-
-            if (!fullScreen && !verticalFullScreen) {
+            if (showDetails) {
                 PlayerDetailsPane(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 1f - verticalFullScreenProgress.value },
                     detailsBackground = detailsBackground,
                     showDetailTabs = showDetailTabs,
                     detailTabs = detailTabs,

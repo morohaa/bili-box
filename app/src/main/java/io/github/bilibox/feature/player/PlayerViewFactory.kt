@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
@@ -19,6 +20,7 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import io.github.bilibox.R
+import kotlin.math.roundToInt
 
 internal tailrec fun Context.findActivity(): ComponentActivity? = when (this) {
     is ComponentActivity -> this
@@ -54,10 +56,11 @@ internal fun PlayerVideoView(
     player: ExoPlayer,
     listening: Boolean,
     mirrorEnabled: Boolean,
-    verticalFullScreen: Boolean,
+    verticalFullScreenProgress: () -> Float,
     adjustmentDp: Int,
     onViewReady: (PlayerView) -> Unit,
 ) {
+    val fullScreenOffset = rememberPlayerVideoOffset(player, verticalFullScreen = true, adjustmentDp = adjustmentDp)
     AndroidView(
         factory = { context -> createTexturePlayerView(context, player).also(onViewReady) },
         update = {
@@ -66,7 +69,7 @@ internal fun PlayerVideoView(
             onViewReady(it)
         },
         modifier = Modifier.fillMaxSize()
-            .offset(y = rememberPlayerVideoOffset(player, verticalFullScreen, adjustmentDp))
+            .offset { IntOffset(0, (fullScreenOffset.toPx() * verticalFullScreenProgress()).roundToInt()) }
             .testTag("player-video-view")
             .then(if (mirrorEnabled) Modifier.graphicsLayer { scaleX = -1f } else Modifier),
     )

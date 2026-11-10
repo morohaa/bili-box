@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -436,7 +437,8 @@ class VideoPlayerScreenTest {
         compose.onNodeWithContentDescription("收起弹幕设置").performClick()
         compose.onNodeWithTag("danmaku-settings-drawer").assertDoesNotExist()
         compose.onNodeWithContentDescription("弹幕设置").performClick()
-        compose.onNodeWithContentDescription("关闭弹幕设置").performClick()
+        // 测试只覆盖方向配置，窗口仍可能很窄；点左侧露出的遮罩，避免中心点落进抽屉。
+        compose.onNodeWithContentDescription("关闭弹幕设置").performTouchInput { click(Offset(1f, center.y)) }
         compose.onNodeWithTag("danmaku-settings-drawer").assertDoesNotExist()
     }
 
