@@ -28,7 +28,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -129,6 +128,7 @@ internal fun VideoPlayerScreen(
     var playWhenReady by remember(player) { mutableStateOf(player.playWhenReady) }
     val scrub = remember(player) { PlayerScrubState() }
     val previewPreference = rememberSeekPreviewPreference()
+    val videoPosition = rememberPlayerVideoPosition()
     val seekPreview = rememberPlayerSeekPreview(player, previewSource, previewPreference.enabled)
     var speed by remember(player) { mutableFloatStateOf(1f) }
     var speedMenuExpanded by remember(player) { mutableStateOf(false) }
@@ -161,7 +161,7 @@ internal fun VideoPlayerScreen(
     var danmakuSendError by remember(player) { mutableStateOf<String?>(null) }
     var controlsVisible by remember(player) { mutableStateOf(true) }
     var screenLocked by remember(player) { mutableStateOf(false) }
-    // 竖屏全屏：保持竖屏方向，画面按原比例居中，不放大也不裁切。
+    // 竖屏全屏：保持竖屏方向，画面按原比例显示，不放大也不裁切。
     var verticalFullScreen by remember(player) { mutableStateOf(false) }
     var orientationBeforeLock by remember(player) { mutableStateOf<Int?>(null) }
     var playerView by remember(player) { mutableStateOf<PlayerView?>(null) }
@@ -447,20 +447,13 @@ internal fun VideoPlayerScreen(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                AndroidView(
-                    factory = { viewContext -> createTexturePlayerView(viewContext, player).also { playerView = it } },
-                    update = {
-                        it.player = player
-                        // Let the screen sleep while only audio is playing.
-                        it.keepScreenOn = !listening
-                        playerView = it
-                    },
-                    modifier = Modifier.fillMaxSize().then(
-                        // 竖屏全屏画面整体下移，这里额外上移，让视频落在更舒适的观看区域。
-                        if (verticalFullScreen) Modifier.offset(y = (-88).dp) else Modifier
-                    ).then(
-                        if (mirrorEnabled) Modifier.graphicsLayer { scaleX = -1f } else Modifier
-                    )
+                PlayerVideoView(
+                    player = player,
+                    listening = listening,
+                    mirrorEnabled = mirrorEnabled,
+                    verticalFullScreen = verticalFullScreen,
+                    adjustmentDp = videoPosition.adjustmentDp,
+                    onViewReady = { playerView = it },
                 )
                 PlayerTouchSurface(
                     locked = screenLocked,
@@ -641,7 +634,8 @@ internal fun VideoPlayerScreen(
                             if (verticalFullScreen) {
                                 verticalFullScreen = false
                                 screenScope.launch {
-                                    withFrameNanos { }
+                                    // 下一帧先完成布局与系统栏重置，再展开设置，避免面板被关闭。
+                                    repeat(2) { withFrameNanos { } }
                                     settingsSheetOpen = true
                                 }
                             } else {
@@ -867,6 +861,11 @@ internal fun VideoPlayerScreen(
                 onSubtitleChange = { subtitleEnabled = it },
                 onMirrorChange = { mirrorEnabled = it },
                 onSeekPreviewChange = previewPreference::update,
+                videoPosition = videoPosition,
+                onAdjustVideoPosition = {
+                    verticalFullScreen = true
+                    videoPosition.adjusting = true
+                },
                 onCache = onCache,
                 onUnavailable = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() },
             )
@@ -910,6 +909,7 @@ internal fun VideoPlayerScreen(
                 )
             }
         }
+        PlayerVideoPositionAdjustment(videoPosition, verticalFullScreen)
         // 弹幕输入与设置放在播放器外层：弹层要盖住视频和详情，而不是被视频 Box 裁掉。
         if (danmakuSupported && danmakuComposerOpen) {
             val send = onSendDanmaku

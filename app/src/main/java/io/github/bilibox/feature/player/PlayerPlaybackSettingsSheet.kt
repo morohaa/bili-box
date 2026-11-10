@@ -149,6 +149,8 @@ internal fun PlayerPlaybackSettingsHost(
     onSubtitleChange: (Boolean) -> Unit,
     onMirrorChange: (Boolean) -> Unit,
     onSeekPreviewChange: (Boolean) -> Unit,
+    videoPosition: PlayerVideoPositionState,
+    onAdjustVideoPosition: () -> Unit,
     onCache: (() -> Unit)?,
     onUnavailable: (String) -> Unit,
 ) {
@@ -169,6 +171,8 @@ internal fun PlayerPlaybackSettingsHost(
                     previewEnabled = state.seekPreviewEnabled,
                     onPreviewChange = onSeekPreviewChange,
                     onBack = { moreSettingsOpen = false },
+                    videoPositionLabel = videoPosition.label,
+                    onVideoPosition = { dismissThen(onAdjustVideoPosition) },
                     onQueueSettings = if (moreSettingsAvailable) {
                         { dismissThen(onMoreSettings) }
                     } else {

@@ -29,6 +29,8 @@ internal fun MorePlaybackSettingsContent(
     onPreviewChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onQueueSettings: (() -> Unit)?,
+    videoPositionLabel: String,
+    onVideoPosition: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().testTag("more-playback-settings")) {
         Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -49,6 +51,13 @@ internal fun MorePlaybackSettingsContent(
                 color = SettingsSecondary,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
+            )
+            SettingsDivider()
+            ActionSettingRow(
+                label = "竖屏全屏画面位置",
+                value = videoPositionLabel,
+                icon = PlayerSettingsIcon.PLAYBACK_SETTINGS,
+                onClick = onVideoPosition,
             )
             if (onQueueSettings != null) {
                 SettingsDivider()

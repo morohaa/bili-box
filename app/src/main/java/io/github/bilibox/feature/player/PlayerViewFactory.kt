@@ -7,7 +7,14 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -23,6 +30,46 @@ internal fun createTexturePlayerView(context: Context, player: ExoPlayer): Playe
     this.player = player
     setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
     keepScreenOn = true
+}
+
+@Composable
+internal fun rememberPlayerVideoOffset(player: Player, verticalFullScreen: Boolean, adjustmentDp: Int): Dp {
+    var videoSize by remember(player) { mutableStateOf(player.videoSize) }
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onVideoSizeChanged(size: VideoSize) {
+                videoSize = size
+            }
+        }
+        player.addListener(listener)
+        videoSize = player.videoSize
+        onDispose { player.removeListener(listener) }
+    }
+    val portraitVideo = videoSize.height > videoSize.width * videoSize.pixelWidthHeightRatio
+    return playerVideoOffsetDp(verticalFullScreen, portraitVideo, adjustmentDp).dp
+}
+
+@Composable
+internal fun PlayerVideoView(
+    player: ExoPlayer,
+    listening: Boolean,
+    mirrorEnabled: Boolean,
+    verticalFullScreen: Boolean,
+    adjustmentDp: Int,
+    onViewReady: (PlayerView) -> Unit,
+) {
+    AndroidView(
+        factory = { context -> createTexturePlayerView(context, player).also(onViewReady) },
+        update = {
+            it.player = player
+            it.keepScreenOn = !listening
+            onViewReady(it)
+        },
+        modifier = Modifier.fillMaxSize()
+            .offset(y = rememberPlayerVideoOffset(player, verticalFullScreen, adjustmentDp))
+            .testTag("player-video-view")
+            .then(if (mirrorEnabled) Modifier.graphicsLayer { scaleX = -1f } else Modifier),
+    )
 }
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
