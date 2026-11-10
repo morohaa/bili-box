@@ -25,13 +25,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,8 +52,7 @@ internal fun OnlineCreatorCard(
     fans: Long?,
     archiveCount: Long?,
     level: Int?,
-    following: Boolean,
-    onToggleFollow: () -> Unit,
+    onFollowUnavailable: () -> Unit,
 ) {
     val accent = OnlinePink
     Row(
@@ -98,7 +97,7 @@ internal fun OnlineCreatorCard(
             CreatorStats(fans, archiveCount)
         }
         Spacer(Modifier.width(8.dp))
-        FollowButton(following, onToggleFollow)
+        FollowButton(onFollowUnavailable)
     }
 }
 
@@ -137,51 +136,45 @@ private fun CreatorStats(fans: Long?, archiveCount: Long?) {
 }
 
 @Composable
-private fun FollowButton(following: Boolean, onClick: () -> Unit) {
+private fun FollowButton(onClick: () -> Unit) {
+    val tint = PlaybackMuted
     Box(
         Modifier.height(44.dp)
-            .semantics { contentDescription = if (following) "取消关注" else "关注 UP 主" }
+            .semantics {
+                contentDescription = "关注 UP 主"
+                stateDescription = "当前版本暂不支持"
+            }
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        val pill = if (following) {
-            Modifier.background(PlaybackDivider, CircleShape)
-        } else {
-            Modifier.background(
-                Brush.linearGradient(listOf(Color(0xFFFF7EA6), Color(0xFFFF6699))),
-                CircleShape,
-            )
-        }
         Row(
             Modifier.height(32.dp)
                 .widthIn(min = 66.dp)
-                .then(pill)
+                .background(PlaybackDivider, CircleShape)
                 .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
         ) {
-            if (!following) {
-                Canvas(Modifier.size(14.dp)) {
-                    val inset = size.width * 5f / 24f
-                    drawLine(
-                        Color.White,
-                        Offset(center.x, inset),
-                        Offset(center.x, size.height - inset),
-                        1.4.dp.toPx(),
-                        StrokeCap.Round,
-                    )
-                    drawLine(
-                        Color.White,
-                        Offset(inset, center.y),
-                        Offset(size.width - inset, center.y),
-                        1.4.dp.toPx(),
-                        StrokeCap.Round,
-                    )
-                }
+            Canvas(Modifier.size(14.dp)) {
+                val inset = size.width * 5f / 24f
+                drawLine(
+                    tint,
+                    Offset(center.x, inset),
+                    Offset(center.x, size.height - inset),
+                    1.4.dp.toPx(),
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    tint,
+                    Offset(inset, center.y),
+                    Offset(size.width - inset, center.y),
+                    1.4.dp.toPx(),
+                    StrokeCap.Round,
+                )
             }
             Text(
-                if (following) "已关注" else "关注",
-                color = if (following) PlaybackMuted else Color.White,
+                "关注",
+                color = PlaybackMuted,
                 fontSize = 13.sp,
                 lineHeight = 16.sp,
                 fontWeight = FontWeight.Medium,

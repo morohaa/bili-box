@@ -29,7 +29,7 @@ jobs:
           packages: platform-tools
 
       - name: Install compile SDK
-        run: sdkmanager "platforms;android-37"
+        run: sdkmanager "platforms;android-37.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -40,4 +40,9 @@ jobs:
           python-version: '3.12'
 
       - name: Lint, architecture, file size, tests and debug build
-        run: ./gradlew ktlintCheck checkArchitecture checkKotlinFileSize testDebugUnitTest assembleDebug --stacktrace
+        run: ./gradlew ktlintCheck checkArchitecture checkKotlinFileSize testDebugUnitTest assembleDebug --max-workers=1 --stacktrace
+
+      - name: Optimized release build
+        # CI checks the optimized release without access to the private signing key.
+        # Keep variants sequential to bound Kotlin compiler memory use.
+        run: ./gradlew assembleRelease --max-workers=1 --stacktrace

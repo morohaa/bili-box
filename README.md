@@ -4,6 +4,10 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 
 > 本项目是非官方项目，仅用于 Android 开发和接口学习。使用前请阅读并遵守哔哩哔哩的用户协议与相关法律法规，不要用于商业用途或高频请求。BiliBox 与哔哩哔哩官方无关联。
 
+## 当前版本
+
+`1.0.0-beta.1` 为首个公开测试候选版，支持 Android 9 及以上系统。功能和限制见 [更新日志](CHANGELOG.md)，实际测试范围见 [发布验证记录](docs/releases/1.0.0-beta.1-validation.md)。
+
 ## 功能
 
 - **首页 / 搜索**：品牌搜索首页、搜索历史、排序与时长 / 发布时间筛选、单双列切换、分页加载。
@@ -52,6 +56,7 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 │   │   ├── auth/                      # B 站通行证请求、会话加密存储
 │   │   ├── bili/                      # B 站接口、模型、播放源与 WBI 签名
 │   │   ├── danmaku/                   # 弹幕模型、解析与显示偏好持久化
+│   │   ├── favorites/                 # 账号收藏夹与收藏视频读取
 │   │   ├── localvideo/                # 本地视频扫描、缩略图、播放队列与进度
 │   │   ├── online/                    # 在线媒体下载与 MediaStore 持久化
 │   │   ├── profile/                   # 自定义头图裁切与私有目录持久化
@@ -61,6 +66,7 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 │       ├── auth/                      # 登录、扫码与极验 UI
 │       ├── danmaku/                   # 弹幕层与播放器弹幕控制
 │       │   └── layout/                # 弹幕轨道、速度、碰撞与显示时间排布
+│       ├── favorites/                # 收藏夹浏览、搜索、排序和播放
 │       ├── home/                      # 首页容器与搜索入口
 │       ├── library/                   # 本地视频库、文件夹与筛选
 │       ├── listen/                    # 听视频页面与播放状态绑定
@@ -78,6 +84,7 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 ├── scripts/
 │   ├── ktlint.sh                      # 固定版本的 Kotlin 格式检查与修复
 │   ├── check_architecture.py          # 依赖边界与功能包循环检查
+│   ├── setup_release_signing.py       # 发布签名初始化与本机备份校验
 │   └── tests/                         # 架构检查器回归测试
 ├── .github/
 │   ├── ISSUE_TEMPLATE/                # 缺陷与功能建议模板
@@ -86,6 +93,7 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 ├── gradle/                            # 版本目录与 Gradle Wrapper
 ├── build.gradle.kts
 ├── settings.gradle.kts
+├── CHANGELOG.md                     # 版本说明与已知限制
 ├── LICENSE
 ├── CONTRIBUTING.md
 └── README.md
@@ -102,7 +110,7 @@ BiliBox 是一个用 Kotlin + Jetpack Compose 编写的原生 Android 哔哩哔�
 - macOS / Linux / Windows，已安装 Android Studio（推荐当前稳定版）。
 - JDK 25（`gradle/gradle-daemon-jvm.properties` 指定；Android Studio 自带 JBR 即可）。
 - 仓库自带 Gradle Wrapper，无需单独安装 Gradle。
-- Android SDK Platform 37、Build-Tools 及对应 Android SDK Platform-Tools。
+- Android SDK Platform 37.0（`platforms;android-37.0`）、Build-Tools 及对应 Android SDK Platform-Tools。
 - 真机或 API 28 以上的模拟器。
 - 架构检查需要 Python 3.9+（仅标准库，无需安装 pip 依赖）。macOS / Linux 默认调用 `python3`，Windows 默认调用 `python`；可用 `-PpythonExecutable=/path/to/python` 指定解释器。
 - `ktlintCheck` / `ktlintFormat` 需要 Bash，以及 PATH 中的 `curl`、`find`、`sort`、`mkdir`、`mv`、`dirname` 和 `sha256sum` 或 `shasum`。首次运行需要联网下载并校验固定版本的 ktlint CLI，之后使用 `build/tools/` 缓存。
@@ -126,7 +134,7 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 2. 无需配置任何第三方 API Key。应用会直接访问 B 站公开 Web 接口。
 3. 登录时在「我的」页选择扫码、账号密码或短信验证码。登录 Cookie 通过 Android Keystore 加密后保存在应用私有目录，不会写入日志或仓库。
 4. Android 13 以下缓存视频或保存截屏时需要存储权限；Android 13 及以上按系统媒体权限申请。
-5. 如需构建 release 包，请在本地配置签名信息，不要把 keystore、`.jks` 或密码提交到仓库。
+5. Release 签名初始化、备份、恢复和构建见 [发布与签名](docs/releasing.md)。密钥和密码配置保存在本地，不能提交到仓库。
 
 ## 构建与运行
 
@@ -164,12 +172,14 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 - `app/src/androidTest` 覆盖播放器控件、手势、本地视频详情、听视频和弹幕设置弹层等 Compose 交互。
 - `scripts/tests` 覆盖反向依赖、功能包循环、别名 / 全限定引用、KDoc 与字符串模板等检查器行为；`checkArchitecture` 会自动运行这些测试。
 - 首次运行 Gradle 需要联网下载依赖；国内网络可自行配置 Maven 镜像，但不要把镜像的私有凭据提交到仓库。
-- GitHub Actions 会在 push / pull request 时执行 ktlint、架构与文件行数检查、单元测试与 Debug 构建，见 `.github/workflows/android.yml`。设备测试需本地另行运行。
+- GitHub Actions 会在 push / pull request 时执行 ktlint、架构与文件行数检查、单元测试、Debug 与未签名 Release 构建，见 `.github/workflows/android.yml`。设备测试需本地另行运行。
 
 ## 已知限制
 
 - B 站接口和风控策略可能变化，部分视频的清晰度或播放地址受账号、地区与版权限制。
-- 暂未接入「我的收藏」「稍后再看」等需要账号数据接口的模块。
+- 视频页的关注、点赞、投币和添加收藏操作尚未接入；点击会提示暂不支持，不会改变计数或伪装操作成功。
+- 「我的收藏」已支持读取和播放现有收藏；暂不支持通过视频页修改收藏。
+- 暂不支持稍后再看、小窗播放和应用内自动更新；后续安装包需手动下载并覆盖安装。
 - 在线评论暂不展示；播放器内的额外能力以实际可用接口为准。
 
 ## License

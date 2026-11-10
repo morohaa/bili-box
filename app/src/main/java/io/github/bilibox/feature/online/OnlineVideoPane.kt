@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,12 +74,11 @@ internal fun OnlineVideoDetails(
     onPageSelected: (Int) -> Unit,
     onOpenEpisodes: () -> Unit,
 ) {
-    var following by rememberSaveable(video.bvid) { mutableStateOf(false) }
-    var liked by rememberSaveable(video.bvid) { mutableStateOf(false) }
-    var coined by rememberSaveable(video.bvid) { mutableStateOf(false) }
-    var saved by rememberSaveable(video.bvid) { mutableStateOf(false) }
     var expanded by rememberSaveable(video.bvid) { mutableStateOf(false) }
     val playerActions = LocalPlayerDetailActions.current
+    val unsupportedAction: (String) -> Unit = { action ->
+        Toast.makeText(context, "当前版本暂不支持$action，请前往哔哩哔哩操作", Toast.LENGTH_SHORT).show()
+    }
 
     val owner = info?.owner
     val ownerName = owner?.name?.takeIf { it.isNotBlank() }
@@ -99,8 +99,7 @@ internal fun OnlineVideoDetails(
             fans = creatorCard?.card?.fans,
             archiveCount = creatorCard?.archiveCount,
             level = creatorCard?.card?.levelInfo?.currentLevel,
-            following = following,
-            onToggleFollow = { following = !following },
+            onFollowUnavailable = { unsupportedAction("关注") },
         )
 
         Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
@@ -188,21 +187,24 @@ internal fun OnlineVideoDetails(
                 OnlineAction(
                     kind = "like",
                     label = "点赞",
-                    value = formatOptionalCount((stat?.like ?: 0L) + if (liked) 1L else 0L),
-                    selected = liked,
-                ) { liked = !liked }
+                    value = formatOptionalCount(stat?.like ?: 0L),
+                    selected = false,
+                    unavailable = true,
+                ) { unsupportedAction("点赞") }
                 OnlineAction(
                     kind = "coin",
                     label = "投币",
-                    value = formatOptionalCount((stat?.coin ?: 0L) + if (coined) 1L else 0L),
-                    selected = coined,
-                ) { coined = !coined }
+                    value = formatOptionalCount(stat?.coin ?: 0L),
+                    selected = false,
+                    unavailable = true,
+                ) { unsupportedAction("投币") }
                 OnlineAction(
                     kind = "favorite",
                     label = "收藏",
-                    value = formatOptionalCount((stat?.favorite ?: 0L) + if (saved) 1L else 0L),
-                    selected = saved,
-                ) { saved = !saved }
+                    value = formatOptionalCount(stat?.favorite ?: 0L),
+                    selected = false,
+                    unavailable = true,
+                ) { unsupportedAction("收藏") }
                 OnlineAction(kind = "screenshot", label = "截图", value = "", selected = false) {
                     val actions = playerActions
                     if (actions != null && actions.screenshotEnabled) {
@@ -348,12 +350,19 @@ internal fun RowScope.OnlineAction(
     label: String,
     value: String,
     selected: Boolean,
+    unavailable: Boolean = false,
     onClick: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val iconScale = remember { Animatable(1f) }
     val iconTint by animateColorAsState(
-        targetValue = if (selected) OnlinePink else PlaybackSecondary,
+        targetValue = if (unavailable) {
+            PlaybackMuted
+        } else if (selected) {
+            OnlinePink
+        } else {
+            PlaybackSecondary
+        },
         animationSpec = tween(180),
         label = "$kind 图标颜色"
     )
@@ -366,23 +375,26 @@ internal fun RowScope.OnlineAction(
         Modifier.weight(1f)
             .clickable(role = Role.Button) {
                 onClick()
-                scope.launch {
-                    iconScale.stop()
-                    iconScale.snapTo(1f)
-                    iconScale.animateTo(
-                        1f,
-                        keyframes {
-                            durationMillis = 380
-                            1f at 0
-                            1.26f at 152 using CubicBezierEasing(.34f, 1.56f, .64f, 1f)
-                            .92f at 285 using CubicBezierEasing(.34f, 1.56f, .64f, 1f)
-                            1f at 380 using CubicBezierEasing(.34f, 1.56f, .64f, 1f)
-                        }
-                    )
+                if (!unavailable) {
+                    scope.launch {
+                        iconScale.stop()
+                        iconScale.snapTo(1f)
+                        iconScale.animateTo(
+                            1f,
+                            keyframes {
+                                durationMillis = 380
+                                1f at 0
+                                1.26f at 152 using CubicBezierEasing(.34f, 1.56f, .64f, 1f)
+                                .92f at 285 using CubicBezierEasing(.34f, 1.56f, .64f, 1f)
+                                1f at 380 using CubicBezierEasing(.34f, 1.56f, .64f, 1f)
+                            }
+                        )
+                    }
                 }
             }
             .semantics(mergeDescendants = true) {
                 contentDescription = if (value.isBlank()) label else "$label $value"
+                if (unavailable) stateDescription = "当前版本暂不支持"
             }
             .padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally

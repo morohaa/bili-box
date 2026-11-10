@@ -29,6 +29,9 @@ local.properties
 *.keystore
 keystore.properties
 signing.properties
+.release-signing/
+*.p12
+*.pfx
 
 # --- OS / editor noise ---
 .DS_Store

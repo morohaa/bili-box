@@ -1,7 +1,27 @@
+import java.io.File
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+}
+
+// Local signing material stays outside version control. An external properties
+// file can be selected when restoring the key from its backup directory.
+val signingPropertiesPath = providers.environmentVariable("BILIBOX_SIGNING_PROPERTIES")
+val signingPropertiesFile = rootProject.file(signingPropertiesPath.orElse("signing.properties").get())
+check(!signingPropertiesPath.isPresent || signingPropertiesFile.isFile) {
+    "BILIBOX_SIGNING_PROPERTIES must point to an existing signing properties file."
+}
+val releaseSigning = Properties().apply {
+    if (signingPropertiesFile.isFile) signingPropertiesFile.inputStream().use { load(it) }
+}
+if (signingPropertiesFile.isFile) {
+    val required = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    check(required.all { !releaseSigning.getProperty(it).isNullOrBlank() }) {
+        "Release signing requires storeFile, storePassword, keyAlias and keyPassword."
+    }
 }
 
 android {
@@ -15,13 +35,29 @@ android {
         minSdk = 28
         targetSdk = 37
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0-beta.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (signingPropertiesFile.isFile) {
+            create("release") {
+                val configuredStore = File(releaseSigning.getProperty("storeFile"))
+                storeFile = if (configuredStore.isAbsolute) configuredStore else {
+                    signingPropertiesFile.parentFile.resolve(configuredStore.path)
+                }
+                check(storeFile?.isFile == true) { "The configured release keystore does not exist." }
+                storePassword = releaseSigning.getProperty("storePassword")
+                keyAlias = releaseSigning.getProperty("keyAlias")
+                keyPassword = releaseSigning.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             optimization {
                 enable = true
             }
