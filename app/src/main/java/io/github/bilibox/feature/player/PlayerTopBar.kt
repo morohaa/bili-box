@@ -11,12 +11,15 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.feature.listen.ListenTopBarButton
+
+internal val PortraitPlayerTopBarHeight = 44.dp
 
 @Composable
 internal fun PlayerTopBar(
@@ -32,9 +35,9 @@ internal fun PlayerTopBar(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier.fillMaxWidth()
+        modifier.fillMaxWidth().testTag("player-top-bar")
             .then(if (fullScreen) Modifier.displayCutoutPadding() else Modifier)
-            .height(if (fullScreen) 48.dp else 44.dp)
+            .height(if (fullScreen) 48.dp else PortraitPlayerTopBarHeight)
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

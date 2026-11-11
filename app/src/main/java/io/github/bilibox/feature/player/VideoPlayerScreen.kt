@@ -56,9 +56,9 @@ import io.github.bilibox.feature.listen.ListenInfo
 import io.github.bilibox.feature.listen.ListenPlaybackEffect
 import io.github.bilibox.feature.listen.ListenScreen
 import io.github.bilibox.feature.listen.rememberListenCover
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -139,8 +139,8 @@ internal fun VideoPlayerScreen(
     var subtitleEnabled by rememberSaveable(player) { mutableStateOf(true) }
     var mirrorEnabled by rememberSaveable(player) { mutableStateOf(false) }
     val density = LocalDensity.current
-    // 卡片顶边要贴在视频下沿，用视频 Box 在根布局里的底边定位。
-    var videoBottom by remember { mutableStateOf(0.dp) }
+    // 竖屏弹层沿用普通竖屏的视频下沿，全屏时只覆盖下方区域，不收回视频。
+    var portraitPanelTop by remember { mutableStateOf(0.dp) }
     var episodesExpanded by remember(player) { mutableStateOf(false) }
     var qualityMenuExpanded by remember(player) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableIntStateOf(player.playbackState) }
@@ -435,8 +435,9 @@ internal fun VideoPlayerScreen(
                 Modifier.fillMaxSize()
                     .background(Color.Black)
                     .onGloballyPositioned { coordinates ->
-                        videoBottom = with(density) {
-                            (coordinates.positionInRoot().y + coordinates.size.height).toDp()
+                        val compactHeight = (coordinates.size.width * 9f / 16f).roundToInt().coerceAtMost(coordinates.size.height)
+                        portraitPanelTop = with(density) {
+                            (coordinates.positionInRoot().y + compactHeight).toDp()
                         }
                     },
                 contentAlignment = Alignment.Center
@@ -447,6 +448,8 @@ internal fun VideoPlayerScreen(
                     mirrorEnabled = mirrorEnabled,
                     verticalFullScreenProgress = { if (fullScreen) 0f else verticalFullScreenProgress.value },
                     adjustmentDp = videoPosition.adjustmentDp,
+                    portraitPanelVisible = !fullScreen && verticalFullScreen &&
+                        (settingsSheetOpen || speedMenuExpanded || playbackModeExpanded || sleepTimerOpen || cacheSheetVisible),
                     onViewReady = { playerView = it },
                 )
                 PlayerGestureSurface(
@@ -622,20 +625,7 @@ internal fun VideoPlayerScreen(
                         onBack = { navigateBack() },
                         onListenClick = { enterListen() },
                         onListenPositioned = { listenOrigin = it },
-                        onMoreClick = {
-                            // 竖屏全屏时先回到普通竖屏，等视频重新排好版再展开卡片。
-                            if (verticalFullScreen) {
-                                verticalFullScreen = false
-                                screenScope.launch {
-                                    // 等收回动画完成，设置卡片才能贴住最终的视频下沿。
-                                    snapshotFlow { verticalFullScreenProgress.value }.first { it == 0f }
-                                    repeat(2) { withFrameNanos { } }
-                                    settingsSheetOpen = true
-                                }
-                            } else {
-                                settingsSheetOpen = true
-                            }
-                        },
+                        onMoreClick = { settingsSheetOpen = true },
                         modifier = Modifier.align(Alignment.TopStart),
                     )
                 }
@@ -811,23 +801,28 @@ internal fun VideoPlayerScreen(
                     extraDetailPane = extraDetailPane,
                     episodeOverlay = episodeOverlay,
                     episodeOverlayVisible = episodeOverlayVisible,
-                    speedMenuExpanded = speedMenuExpanded,
-                    onDismissSpeedSheet = { speedMenuExpanded = false },
-                    onSpeedChange = {
-                        player.setPlaybackSpeed(it)
-                        speed = it
-                    },
-                    playbackModeExpanded = playbackModeExpanded,
-                    playbackModeSheet = playbackModeSheet,
-                    onDismissPlaybackMode = { playbackModeExpanded = false },
                 )
             }
         }
-        // 播放设置卡片从视频下沿铺到屏幕底部，作为兄弟节点才能盖住详情区。
-        if (!fullScreen && !verticalFullScreen) {
+        // 竖屏弹层独立于详情区，竖屏全屏隐藏详情后仍可使用。
+        if (!fullScreen) {
+            PlayerPortraitPlaybackPanels(
+                modifier = Modifier.fillMaxSize().padding(top = portraitPanelTop),
+                speed = speed,
+                remainingMs = (duration - position).coerceAtLeast(0L),
+                speedMenuExpanded = speedMenuExpanded,
+                onDismissSpeedSheet = { speedMenuExpanded = false },
+                onSpeedChange = {
+                    player.setPlaybackSpeed(it)
+                    speed = it
+                },
+                playbackModeExpanded = playbackModeExpanded,
+                playbackModeSheet = playbackModeSheet,
+                onDismissPlaybackMode = { playbackModeExpanded = false },
+            )
             PlayerPlaybackSettingsHost(
                 visible = settingsSheetOpen,
-                topInset = videoBottom,
+                topInset = portraitPanelTop,
                 state = PlayerSettingsState(
                     speed = speed,
                     autoPlayNext = settingsAutoPlayNext,
@@ -864,8 +859,8 @@ internal fun VideoPlayerScreen(
             )
         }
         // 缓存面板也贴在视频下沿；播放器只量 topInset，避免反向依赖在线视频包。
-        if (!fullScreen && !verticalFullScreen) {
-            cacheSheet?.invoke(cacheSheetVisible, videoBottom) {
+        if (!fullScreen) {
+            cacheSheet?.invoke(cacheSheetVisible, portraitPanelTop) {
                 onCacheSheetVisibleChange(false)
             }
         }
@@ -877,7 +872,7 @@ internal fun VideoPlayerScreen(
             }
         }
         // 竖屏的画质选择使用底部弹层；横屏仍沿用侧边抽屉。
-        if (!fullScreen && !verticalFullScreen && qualityMenuExpanded && qualityOptions.isNotEmpty()) {
+        if (!fullScreen && qualityMenuExpanded && qualityOptions.isNotEmpty()) {
             PlayerQualitySheet(
                 options = qualityOptions,
                 selectedQuality = selectedQuality,
@@ -897,7 +892,7 @@ internal fun VideoPlayerScreen(
                     remainingVideos = remainingVideos,
                     currentRemainingMs = (duration - position).coerceAtLeast(0L),
                     durationMs = duration,
-                    topInset = videoBottom,
+                    topInset = portraitPanelTop,
                     onDismiss = { sleepTimerOpen = false },
                 )
             }
@@ -938,7 +933,7 @@ internal fun VideoPlayerScreen(
                 visible = danmakuSettingsOpen,
                 fullScreen = fullScreen,
                 settings = danmakuSettings,
-                topInset = if (fullScreen || verticalFullScreen) null else videoBottom,
+                topInset = if (fullScreen || verticalFullScreen) null else portraitPanelTop,
                 onDismiss = { danmakuSettingsOpen = false },
                 onSettingsChange = onDanmakuSettingsChange,
             )

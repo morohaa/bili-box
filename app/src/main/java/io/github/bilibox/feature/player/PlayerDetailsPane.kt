@@ -66,12 +66,6 @@ internal fun PlayerDetailsPane(
     extraDetailPane: (@Composable (Long) -> Unit)?,
     episodeOverlay: (@Composable () -> Unit)?,
     episodeOverlayVisible: Boolean,
-    speedMenuExpanded: Boolean,
-    onDismissSpeedSheet: () -> Unit,
-    onSpeedChange: (Float) -> Unit,
-    playbackModeExpanded: Boolean,
-    playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)?,
-    onDismissPlaybackMode: () -> Unit,
 ) {
     val overlayVisible = episodeOverlayVisible && episodeOverlay != null
     val activePane = if (showDetailTabs) detailsTab else 0
@@ -168,15 +162,38 @@ internal fun PlayerDetailsPane(
             PlayerDetailsOverlay(visible = overlayVisible) { overlay() }
         }
 
-        // Keep the portrait sheet inside the details pane so the video
-        // stays bright and the dimmed details remain visible behind it.
+        val exitLightsOff = onToggleLights
+        if (lightsOff && exitLightsOff != null) {
+            PlayerLightsOffOverlay(
+                mode = lightsOffMode,
+                onExit = exitLightsOff,
+                onSelectMode = onSelectLightsOffMode,
+            )
+        }
+    }
+}
+
+/** Playback panels stay available when portrait fullscreen removes the details pane. */
+@Composable
+internal fun PlayerPortraitPlaybackPanels(
+    modifier: Modifier = Modifier,
+    speed: Float,
+    remainingMs: Long,
+    speedMenuExpanded: Boolean,
+    onDismissSpeedSheet: () -> Unit,
+    onSpeedChange: (Float) -> Unit,
+    playbackModeExpanded: Boolean,
+    playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)?,
+    onDismissPlaybackMode: () -> Unit,
+) {
+    Box(modifier.navigationBarsPadding().clipToBounds()) {
         PlayerDrawerVisibility(visible = speedMenuExpanded, fromBottom = true) {
             SpeedPanel(
                 speed = speed,
                 mode = SpeedPanelMode.Sheet,
                 onDismiss = onDismissSpeedSheet,
                 onSpeedChange = onSpeedChange,
-                remainingMs = (duration - positionMs).coerceAtLeast(0L),
+                remainingMs = remainingMs,
             )
         }
 
@@ -185,15 +202,6 @@ internal fun PlayerDetailsPane(
             PlayerDrawerVisibility(visible = playbackModeExpanded, fromBottom = true) {
                 modeSheet { onDismissPlaybackMode() }
             }
-        }
-
-        val exitLightsOff = onToggleLights
-        if (lightsOff && exitLightsOff != null) {
-            PlayerLightsOffOverlay(
-                mode = lightsOffMode,
-                onExit = exitLightsOff,
-                onSelectMode = onSelectLightsOffMode,
-            )
         }
     }
 }
