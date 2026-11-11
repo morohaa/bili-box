@@ -93,6 +93,7 @@ import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.EqualizerBars
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.core.ui.theme.OnlineCardGray
 import io.github.bilibox.core.ui.theme.OnlineMuted
 import io.github.bilibox.core.ui.theme.OnlinePink
@@ -533,7 +534,7 @@ private fun CacheEpisodeRow(
                     color = OnlineMuted,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    style = TextStyle(fontFeatureSettings = "tnum"),
+                    style = TextStyle(fontFamily = LocalAppFontFamily.current, fontFeatureSettings = "tnum"),
                     maxLines = 1,
                 )
             }

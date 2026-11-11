@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.theme.LocalAccentColor
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.data.auth.BiliSession
 import io.github.bilibox.data.profile.BannerAdjustments
 
@@ -349,6 +350,7 @@ internal fun LevelBadge(level: Int) {
             text = "LV${level.coerceAtLeast(0)}",
             color = Color.White,
             style = TextStyle(
+                fontFamily = LocalAppFontFamily.current,
                 fontSize = 9.5.sp,
                 lineHeight = 9.5.sp,
                 fontWeight = FontWeight.Black,

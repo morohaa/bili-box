@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.data.danmaku.Danmaku
 import io.github.bilibox.data.danmaku.DanmakuFilter
 import io.github.bilibox.data.danmaku.DanmakuSettings
@@ -60,16 +61,18 @@ internal fun DanmakuOverlay(
     val localDensity = LocalDensity.current
     val density = localDensity.density
     val textMeasurer = rememberTextMeasurer()
+    val fontFamily = LocalAppFontFamily.current
     var positionMs by remember(player) { mutableLongStateOf(player.currentPosition.coerceAtLeast(0L)) }
 
     // 按原始字号测量一次；用户字号在绘制时缩放，同时参与轨道宽高计算。
     // 滑杆每次变化都重新测量整个视频的弹幕，会长时间占用主线程。
-    val measured = remember(visible, density, localDensity.fontScale) {
+    val measured = remember(visible, density, localDensity.fontScale, fontFamily) {
         visible.map { item ->
             val fontSize = item.fontSize.coerceIn(12, 36).sp
             item to textMeasurer.measure(
                 text = AnnotatedString(item.text),
                 style = TextStyle(
+                    fontFamily = fontFamily,
                     fontSize = fontSize,
                     fontWeight = FontWeight.Medium,
                     color = Color.White,

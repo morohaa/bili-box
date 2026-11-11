@@ -274,6 +274,12 @@ internal fun AppearanceScreen(
                         }
                     }
                 }
+                FontSettingsCard(
+                    selected = appearance.font,
+                    accent = accent,
+                    palette = palette,
+                    onSelect = { font -> onChange(appearance.copy(font = font)) },
+                )
                 Spacer(Modifier.height(ApplyBarGap))
             }
         }

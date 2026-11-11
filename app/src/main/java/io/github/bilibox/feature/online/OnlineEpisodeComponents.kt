@@ -62,6 +62,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.OnlinePinkSoft
 import io.github.bilibox.core.ui.theme.PlaybackCard
@@ -203,7 +204,7 @@ private fun EpisodesSheetHeader(
             "($fraction/$total)",
             color = PlaybackMuted,
             fontSize = 12.sp,
-            style = TextStyle(fontFeatureSettings = "tnum"),
+            style = TextStyle(fontFamily = LocalAppFontFamily.current, fontFeatureSettings = "tnum"),
             maxLines = 1,
         )
         Spacer(Modifier.weight(1f))
@@ -352,7 +353,7 @@ private fun OnlineSheetEpisodeRow(
                     color = PlaybackMuted,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    style = TextStyle(fontFeatureSettings = "tnum"),
+                    style = TextStyle(fontFamily = LocalAppFontFamily.current, fontFeatureSettings = "tnum"),
                     maxLines = 1,
                 )
             }
@@ -376,7 +377,7 @@ private fun OnlineSheetEpisodeRow(
             color = if (selected) OnlinePink else PlaybackMuted,
             fontSize = 11.5.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            style = TextStyle(fontFeatureSettings = "tnum"),
+            style = TextStyle(fontFamily = LocalAppFontFamily.current, fontFeatureSettings = "tnum"),
             maxLines = 1,
         )
     }
@@ -419,7 +420,7 @@ private fun OnlineSheetEpisodeCell(
                 color = if (selected) OnlinePink else PlaybackText,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
-                style = TextStyle(fontFeatureSettings = "tnum"),
+                style = TextStyle(fontFamily = LocalAppFontFamily.current, fontFeatureSettings = "tnum"),
                 maxLines = 1,
             )
         }

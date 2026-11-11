@@ -45,6 +45,7 @@ import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.VideoMetaIcon
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.Pink
 import io.github.bilibox.core.ui.theme.PlaybackDivider
@@ -257,7 +258,7 @@ internal fun OnlineEpisodesSection(
             "(${if (pageIndex >= 0) pageIndex + 1 else selectedPage}/${pages.size})",
             color = PlaybackMuted,
             fontSize = 12.sp,
-            style = TextStyle(fontFeatureSettings = "tnum"),
+            style = TextStyle(fontFamily = LocalAppFontFamily.current, fontFeatureSettings = "tnum"),
             maxLines = 1,
         )
         Spacer(Modifier.width(8.dp))

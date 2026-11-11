@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.data.danmaku.DanmakuBlockType
 import io.github.bilibox.data.danmaku.DanmakuSettings
 import kotlin.math.abs
@@ -222,7 +223,7 @@ internal fun DanmakuComposerDialog(
                 onValueChange = { value -> text = value.take(100) },
                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                 placeholder = { Text("发个友善的弹幕见证当下…", color = Color.White.copy(alpha = .4f)) },
-                textStyle = TextStyle(color = Color.White, fontSize = 15.sp),
+                textStyle = TextStyle(fontFamily = LocalAppFontFamily.current, color = Color.White, fontSize = 15.sp),
                 minLines = 3,
                 maxLines = 4,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),

@@ -2,6 +2,7 @@ package io.github.bilibox.data.appearance
 
 import android.content.Context
 import android.content.SharedPreferences
+import io.github.bilibox.core.ui.theme.AppFont
 import io.github.bilibox.core.ui.theme.AppearanceMode
 import io.github.bilibox.core.ui.theme.AppearanceSettings
 import io.github.bilibox.core.ui.theme.BackgroundPage
@@ -26,6 +27,7 @@ internal class AppearanceStore(private val preferences: SharedPreferences) {
         return AppearanceSettings(
             themeId = themeId,
             mode = mode,
+            font = AppFont.fromStorageId(preferences.getString("font_id", null)),
         ).let { settings ->
             BackgroundPage.entries.fold(settings) { result, page ->
                 result.withBackground(page, loadBackground(page))
@@ -50,6 +52,7 @@ internal class AppearanceStore(private val preferences: SharedPreferences) {
         val editor = preferences.edit()
             .putString("theme_id", settings.themeId)
             .putString("appearance_mode", settings.mode.name)
+            .putString("font_id", settings.font.storageId)
             .remove("dark_mode")
         BackgroundPage.entries.forEach { page ->
             val background = settings.backgroundFor(page)

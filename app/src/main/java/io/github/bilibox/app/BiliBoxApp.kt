@@ -12,6 +12,7 @@ import io.github.bilibox.core.ui.theme.AppearanceMode
 import io.github.bilibox.core.ui.theme.AppearanceSettings
 import io.github.bilibox.core.ui.theme.BackgroundPage
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
+import io.github.bilibox.core.ui.theme.fontFamily
 import io.github.bilibox.core.ui.theme.resolveDark
 import io.github.bilibox.data.appearance.AppearanceStore
 import io.github.bilibox.data.appearance.BackgroundImageStore
@@ -51,7 +52,7 @@ internal fun BiliBoxApp() {
             )
         },
     ) { toggleTheme ->
-        BiliBoxTheme(darkTheme = darkMode, accent = appearance.theme.base, dynamicColor = false) {
+        BiliBoxTheme(darkTheme = darkMode, accent = appearance.theme.base, dynamicColor = false, fontFamily = appearance.font.fontFamily) {
             AppSystemBars(appState, darkMode)
             AppNavigation(
                 appState = appState,

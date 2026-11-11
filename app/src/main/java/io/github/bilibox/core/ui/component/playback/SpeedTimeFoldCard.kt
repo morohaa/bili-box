@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.core.util.formatPlaybackTime
 import kotlin.math.roundToInt
 
@@ -119,7 +120,7 @@ internal fun SpeedTimeFoldCard(
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 textDecoration = TextDecoration.LineThrough,
-                style = TextStyle(fontFeatureSettings = "tnum"),
+                style = TextStyle(fontFamily = LocalAppFontFamily.current, fontFeatureSettings = "tnum"),
             )
         }
 
@@ -171,6 +172,7 @@ internal fun SpeedTimeFoldCard(
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 style = TextStyle(
+                    fontFamily = LocalAppFontFamily.current,
                     fontFeatureSettings = "tnum",
                     shadow = Shadow(
                         color = FoldSpeedCyan.copy(alpha = .30f),

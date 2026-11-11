@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.data.localvideo.LocalVideoFolder
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
 import io.github.bilibox.data.localvideo.localVideoFolderLabel
@@ -187,7 +188,7 @@ private fun LibrarySearchField(
                 onValueChange = onQueryChange,
                 modifier = Modifier.weight(1f).focusRequester(focusRequester),
                 singleLine = true,
-                textStyle = TextStyle(color = style.searchText, fontSize = 14.5.sp),
+                textStyle = TextStyle(fontFamily = LocalAppFontFamily.current, color = style.searchText, fontSize = 14.5.sp),
                 cursorBrush = SolidColor(palette.accent),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),

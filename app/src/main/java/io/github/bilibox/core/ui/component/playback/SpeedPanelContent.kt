@@ -31,6 +31,7 @@ import io.github.bilibox.core.playback.PlaybackSpeedBoost
 import io.github.bilibox.core.playback.PlaybackSpeedMax
 import io.github.bilibox.core.playback.PlaybackSpeedMin
 import io.github.bilibox.core.playback.PlaybackSpeedPresets
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.util.formatSpeedBadge
 import kotlin.math.abs
@@ -82,7 +83,7 @@ internal fun SpeedPanelContent(
                     fontSize = 38.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-1).sp,
-                    style = TextStyle(fontFeatureSettings = "tnum")
+                    style = TextStyle(fontFamily = LocalAppFontFamily.current, fontFeatureSettings = "tnum")
                 )
                 Text(
                     "x",

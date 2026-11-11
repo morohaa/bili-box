@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.core.ui.theme.WallpaperBlurMax
 import io.github.bilibox.core.ui.theme.WallpaperDarknessMax
 import kotlin.math.roundToInt
@@ -197,7 +198,7 @@ internal fun WallpaperEditorChrome(
                     )
                     Text(
                         text = title,
-                        style = OverlayText,
+                        style = OverlayText.copy(fontFamily = LocalAppFontFamily.current),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f),
@@ -395,7 +396,7 @@ private fun SliderRow(
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = label,
-            style = OverlayText,
+            style = OverlayText.copy(fontFamily = LocalAppFontFamily.current),
             fontSize = 13.sp,
             modifier = Modifier.width(60.dp),
         )
@@ -422,7 +423,7 @@ private fun SliderRow(
         )
         Text(
             text = "$value$suffix",
-            style = OverlayText,
+            style = OverlayText.copy(fontFamily = LocalAppFontFamily.current),
             fontSize = 13.sp,
             textAlign = TextAlign.End,
             modifier = Modifier.width(38.dp),

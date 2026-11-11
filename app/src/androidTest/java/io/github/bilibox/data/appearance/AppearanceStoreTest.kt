@@ -2,6 +2,7 @@ package io.github.bilibox.data.appearance
 
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
+import io.github.bilibox.core.ui.theme.AppFont
 import io.github.bilibox.core.ui.theme.AppearanceSettings
 import io.github.bilibox.core.ui.theme.BackgroundPage
 import io.github.bilibox.core.ui.theme.HomeBackground
@@ -64,5 +65,25 @@ class AppearanceStoreTest {
         val settings = AppearanceStore(preferences).load()
         assertEquals(PageBackgroundSettings(HomeBackground.GRADIENT, 80, 0), settings.videoBackground)
         assertEquals(PageBackgroundSettings(HomeBackground.SOLID, 0, 20), settings.profileBackground)
+    }
+
+    @Test
+    fun fontSurvivesReopeningAndOtherAppearanceChanges() {
+        AppFont.entries.forEach { font ->
+            val settings = AppearanceSettings(font = font, themeId = "blue")
+                .withBackground(BackgroundPage.VIDEO, PageBackgroundSettings(HomeBackground.SOLID))
+            AppearanceStore(preferences).save(settings)
+            assertEquals(settings, AppearanceStore(preferences).load())
+        }
+        AppearanceStore(preferences).save(AppearanceSettings())
+        assertEquals(AppFont.DEFAULT, AppearanceStore(preferences).load().font)
+    }
+
+    @Test
+    fun missingOrUnknownFontFallsBackToDefault() {
+        preferences.edit().clear().commit()
+        assertEquals(AppFont.DEFAULT, AppearanceStore(preferences).load().font)
+        preferences.edit().putString("font_id", "removed-font").commit()
+        assertEquals(AppFont.DEFAULT, AppearanceStore(preferences).load().font)
     }
 }

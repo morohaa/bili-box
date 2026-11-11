@@ -9,8 +9,10 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 
 private fun darkScheme(accent: Color) = darkColorScheme(
     primary = accent,
@@ -41,6 +43,7 @@ fun BiliBoxTheme(
     accent: Color = OnlinePinkBrand,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
+    fontFamily: FontFamily = FontFamily.Default,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -54,10 +57,11 @@ fun BiliBoxTheme(
         else -> lightScheme(accent)
     }
 
-    CompositionLocalProvider(LocalAccentColor provides accent) {
+    val typography = remember(fontFamily) { typographyFor(fontFamily) }
+    CompositionLocalProvider(LocalAccentColor provides accent, LocalAppFontFamily provides fontFamily) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = Typography,
+            typography = typography,
             content = content
         )
     }

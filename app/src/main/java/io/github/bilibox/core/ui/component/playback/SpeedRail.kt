@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.playback.PlaybackSpeedMax
 import io.github.bilibox.core.playback.PlaybackSpeedMin
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.core.ui.theme.OnlinePink
 import kotlin.math.PI
 import kotlin.random.Random
@@ -43,14 +44,16 @@ internal fun SpeedRail(
     onScrubFraction: (Float) -> Unit,
 ) {
     val measurer = rememberTextMeasurer()
-    val labelStyle = remember {
+    val fontFamily = LocalAppFontFamily.current
+    val labelStyle = remember(fontFamily) {
         TextStyle(
+            fontFamily = fontFamily,
             fontSize = 10.sp,
             color = Color.White.copy(alpha = .40f),
             fontFeatureSettings = "tnum"
         )
     }
-    val labels = remember(measurer) {
+    val labels = remember(measurer, labelStyle) {
         RulerLabels.map { measurer.measure(text = it, style = labelStyle) }
     }
     val phase = remember { mutableFloatStateOf(PI.toFloat() / 2f) }

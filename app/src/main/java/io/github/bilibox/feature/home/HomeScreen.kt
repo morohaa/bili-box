@@ -88,6 +88,7 @@ import io.github.bilibox.core.ui.theme.BrandSpringEasing
 import io.github.bilibox.core.ui.theme.DynamicColors
 import io.github.bilibox.core.ui.theme.HomeBackground
 import io.github.bilibox.core.ui.theme.LocalAccentColor
+import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.core.ui.theme.dynamicColors
 import io.github.bilibox.data.search.SearchHistoryStore
 import io.github.bilibox.feature.search.SearchControlsBar
@@ -360,7 +361,7 @@ private fun SearchBarRow(
                     onValueChange = onQueryChange,
                     modifier = Modifier.weight(1f).focusRequester(focusRequester),
                     singleLine = true,
-                    textStyle = TextStyle(color = colors.ink, fontSize = 15.sp),
+                    textStyle = TextStyle(fontFamily = LocalAppFontFamily.current, color = colors.ink, fontSize = 15.sp),
                     cursorBrush = SolidColor(colors.pink),
                     interactionSource = interactionSource,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
