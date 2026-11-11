@@ -11,6 +11,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.test.espresso.Espresso.closeSoftKeyboard
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.data.localvideo.LocalVideo
@@ -44,6 +46,8 @@ class OfflineCacheScreenTest {
         savePreview("offline-cache-root.png")
         compose.onNodeWithText("Compose 入门课").performClick()
         compose.onNodeWithText("P1  起步").assertIsDisplayed()
+        compose.onNodeWithText("Compose 入门课").assertDoesNotExist()
+        compose.onNodeWithText("已缓存分集").assertDoesNotExist()
         compose.onNodeWithText("已看完").assertIsDisplayed()
         compose.onNodeWithText("00:20 / 01:40").assertIsDisplayed()
         savePreview("offline-cache-parts.png")
@@ -102,6 +106,35 @@ class OfflineCacheScreenTest {
     }
 
     @Test
+    fun systemBackClosesModesThenReturnsToGroupListBeforeExiting() {
+        var exits = 0
+        show(onBack = { exits++ })
+        compose.onNodeWithText("Compose 入门课").performClick()
+        compose.onNodeWithText("P1  起步").assertIsDisplayed()
+
+        compose.onNodeWithText("管理").performClick()
+        compose.onNodeWithText("全选").assertIsDisplayed()
+        pressBack()
+        compose.onNodeWithText("管理").assertIsDisplayed()
+        compose.onNodeWithText("P1  起步").assertIsDisplayed()
+
+        compose.onNodeWithContentDescription("搜索缓存").performClick()
+        compose.onNodeWithText("搜索视频、分集或 UP 主").performTextInput("进阶")
+        compose.onNodeWithText("P1  起步").assertDoesNotExist()
+        closeSoftKeyboard()
+        pressBack()
+        compose.onNodeWithText("搜索视频、分集或 UP 主").assertDoesNotExist()
+        compose.onNodeWithText("P1  起步").assertIsDisplayed()
+
+        pressBack()
+        compose.onNodeWithText("Compose 入门课").assertIsDisplayed()
+        compose.onNodeWithText("P1  起步").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, exits) }
+        pressBack()
+        compose.runOnIdle { assertEquals(1, exits) }
+    }
+
+    @Test
     fun emptyLibraryExplainsWhereToDownload() {
         compose.setContent {
             BiliBoxTheme(dynamicColor = false) {
@@ -124,6 +157,7 @@ class OfflineCacheScreenTest {
         dark: Boolean = false,
         onPlay: (LocalVideo, List<LocalVideo>) -> Unit = { _, _ -> },
         onDelete: (List<OfflineCacheEntry>) -> Unit = {},
+        onBack: () -> Unit = {},
     ) {
         compose.setContent {
             BiliBoxTheme(darkTheme = dark, dynamicColor = false) {
@@ -134,7 +168,7 @@ class OfflineCacheScreenTest {
                         second.id to LocalVideoPlayback(LocalVideoPlaybackState.Watching(20_000, .2f)),
                     ),
                     onDelete = onDelete,
-                    onBack = {},
+                    onBack = onBack,
                     onPlay = onPlay,
                     onForward = { it() },
                     onBackward = { it() },

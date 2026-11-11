@@ -15,8 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -91,7 +89,6 @@ internal fun OfflineCacheContent(
     val group = library.groups.firstOrNull { it.bvid == groupId }
     // 最后一集被删除后保留详情空态；返回仍回到缓存首页。
     val detail = groupId != null
-    var detailTitle by rememberSaveable { mutableStateOf("") }
     val groups = library.groups.filter {
         it.title.contains(query, true) || it.author.contains(query, true) || it.entries.any { entry -> entry.title.contains(query, true) }
     }
@@ -129,23 +126,12 @@ internal fun OfflineCacheContent(
     fun toggle(ids: Set<String>) {
         selected = if (selected.containsAll(ids)) selected - ids else selected + ids
     }
-    BackHandler(onBack = ::back)
+    // 使用 lambda 更新状态捕获，避免局部函数引用相等导致系统返回保留旧层级。
+    BackHandler { back() }
     Column(Modifier.fillMaxSize().background(colors.background).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OfflineIconButton(AppIcon.BACK, "返回", ::back)
-            if (detail) {
-                Text(
-                    detailTitle,
-                    Modifier.weight(1f).padding(horizontal = 8.dp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.onBackground,
-                )
-            } else {
-                Spacer(Modifier.weight(1f))
-            }
+            OfflineIconButton(AppIcon.BACK, "返回", { back() })
+            Spacer(Modifier.weight(1f))
             if (!managing) {
                 OfflineIconButton(AppIcon.SEARCH, "搜索缓存", {
                     searching = !searching
@@ -166,17 +152,10 @@ internal fun OfflineCacheContent(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 12.dp),
             )
         }
-        if (detail || managing) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (detail) {
-                    Text("已缓存分集", color = colors.onBackground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("  ${entries.size}", color = colors.onSurfaceVariant, fontSize = 13.sp)
-                }
-                Spacer(Modifier.weight(1f))
-                if (managing) {
-                    TextButton(onClick = { toggle(visibleIds) }, enabled = visibleIds.isNotEmpty() && !deleting) {
-                        Text(if (visibleIds.isNotEmpty() && selected.containsAll(visibleIds)) "取消全选" else "全选", color = accent)
-                    }
+        if (managing) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { toggle(visibleIds) }, enabled = visibleIds.isNotEmpty() && !deleting) {
+                    Text(if (visibleIds.isNotEmpty() && selected.containsAll(visibleIds)) "取消全选" else "全选", color = accent)
                 }
             }
         }
@@ -229,7 +208,6 @@ internal fun OfflineCacheContent(
                                         managing -> toggle(item.entries.map { it.id }.toSet())
 
                                         item.isCollection -> onForward {
-                                            detailTitle = item.title
                                             groupId = item.bvid
                                             searching = false
                                             query = ""
