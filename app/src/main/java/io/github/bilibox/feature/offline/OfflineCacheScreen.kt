@@ -152,13 +152,6 @@ internal fun OfflineCacheContent(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 12.dp),
             )
         }
-        if (managing) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { toggle(visibleIds) }, enabled = visibleIds.isNotEmpty() && !deleting) {
-                    Text(if (visibleIds.isNotEmpty() && selected.containsAll(visibleIds)) "取消全选" else "全选", color = accent)
-                }
-            }
-        }
         if (error != null) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(error, Modifier.weight(1f), color = colors.error, fontSize = 13.sp)
@@ -224,13 +217,14 @@ internal fun OfflineCacheContent(
             }
         }
         if (managing) {
-            HorizontalDivider(color = colors.outlineVariant.copy(alpha = .45f))
-            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("已选 ${selectedEntries.size} 项", Modifier.weight(1f), color = colors.onSurfaceVariant, fontSize = 13.sp)
-                Button(onClick = { pendingDelete = selectedEntries }, enabled = selectedEntries.isNotEmpty() && !deleting) {
-                    Text(if (deleting) "正在删除…" else "删除缓存")
-                }
-            }
+            OfflineSelectionBar(
+                selectedCount = selectedEntries.size,
+                allSelected = visibleIds.isNotEmpty() && selected.containsAll(visibleIds),
+                canSelect = visibleIds.isNotEmpty() && !deleting,
+                deleting = deleting,
+                onSelectAll = { toggle(visibleIds) },
+                onDelete = { pendingDelete = selectedEntries },
+            )
         } else {
             OfflineStorageSummary(cacheBytes = library.sizeBytes, freeBytes = library.freeBytes)
         }

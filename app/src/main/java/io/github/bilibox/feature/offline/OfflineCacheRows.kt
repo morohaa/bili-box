@@ -101,7 +101,13 @@ private fun OfflineCacheRow(
     var menu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         if (managing) {
-            Checkbox(checked = selected, onCheckedChange = { onClick() }, enabled = enabled, modifier = Modifier.size(36.dp).padding(end = 6.dp))
+            OfflineSelectionCheckbox(
+                checked = selected,
+                onClick = onClick,
+                enabled = enabled,
+                description = "选择：$title",
+                modifier = Modifier.size(48.dp),
+            )
         }
         VideoListCardLayout(
             title = title,

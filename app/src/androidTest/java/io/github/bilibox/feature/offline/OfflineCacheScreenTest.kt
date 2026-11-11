@@ -79,8 +79,10 @@ class OfflineCacheScreenTest {
         show(dark = true, onDelete = { deleted = it })
         savePreview("offline-cache-dark.png")
         compose.onNodeWithText("管理").performClick()
+        savePreview("offline-cache-manage-dark-empty.png")
         compose.onNodeWithText("Compose 入门课").performClick()
         compose.onNodeWithText("已选 2 项").assertIsDisplayed()
+        savePreview("offline-cache-manage-dark-selected.png")
         compose.onNodeWithText("删除缓存").performClick()
         compose.onNodeWithText("删除离线缓存？").assertIsDisplayed()
         compose.runOnIdle { assertEquals(emptyList<OfflineCacheEntry>(), deleted) }
@@ -114,6 +116,7 @@ class OfflineCacheScreenTest {
 
         compose.onNodeWithText("管理").performClick()
         compose.onNodeWithText("全选").assertIsDisplayed()
+        savePreview("offline-cache-manage-light.png")
         pressBack()
         compose.onNodeWithText("管理").assertIsDisplayed()
         compose.onNodeWithText("P1  起步").assertIsDisplayed()
