@@ -52,10 +52,7 @@ class AppNavigationTransitionTest {
             }
         }
         compose.mainClock.autoAdvance = false
-        compose.onNodeWithText("我的").performClick()
-        compose.mainClock.advanceTimeBy(48)
-        assertTransitioning()
-        finishTransition()
+        switchTabWithStationaryNavigation("我的")
         compose.runOnIdle {
             assertEquals(AppTab.PROFILE, state.selectedTab)
             state.updateQuery("Kotlin")
@@ -66,6 +63,7 @@ class AppNavigationTransitionTest {
         assertTransitioning()
         finishTransition()
         compose.runOnIdle { assertTrue(state.appearanceOpen) }
+        compose.onNodeWithTag("app-bottom-navigation").assertDoesNotExist()
         compose.onNodeWithContentDescription("返回").performClick()
         finishTransition()
         compose.runOnIdle {
@@ -76,6 +74,7 @@ class AppNavigationTransitionTest {
         compose.onNodeWithContentDescription("预览头图").performClick()
         finishTransition()
         compose.runOnIdle { assertTrue(state.bannerPreviewOpen) }
+        compose.onNodeWithTag("app-bottom-navigation").assertDoesNotExist()
         pressBack()
         finishTransition()
         compose.runOnIdle { assertFalse(state.bannerPreviewOpen) }
@@ -83,6 +82,7 @@ class AppNavigationTransitionTest {
         compose.onNodeWithText("离线缓存").performClick()
         finishTransition()
         compose.runOnIdle { assertTrue(state.offlineCacheOpen) }
+        compose.onNodeWithTag("app-bottom-navigation").assertDoesNotExist()
         compose.onNodeWithText("已缓存视频").assertDoesNotExist()
         compose.onNodeWithContentDescription("搜索缓存").assertExists()
         pressBack()
@@ -92,15 +92,27 @@ class AppNavigationTransitionTest {
             assertEquals(AppTab.PROFILE, state.selectedTab)
         }
 
-        compose.onNodeWithText("视频").performClick()
-        finishTransition()
+        switchTabWithStationaryNavigation("视频")
         compose.onNodeWithTag("library-search-field").assertExists()
+        // Returning to an existing search intentionally hides the navigation bar.
         compose.onNodeWithText("首页").performClick()
         finishTransition()
         compose.runOnIdle {
             assertEquals(AppTab.HOME, state.selectedTab)
             assertEquals("Kotlin", state.searchQuery)
         }
+    }
+
+    private fun switchTabWithStationaryNavigation(title: String) {
+        val bounds = compose.onNodeWithTag("app-bottom-navigation").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithText(title).performClick()
+        compose.mainClock.advanceTimeBy(48)
+        assertTransitioning()
+        repeat(8) {
+            compose.mainClock.advanceTimeByFrame()
+            assertEquals("页面切换期间底部导航应保持原位", bounds, compose.onNodeWithTag("app-bottom-navigation").fetchSemanticsNode().boundsInRoot)
+        }
+        finishTransition()
     }
 
     private fun assertTransitioning() {
