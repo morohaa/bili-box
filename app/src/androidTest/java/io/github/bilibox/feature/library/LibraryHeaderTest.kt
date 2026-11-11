@@ -28,7 +28,7 @@ class LibraryHeaderTest {
     fun rootSearchRightEdgeStaysFixedDuringPressAndTransitions() = verifySearchEdge(inFolder = false)
 
     @Test
-    fun folderSearchRightEdgeStaysFixedWhileBackButtonDisappears() = verifySearchEdge(inFolder = true)
+    fun folderSearchRightEdgeStaysFixedDuringPressAndTransitions() = verifySearchEdge(inFolder = true)
 
     private fun verifySearchEdge(inFolder: Boolean) {
         compose.setContent {
@@ -43,7 +43,6 @@ class LibraryHeaderTest {
                             query = "",
                             breadcrumbs = if (inFolder) listOf("MiShare") else emptyList(),
                             filter = null,
-                            onBack = {},
                             onSearchOpen = { searchOpen = true },
                             onSearchClose = { searchOpen = false },
                             onQueryChange = {},
@@ -68,7 +67,7 @@ class LibraryHeaderTest {
         compose.onNodeWithText("取消").performClick()
         assertRightEdgeDuringTransition(right)
         compose.onNodeWithContentDescription("显示与排序设置").assertExists()
-        if (inFolder) compose.onNodeWithContentDescription("返回上一级").assertExists()
+        compose.onNodeWithContentDescription("返回上一级").assertDoesNotExist()
         compose.mainClock.autoAdvance = true
     }
 

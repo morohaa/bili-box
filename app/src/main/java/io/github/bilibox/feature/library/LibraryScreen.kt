@@ -277,7 +277,6 @@ internal fun LibraryScreen(
                     query = query,
                     breadcrumbs = nav,
                     filter = quickFilter,
-                    onBack = { nav = nav.dropLast(1) },
                     onSearchOpen = { searchOpen = true },
                     onSearchClose = {
                         searchOpen = false

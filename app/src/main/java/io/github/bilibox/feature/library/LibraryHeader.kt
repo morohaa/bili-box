@@ -5,10 +5,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -68,7 +66,7 @@ private val HeaderControlShape = RoundedCornerShape(24.dp)
  * 本地视频页头部：渐变底 + 顶部搜索框 + 筛选胶囊。
  *
  * 搜索框放在最上层，页面不再有单独的大标题；根目录显示快捷筛选，
- * 进入文件夹后换成路径面包屑并出现返回键。搜索展开时只保留搜索框。
+ * 进入文件夹后换成路径面包屑。搜索展开时只保留搜索框。
  */
 @Composable
 internal fun LibraryTopBar(
@@ -77,7 +75,6 @@ internal fun LibraryTopBar(
     query: String,
     breadcrumbs: List<String>,
     filter: LocalVideoQuickFilter?,
-    onBack: () -> Unit,
     onSearchOpen: () -> Unit,
     onSearchClose: () -> Unit,
     onQueryChange: (String) -> Unit,
@@ -101,13 +98,6 @@ internal fun LibraryTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            AnimatedVisibility(
-                visible = inFolder && !searchOpen,
-                enter = fadeIn(tween(160)) + expandHorizontally(tween(180)),
-                exit = fadeOut(tween(120)) + shrinkHorizontally(tween(150)),
-            ) {
-                HeaderIconButton(style, AppIcon.BACK, "返回上一级", onBack)
-            }
             LibrarySearchField(
                 style = style,
                 searchOpen = searchOpen,

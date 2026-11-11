@@ -46,7 +46,6 @@ private fun HeaderExample(label: String, dark: Boolean, accent: Color, folder: B
             query = query,
             breadcrumbs = if (inFolder) listOf("MiShare") else emptyList(),
             filter = filter,
-            onBack = { inFolder = false },
             onSearchOpen = { searchOpen = true },
             onSearchClose = {
                 searchOpen = false
