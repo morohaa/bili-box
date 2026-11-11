@@ -90,161 +90,170 @@ internal fun AppNavigation(
     val favoritesFolderScroll = rememberLazyListState()
     val favoritesVideoScroll = rememberLazyListState()
 
-    if (appState.appearanceOpen) {
-        AppearanceScreen(
-            appearance = appearance,
-            darkMode = darkMode,
-            backgroundImages = backgroundImages,
-            backgroundStores = backgroundStores,
-            onBackgroundImageChange = onBackgroundImageChange,
-            onBack = appState::closeAppearance,
-            onChange = onAppearanceChange,
-        )
-        return
-    }
-
-    if (appState.bannerPreviewOpen) {
-        ProfileBannerPreviewScreen(
-            avatar = avatar,
-            customBanner = customBanner,
-            adjustments = bannerAdjustments,
-            store = bannerStore,
-            onBannerChange = { customBanner = it },
-            onAdjustmentsChange = {
-                bannerAdjustments = it
-                bannerStore.saveAdjustments(it)
-            },
-            onClose = appState::closeBannerPreview,
-        )
-        return
-    }
-
-    appState.selectedVideo?.let { video ->
-        OnlineVideoScreen(
-            video = video,
-            session = appState.session,
-            onBack = appState::closeOnlineVideo,
-            onViewCache = {
-                // Cached MP4s are published to Movies/BiliBox, so the local
-                // video library is the natural "view cache" destination.
-                appState.closeOnlineVideo()
-                appState.selectTab(AppTab.LIBRARY.ordinal)
-            },
-        )
-        return
-    }
-
-    if (appState.favoritesOpen) {
-        FavoritesScreen(
-            darkMode = darkMode,
-            holder = favorites,
-            folderListState = favoritesFolderScroll,
-            videoListState = favoritesVideoScroll,
-            onBack = appState::closeFavorites,
-            onVideoClick = appState::openOnlineVideo,
-        )
-        return
-    }
-
-    val focusManager = LocalFocusManager.current
-    // 搜索态属于首页：系统返回键先退出搜索，再交给外层处理。
-    BackHandler(enabled = appState.selectedTab == AppTab.HOME && appState.homeExpanded) {
-        appState.closeSearch()
-        focusManager.clearFocus()
-    }
-    val backdrop = rememberGraphicsLayer()
-    val appBackground = if (darkMode) Color(0xFF17191D) else Color(0xFFF4F6FA)
-    Box(Modifier.fillMaxSize().background(appBackground)) {
-        Box(
-            Modifier.fillMaxSize().drawWithContent {
-                backdrop.record { this@drawWithContent.drawContent() }
-                drawLayer(backdrop)
-            }
-        ) {
-            when (appState.selectedTab) {
-                AppTab.LIBRARY -> LibraryScreen(
-                    refreshToken = appState.libraryRefresh,
-                    darkMode = darkMode,
-                    backgroundSettings = appearance.videoBackground,
-                    backgroundImage = backgroundImages[BackgroundPage.VIDEO],
-                    initialFilter = appState.libraryFilter,
-                    onVideoSelected = appState::openLocalVideo,
-                )
-
-                AppTab.PROFILE -> ProfileScreen(
-                    session = appState.session,
-                    avatar = avatar,
-                    defaultAvatar = defaultAvatar,
-                    customBanner = customBanner,
-                    bannerAdjustments = bannerAdjustments,
-                    darkMode = darkMode,
-                    backgroundSettings = appearance.profileBackground,
-                    backgroundImage = backgroundImages[BackgroundPage.PROFILE],
-                    onToggleDarkMode = onToggleDarkMode,
-                    onOpenThemeAppearance = appState::openAppearance,
-                    onOpenLibrary = appState::openLibrary,
-                    onOpenFavorites = appState::openFavorites,
-                    onBannerClick = appState::openBannerPreview,
-                    onSessionChange = appState::updateSession,
-                    scrollState = appState.profileScroll,
-                    onBannerScrollLimitChange = appState::updateProfileBannerScrollLimit,
-                )
-
-                AppTab.HOME -> HomeScreen(
-                    query = appState.searchQuery,
-                    onQueryChange = appState::updateQuery,
-                    onSearch = { appState.runSearch() },
-                    onRetry = appState::runSearch,
-                    onVideoClick = appState::openOnlineVideo,
-                    onPageChange = { appState.runSearch(page = it) },
-                    searchState = appState.searchState,
-                    order = appState.searchOrder,
-                    onOrderChange = { appState.runSearch(order = it) },
-                    duration = appState.searchDuration,
-                    timeRange = appState.searchTimeRange,
-                    onFiltersChange = appState::updateSearchFilters,
-                    gridLayout = appState.searchGrid,
-                    onToggleLayout = { appState.searchGrid = !appState.searchGrid },
-                    onExpandedChange = { appState.homeExpanded = it },
-                    scrollState = appState.homeScroll,
-                    darkMode = darkMode,
-                    backgroundStyle = appearance.background,
-                    backgroundImage = backgroundImages[BackgroundPage.HOME],
-                    backgroundBlur = appearance.backgroundBlur,
-                    backgroundDarkness = appearance.backgroundDarkness,
-                )
-            }
-        }
-        if (appState.selectedLocalVideo == null) {
-            AnimatedVisibility(
-                visible = !(appState.selectedTab == AppTab.HOME && appState.homeExpanded),
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically(
-                    initialOffsetY = { it },
-                    animationSpec = tween(420, easing = BrandSpringEasing),
-                ) + fadeIn(tween(200)),
-                exit = slideOutVertically(
-                    targetOffsetY = { it },
-                    animationSpec = tween(360, easing = BrandSpringEasing),
-                ) + fadeOut(tween(140)),
-            ) {
-                LiquidNavigation(
-                    appState.selectedTab.ordinal,
-                    appState::selectTab,
-                    backdrop,
-                    darkMode,
-                    Modifier.navigationBarsPadding().padding(bottom = 16.dp)
-                )
-            }
-        }
-        // 保持下层视频库处于组合中，播放结束后保留目录、搜索与滚动位置。
-        appState.selectedLocalVideo?.let { video ->
-            LocalVideoScreen(
-                video = video,
-                playlist = appState.localPlaylist,
-                onVideoSelected = appState::selectLocalVideo,
-                onBack = appState::closeLocalVideo,
+    val pageTransition = rememberAppPageTransitionState()
+    AppPageTransition(pageTransition, if (darkMode) Color(0xFF17191D) else Color(0xFFF4F6FA)) {
+        if (appState.appearanceOpen) {
+            AppearanceScreen(
+                appearance = appearance,
+                darkMode = darkMode,
+                backgroundImages = backgroundImages,
+                backgroundStores = backgroundStores,
+                onBackgroundImageChange = onBackgroundImageChange,
+                onBack = { pageTransition.back(appState::closeAppearance) },
+                onChange = onAppearanceChange,
             )
+            return@AppPageTransition
+        }
+
+        if (appState.bannerPreviewOpen) {
+            ProfileBannerPreviewScreen(
+                avatar = avatar,
+                customBanner = customBanner,
+                adjustments = bannerAdjustments,
+                store = bannerStore,
+                onBannerChange = { customBanner = it },
+                onAdjustmentsChange = {
+                    bannerAdjustments = it
+                    bannerStore.saveAdjustments(it)
+                },
+                onClose = { pageTransition.back(appState::closeBannerPreview) },
+            )
+            return@AppPageTransition
+        }
+
+        appState.selectedVideo?.let { video ->
+            OnlineVideoScreen(
+                video = video,
+                session = appState.session,
+                onBack = { pageTransition.back(appState::closeOnlineVideo) },
+                onViewCache = {
+                    // Cached MP4s are published to Movies/BiliBox, so the local
+                    // video library is the natural "view cache" destination.
+                    pageTransition.back {
+                        appState.closeOnlineVideo()
+                        appState.selectTab(AppTab.LIBRARY.ordinal)
+                    }
+                },
+            )
+            return@AppPageTransition
+        }
+
+        if (appState.favoritesOpen) {
+            FavoritesScreen(
+                darkMode = darkMode,
+                holder = favorites,
+                folderListState = favoritesFolderScroll,
+                videoListState = favoritesVideoScroll,
+                onBack = { pageTransition.back(appState::closeFavorites) },
+                onVideoClick = { video -> pageTransition.forward { appState.openOnlineVideo(video) } },
+            )
+            return@AppPageTransition
+        }
+
+        val focusManager = LocalFocusManager.current
+        // 搜索态属于首页：系统返回键先退出搜索，再交给外层处理。
+        BackHandler(enabled = appState.selectedTab == AppTab.HOME && appState.homeExpanded) {
+            appState.closeSearch()
+            focusManager.clearFocus()
+        }
+        val backdrop = rememberGraphicsLayer()
+        val appBackground = if (darkMode) Color(0xFF17191D) else Color(0xFFF4F6FA)
+        Box(Modifier.fillMaxSize().background(appBackground)) {
+            Box(
+                Modifier.fillMaxSize().drawWithContent {
+                    backdrop.record { this@drawWithContent.drawContent() }
+                    drawLayer(backdrop)
+                }
+            ) {
+                when (appState.selectedTab) {
+                    AppTab.LIBRARY -> LibraryScreen(
+                        refreshToken = appState.libraryRefresh,
+                        darkMode = darkMode,
+                        backgroundSettings = appearance.videoBackground,
+                        backgroundImage = backgroundImages[BackgroundPage.VIDEO],
+                        initialFilter = appState.libraryFilter,
+                        onVideoSelected = { video, playlist -> pageTransition.forward { appState.openLocalVideo(video, playlist) } },
+                    )
+
+                    AppTab.PROFILE -> ProfileScreen(
+                        session = appState.session,
+                        avatar = avatar,
+                        defaultAvatar = defaultAvatar,
+                        customBanner = customBanner,
+                        bannerAdjustments = bannerAdjustments,
+                        darkMode = darkMode,
+                        backgroundSettings = appearance.profileBackground,
+                        backgroundImage = backgroundImages[BackgroundPage.PROFILE],
+                        onToggleDarkMode = onToggleDarkMode,
+                        onOpenThemeAppearance = { pageTransition.forward(appState::openAppearance) },
+                        onOpenLibrary = { filter ->
+                            pageTransition.tab(appState.selectedTab, AppTab.LIBRARY) { appState.openLibrary(filter) }
+                        },
+                        onOpenFavorites = { pageTransition.forward(appState::openFavorites) },
+                        onBannerClick = { pageTransition.forward(appState::openBannerPreview) },
+                        onSessionChange = appState::updateSession,
+                        scrollState = appState.profileScroll,
+                        onBannerScrollLimitChange = appState::updateProfileBannerScrollLimit,
+                    )
+
+                    AppTab.HOME -> HomeScreen(
+                        query = appState.searchQuery,
+                        onQueryChange = appState::updateQuery,
+                        onSearch = { appState.runSearch() },
+                        onRetry = appState::runSearch,
+                        onVideoClick = { video -> pageTransition.forward { appState.openOnlineVideo(video) } },
+                        onPageChange = { appState.runSearch(page = it) },
+                        searchState = appState.searchState,
+                        order = appState.searchOrder,
+                        onOrderChange = { appState.runSearch(order = it) },
+                        duration = appState.searchDuration,
+                        timeRange = appState.searchTimeRange,
+                        onFiltersChange = appState::updateSearchFilters,
+                        gridLayout = appState.searchGrid,
+                        onToggleLayout = { appState.searchGrid = !appState.searchGrid },
+                        onExpandedChange = { appState.homeExpanded = it },
+                        scrollState = appState.homeScroll,
+                        darkMode = darkMode,
+                        backgroundStyle = appearance.background,
+                        backgroundImage = backgroundImages[BackgroundPage.HOME],
+                        backgroundBlur = appearance.backgroundBlur,
+                        backgroundDarkness = appearance.backgroundDarkness,
+                    )
+                }
+            }
+            if (appState.selectedLocalVideo == null) {
+                AnimatedVisibility(
+                    visible = !(appState.selectedTab == AppTab.HOME && appState.homeExpanded),
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    enter = slideInVertically(
+                        initialOffsetY = { it },
+                        animationSpec = tween(420, easing = BrandSpringEasing),
+                    ) + fadeIn(tween(200)),
+                    exit = slideOutVertically(
+                        targetOffsetY = { it },
+                        animationSpec = tween(360, easing = BrandSpringEasing),
+                    ) + fadeOut(tween(140)),
+                ) {
+                    LiquidNavigation(
+                        appState.selectedTab.ordinal,
+                        { index ->
+                            pageTransition.tab(appState.selectedTab, AppTab.entries[index]) { appState.selectTab(index) }
+                        },
+                        backdrop,
+                        darkMode,
+                        Modifier.navigationBarsPadding().padding(bottom = 16.dp)
+                    )
+                }
+            }
+            // 保持下层视频库处于组合中，播放结束后保留目录、搜索与滚动位置。
+            appState.selectedLocalVideo?.let { video ->
+                LocalVideoScreen(
+                    video = video,
+                    playlist = appState.localPlaylist,
+                    onVideoSelected = appState::selectLocalVideo,
+                    onBack = { pageTransition.back(appState::closeLocalVideo) },
+                )
+            }
         }
     }
 }
