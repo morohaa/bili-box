@@ -184,7 +184,7 @@ internal fun MyInfoDialog(
                             "· 视频无法播放：先确认账号已登录，部分视频需要大会员或登录后才能取流。\n" +
                                 "· 扫码后无反应：在哔哩哔哩 App 中确认登录，或改用密码 / 短信登录。\n" +
                                 "· 本地视频缺失：在系统设置中授予媒体权限，部分目录含 .nomedia 会被跳过。\n" +
-                                "· 缓存位置：视频缓存写入 Movies/BiliBox，可在「视频」页查看。",
+                                "· 缓存位置：视频缓存写入 Movies/BiliBox，可在「我的 → 离线缓存」查看。",
                             color = muted,
                             fontSize = 13.sp,
                             lineHeight = 20.sp,

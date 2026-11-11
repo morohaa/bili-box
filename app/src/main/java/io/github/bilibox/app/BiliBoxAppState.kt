@@ -85,6 +85,16 @@ internal class BiliBoxAppState(
     var bannerPreviewOpen by mutableStateOf(false)
         private set
 
+    var offlineCacheOpen by mutableStateOf(false)
+        private set
+
+    fun openOfflineCache() {
+        offlineCacheOpen = true
+    }
+    fun closeOfflineCache() {
+        offlineCacheOpen = false
+    }
+
     var favoritesOpen by mutableStateOf(false)
         private set
 
@@ -215,6 +225,7 @@ internal class BiliBoxAppState(
                     "appearanceOpen" to it.appearanceOpen,
                     "bannerPreviewOpen" to it.bannerPreviewOpen,
                     "favoritesOpen" to it.favoritesOpen,
+                    "offlineCacheOpen" to it.offlineCacheOpen,
                 )
             },
             restore = {
@@ -229,6 +240,7 @@ internal class BiliBoxAppState(
                     appearanceOpen = it["appearanceOpen"] as Boolean? ?: false
                     bannerPreviewOpen = it["bannerPreviewOpen"] as Boolean? ?: false
                     favoritesOpen = it["favoritesOpen"] as Boolean? ?: false
+                    offlineCacheOpen = it["offlineCacheOpen"] as Boolean? ?: false
                 }
             },
         )

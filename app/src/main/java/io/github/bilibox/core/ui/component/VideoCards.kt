@@ -49,7 +49,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 搜索与收藏共用的视频卡片：列表卡片与宫格卡片。
+ * 搜索、收藏与离线缓存共用的视频卡片：列表卡片与宫格卡片。
  *
  * 列表卡片把封面放在左侧，标题与两行元信息在右侧；宫格卡片把 16:10 封面放在上方，
  * 元信息只保留 UP 主与播放 / 弹幕，避免在窄卡片里挤入日期。两者共用同一套
@@ -70,65 +70,82 @@ internal fun VideoListCard(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    val palette = videoCardPalette(darkMode)
     val publishDate = remember(video.publishTime) { formatPublishDate(video.publishTime) }
-    VideoCardSurface(darkMode, modifier.fillMaxWidth(), onClick, enabled) {
-        // 封面作为背景层铺满卡片左缘：matchParentSize 不参与卡高度测量，
-        // 因此右栏文字（多行或系统字体放大）决定卡片高度时封面仍能填满。
-        Row(Modifier.matchParentSize()) {
-            Box(Modifier.width(CoverWidth).fillMaxHeight()) {
-                RemoteCover(
-                    video.coverUrl,
-                    Modifier.fillMaxSize(),
-                    RectangleShape,
-                    placeholder = { VideoCoverPlaceholder(Modifier.fillMaxSize()) },
-                )
-                DurationBadge(video.duration, Modifier.align(Alignment.BottomEnd))
+    VideoListCardLayout(
+        title = video.title,
+        author = video.author,
+        darkMode = darkMode,
+        modifier = modifier,
+        publishDate = publishDate,
+        additionalInfo = additionalInfo,
+        enabled = enabled,
+        cover = {
+            RemoteCover(
+                video.coverUrl,
+                Modifier.fillMaxSize(),
+                RectangleShape,
+                placeholder = { VideoCoverPlaceholder(Modifier.fillMaxSize()) },
+            )
+            DurationBadge(video.duration, Modifier.align(Alignment.BottomEnd))
+        },
+        metadata = { color ->
+            if (statusText == null) {
+                VideoStatsLine(video.playCount, video.commentCount, color, 11.sp, 12.5.dp)
+            } else {
+                Text(statusText, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, lineHeight = metaLineHeight(11.sp))
             }
+        },
+        onClick = onClick,
+    )
+}
+
+/** 在线与离线共用的列表卡片，封面、元信息及管理操作由调用方提供。 */
+@Composable
+internal fun VideoListCardLayout(
+    title: String,
+    author: String,
+    darkMode: Boolean,
+    cover: @Composable BoxScope.() -> Unit,
+    metadata: @Composable (Color) -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    publishDate: String? = null,
+    additionalInfo: String? = null,
+    enabled: Boolean = true,
+    action: (@Composable () -> Unit)? = null,
+) {
+    val palette = videoCardPalette(darkMode)
+    VideoCardSurface(darkMode, modifier.fillMaxWidth(), onClick, enabled) {
+        // 封面不参与高度测量，由右栏文字决定卡高，系统字体放大后仍填满左缘。
+        Row(Modifier.matchParentSize()) {
+            Box(Modifier.width(CoverWidth).fillMaxHeight().clip(RectangleShape), content = cover)
             Spacer(Modifier.weight(1f))
         }
         Column(
             Modifier.fillMaxWidth().heightIn(min = ListCardHeight + if (additionalInfo == null) 0.dp else 19.dp)
                 .padding(start = CoverWidth + 12.dp, top = 9.dp, end = 10.dp, bottom = 9.dp)
         ) {
-            VideoCardTitle(
-                title = video.title,
-                color = palette.title,
-                fontSize = 14.sp,
-                lineHeight = 19.sp,
-            )
+            VideoCardTitle(title, palette.title, 14.sp, 19.sp)
             Spacer(Modifier.weight(1f))
-            VideoAuthorLine(
-                author = video.author,
-                date = publishDate,
-                authorColor = palette.author,
-                mutedColor = palette.muted,
-                fontSize = 11.sp,
-                iconSize = 12.5.dp,
-            )
-            Spacer(Modifier.height(5.dp))
-            if (statusText == null) {
-                VideoStatsLine(
-                    playCount = video.playCount,
-                    commentCount = video.commentCount,
-                    color = palette.muted,
-                    fontSize = 11.sp,
-                    iconSize = 12.5.dp,
-                )
-            } else {
-                Text(statusText, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, lineHeight = metaLineHeight(11.sp))
-            }
-            if (additionalInfo != null) {
+            Column(Modifier.padding(end = if (action == null) 0.dp else 36.dp)) {
+                VideoAuthorLine(author, publishDate, palette.author, palette.muted, 11.sp, 12.5.dp)
                 Spacer(Modifier.height(5.dp))
-                Text(
-                    additionalInfo,
-                    color = palette.muted,
-                    fontSize = 11.sp,
-                    lineHeight = metaLineHeight(11.sp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                metadata(palette.muted)
+                if (additionalInfo != null) {
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        additionalInfo,
+                        color = palette.muted,
+                        fontSize = 11.sp,
+                        lineHeight = metaLineHeight(11.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
+        }
+        if (action != null) {
+            Box(Modifier.align(Alignment.BottomEnd), contentAlignment = Alignment.BottomEnd) { action() }
         }
     }
 }
@@ -324,8 +341,14 @@ private fun VideoStat(
 /** 封面右下角的时长胶囊，深色半透明底保证在任何封面上都能读清。 */
 @Composable
 private fun DurationBadge(duration: String, modifier: Modifier = Modifier) {
+    VideoCoverBadge(formatSearchDuration(duration), modifier)
+}
+
+/** 时长、分集数与离线播放进度共用的封面角标。 */
+@Composable
+internal fun VideoCoverBadge(label: String, modifier: Modifier = Modifier) {
     Text(
-        text = formatSearchDuration(duration),
+        text = label,
         color = Color.White,
         fontSize = 10.sp,
         lineHeight = 12.sp,

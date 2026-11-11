@@ -44,6 +44,7 @@ import io.github.bilibox.feature.favorites.FavoritesScreen
 import io.github.bilibox.feature.favorites.FavoritesStateHolder
 import io.github.bilibox.feature.home.HomeScreen
 import io.github.bilibox.feature.library.LibraryScreen
+import io.github.bilibox.feature.offline.OfflineCacheScreen
 import io.github.bilibox.feature.online.OnlineVideoScreen
 import io.github.bilibox.feature.player.LocalVideoScreen
 import io.github.bilibox.feature.profile.ProfileBannerPreviewScreen
@@ -127,14 +128,33 @@ internal fun AppNavigation(
                 session = appState.session,
                 onBack = { pageTransition.back(appState::closeOnlineVideo) },
                 onViewCache = {
-                    // Cached MP4s are published to Movies/BiliBox, so the local
-                    // video library is the natural "view cache" destination.
-                    pageTransition.back {
+                    pageTransition.forward {
                         appState.closeOnlineVideo()
-                        appState.selectTab(AppTab.LIBRARY.ordinal)
+                        appState.openOfflineCache()
                     }
                 },
             )
+            return@AppPageTransition
+        }
+
+        if (appState.offlineCacheOpen) {
+            Box(Modifier.fillMaxSize()) {
+                OfflineCacheScreen(
+                    refreshToken = appState.libraryRefresh,
+                    onBack = { pageTransition.back(appState::closeOfflineCache) },
+                    onPlay = { video, playlist -> pageTransition.forward { appState.openLocalVideo(video, playlist) } },
+                    onForward = { action -> pageTransition.forward(action) },
+                    onBackward = { action -> pageTransition.back(action) },
+                )
+                appState.selectedLocalVideo?.let { video ->
+                    LocalVideoScreen(
+                        video = video,
+                        playlist = appState.localPlaylist,
+                        onVideoSelected = appState::selectLocalVideo,
+                        onBack = { pageTransition.back(appState::closeLocalVideo) },
+                    )
+                }
+            }
             return@AppPageTransition
         }
 
@@ -189,6 +209,7 @@ internal fun AppNavigation(
                         onOpenLibrary = { filter ->
                             pageTransition.tab(appState.selectedTab, AppTab.LIBRARY) { appState.openLibrary(filter) }
                         },
+                        onOpenOfflineCache = { pageTransition.forward(appState::openOfflineCache) },
                         onOpenFavorites = { pageTransition.forward(appState::openFavorites) },
                         onBannerClick = { pageTransition.forward(appState::openBannerPreview) },
                         onSessionChange = appState::updateSession,

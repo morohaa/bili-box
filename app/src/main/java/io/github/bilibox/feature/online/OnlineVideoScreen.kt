@@ -107,6 +107,8 @@ internal fun OnlineVideoScreen(
         OnlineCacheController(
             bvid = video.bvid,
             videoTitle = video.title,
+            author = video.author,
+            coverUrl = video.coverUrl,
             downloader = cacheDownloader,
             scope = scope,
             notify = { message -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show() },

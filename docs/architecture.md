@@ -24,7 +24,7 @@ data         → core
 
 弹幕模型、解析、偏好持久化在 `data/danmaku`；轨道、速度、碰撞与显示时间排布仅服务显示，放在 `feature/danmaku/layout`。
 
-搜索与收藏的视频卡片共用 `core/ui/component/VideoCards` 的封面、排版、元信息与明暗配色；收藏通过附加信息显示收藏时间，并为失效资源传入状态文案与禁用点击。
+搜索、收藏与离线缓存的视频卡片共用 `core/ui/component/VideoCards` 的封面、排版、元信息与明暗配色；列表通过 `VideoListCardLayout` 复用封面比例、卡片外壳与文字排版，离线页注入本地封面、分集 / 进度角标和缓存管理菜单。收藏通过附加信息显示收藏时间，并为失效资源传入状态文案与禁用点击。
 
 `RemoteCover` 通过 `core/util/RemoteImageCache` 复用按图片实际内存占用限制的 32 MiB LRU 缓存；创建列表项时同步读取缓存，避免滚动返回先显示占位。相同 URL 的并发加载共享任务，任务不会随单个列表项离开组合而取消；加载最多四路并发，解码最长边限制为 640px，「清除缓存」同时清空这份内存缓存。
 
@@ -69,6 +69,13 @@ data         → core
 共享模型放在 `core/model`，不夹带接口客户端或页面状态。UI 文案与图标由 UI 层映射，接口参数和响应转换放在数据层。
 
 三种“缓存”职责不同：`feature/online/EpisodePlayCache` 是播放会话内的相邻分 P 地址预取与短期内存复用；`feature/online/OnlineCacheController` 维护缓存面板的两路并发队列、视频/音频双轨状态、取消与重试；`data/online/OnlineVideoCacheStore` 负责真实下载（视频 MP4 + DASH 音频）、进度回调、取消清理与 MediaStore 发布，`OnlineCacheIndex` 持久化每个分 P 的双轨文件。前两者随会话重建，后者产出持久文件，不应因为同名 Cache 合并。
+
+## 离线缓存
+
+- 「我的 → 离线缓存」由 `feature/offline` 提供独立页面，`app` 连接个人页、在线页的「查看缓存」与本地播放器；分组进出和播放沿用应用的页面过渡动画。
+- `data/online/OnlineCacheRepository` 与下载器共用索引及进程内互斥锁，按 BV 号归组、按分 P 排序，并将视频与独立音频保留为各自文件。索引保存标题、UP 主、分 P 总数和时长；旧索引从文件名补显示标题，查询媒体库补时长，封面取本地视频帧，浏览不依赖联网。
+- 仅展示已登记且仍存在的文件；读取时清理失效轨道，删除操作同步更新 MediaStore 与索引，失败的轨道保留供重试。并发下载快照按轨道完成时间合并，已完成文件的索引提交不随页面退出取消。
+- `OfflineCacheState` 负责读取、删除与刷新；搜索、分集导航、选择状态留在页面。离线页在播放覆盖层下面保持组合，返回时刷新共享的 `PlaybackProgressStore`，保留分组与滚动位置。播放队列仅含当前分组同一类型的视频或音频。
 
 ## 自动边界检查
 

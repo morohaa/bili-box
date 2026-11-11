@@ -86,6 +86,7 @@ private fun AppSystemBars(appState: BiliBoxAppState, darkMode: Boolean) {
     // 头图预览是深色沉浸层，系统栏图标始终用白色。
     val bannerPreviewOpen = appState.bannerPreviewOpen
     val favoritesOpen = appState.favoritesOpen
+    val offlineCacheOpen = appState.offlineCacheOpen
     SideEffect {
         val window = (view.context as? Activity)?.window ?: return@SideEffect
         WindowCompat.getInsetsController(window, view).apply {
@@ -93,7 +94,7 @@ private fun AppSystemBars(appState: BiliBoxAppState, darkMode: Boolean) {
                 // 头图预览是深色沉浸层。
                 bannerPreviewOpen -> false
 
-                favoritesOpen -> !darkMode
+                favoritesOpen || offlineCacheOpen -> !darkMode
 
                 // 视频页头部是深色渐变，状态栏固定浅色图标。
                 appState.selectedTab == AppTab.LIBRARY && !appearanceOpen -> false

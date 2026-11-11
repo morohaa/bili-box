@@ -25,6 +25,18 @@ class BiliBoxAppStateTest {
     }
 
     @Test
+    fun `offline destination restores without changing selected tab`() {
+        val state = newState()
+        state.selectTab(AppTab.PROFILE.ordinal)
+        state.openOfflineCache()
+        val restored = restore(state)
+        assertTrue(restored.offlineCacheOpen)
+        assertEquals(AppTab.PROFILE, restored.selectedTab)
+        restored.closeOfflineCache()
+        assertFalse(restored.offlineCacheOpen)
+    }
+
+    @Test
     fun `navigation and search preferences survive restoration and disposal`() {
         val state = newState()
         state.selectTab(AppTab.PROFILE.ordinal)

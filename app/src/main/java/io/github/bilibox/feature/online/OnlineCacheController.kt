@@ -16,7 +16,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Owns the cache sheet's queue and state machine.
@@ -32,7 +34,12 @@ internal class OnlineCacheController(
     private val downloader: OnlineCacheDownloader,
     private val scope: CoroutineScope,
     private val notify: (String) -> Unit = {},
+    private val author: String = "",
+    private val coverUrl: String = "",
 ) {
+    private var pageDurations = emptyMap<Long, Long>()
+    private var totalParts = 1
+
     var episodes by mutableStateOf<List<OnlineCacheEpisodeUi>>(emptyList())
         private set
     var mode by mutableStateOf(OnlineCacheKind.VIDEO)
@@ -92,6 +99,8 @@ internal class OnlineCacheController(
      */
     fun syncEpisodes(pages: List<Page>, fallbackCid: Long, fallbackTitle: String) {
         if (disposed) return
+        pageDurations = pages.associate { it.cid to it.duration * 1000L }
+        totalParts = pages.size.coerceAtLeast(1)
         val seeds = pages.map { OnlineCacheSeed(it.cid, it.page, it.part) }.ifEmpty {
             if (fallbackCid > 0L) listOf(OnlineCacheSeed(fallbackCid, 1, fallbackTitle)) else emptyList()
         }
@@ -328,10 +337,9 @@ internal class OnlineCacheController(
                         onProgress = { progress -> onProgress(task, progress) },
                     )
                 }
-                if (disposed) return@launch
-
-                updateTrack(task.cid, task.kind, OnlineCacheTrackState.Done)
                 record(task, file)
+                if (disposed) return@launch
+                updateTrack(task.cid, task.kind, OnlineCacheTrackState.Done)
                 notify(
                     "P${task.page} ${if (task.kind == OnlineCacheKind.VIDEO) "视频" else "音频"}缓存完成" +
                         file.qualityLabel.takeIf { it.isNotBlank() }?.let { "（$it）" }.orEmpty()
@@ -390,7 +398,7 @@ internal class OnlineCacheController(
         }
     }
 
-    private fun record(task: OnlineCacheTask, file: CachedMediaFile) {
+    private suspend fun record(task: OnlineCacheTask, file: CachedMediaFile) {
         val previous = cachedEpisodes[task.cid] ?: OnlineCacheEpisode(
             cid = task.cid,
             page = task.page,
@@ -408,14 +416,17 @@ internal class OnlineCacheController(
             OnlineCacheKind.VIDEO -> previous.copy(page = task.page, part = task.part, video = cached)
             OnlineCacheKind.AUDIO -> previous.copy(page = task.page, part = task.part, audio = cached)
         }
-        cachedEpisodes = cachedEpisodes + (task.cid to updated)
+        cachedEpisodes = cachedEpisodes + (task.cid to updated.copy(durationMs = pageDurations[task.cid] ?: previous.durationMs))
         val snapshot = OnlineCacheIndex(
             bvid = bvid,
+            title = videoTitle,
+            author = author,
+            coverUrl = coverUrl,
+            totalParts = totalParts,
             episodes = cachedEpisodes.values.sortedBy { it.page },
         )
-        scope.launch {
-            runCatching { downloader.saveIndex(snapshot) }
-        }
+        // 完成文件的索引写入不随页面离开而取消。
+        withContext(NonCancellable) { downloader.saveIndex(snapshot) }
     }
 
     private data class OnlineCacheSeed(

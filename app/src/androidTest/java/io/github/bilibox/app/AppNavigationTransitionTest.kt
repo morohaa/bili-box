@@ -80,6 +80,18 @@ class AppNavigationTransitionTest {
         finishTransition()
         compose.runOnIdle { assertFalse(state.bannerPreviewOpen) }
 
+        compose.onNodeWithText("离线缓存").performClick()
+        finishTransition()
+        compose.runOnIdle { assertTrue(state.offlineCacheOpen) }
+        compose.onNodeWithText("已缓存视频").assertDoesNotExist()
+        compose.onNodeWithContentDescription("搜索缓存").assertExists()
+        pressBack()
+        finishTransition()
+        compose.runOnIdle {
+            assertFalse(state.offlineCacheOpen)
+            assertEquals(AppTab.PROFILE, state.selectedTab)
+        }
+
         compose.onNodeWithText("视频").performClick()
         finishTransition()
         compose.onNodeWithTag("library-search-field").assertExists()

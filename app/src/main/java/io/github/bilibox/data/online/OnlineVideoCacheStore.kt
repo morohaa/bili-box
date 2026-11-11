@@ -18,11 +18,7 @@ import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 /**
  * Downloads video and audio tracks for the cache sheet.
@@ -40,39 +36,11 @@ internal class OnlineVideoCacheStore(
 ) : OnlineCacheDownloader {
     private val appContext = context.applicationContext
     private val resolver = appContext.contentResolver
-    private val json = Json {
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-        prettyPrint = true
-    }
-    private val indexMutex = Mutex()
-    private val indexDir = File(appContext.filesDir, "online_cache")
+    private val indices = OnlineCacheRepository(appContext)
 
-    override suspend fun loadIndex(bvid: String): OnlineCacheIndex = withContext(Dispatchers.IO) {
-        indexMutex.withLock {
-            val file = indexFile(bvid)
-            if (!file.isFile) return@withLock OnlineCacheIndex(bvid)
+    override suspend fun loadIndex(bvid: String): OnlineCacheIndex = indices.loadIndex(bvid)
 
-            val parsed = runCatching {
-                json.decodeFromString<OnlineCacheIndex>(file.readText())
-            }.getOrNull() ?: return@withLock OnlineCacheIndex(bvid)
-
-            // The user can delete a cached video from the gallery while the app
-            // is not running. Prune index entries whose MediaStore row is gone.
-            val episodes = parsed.episodes.mapNotNull { episode ->
-                val video = episode.video?.takeIf { isMediaAlive(it.uri) }
-                val audio = episode.audio?.takeIf { isMediaAlive(it.uri) }
-                if (video == null && audio == null) null else episode.copy(video = video, audio = audio)
-            }
-            val index = parsed.copy(bvid = bvid, episodes = episodes)
-            if (episodes.size != parsed.episodes.size) writeIndex(index)
-            index
-        }
-    }
-
-    override suspend fun saveIndex(index: OnlineCacheIndex) = withContext(Dispatchers.IO) {
-        indexMutex.withLock { writeIndex(index) }
-    }
+    override suspend fun saveIndex(index: OnlineCacheIndex) = indices.saveIndex(index)
 
     override suspend fun cacheVideo(
         bvid: String,
@@ -323,35 +291,6 @@ internal class OnlineVideoCacheStore(
         )
         if (published != 1) throw IOException("无法发布缓存文件")
     }
-
-    private fun writeIndex(index: OnlineCacheIndex) {
-        if (!indexDir.isDirectory && !indexDir.mkdirs()) throw IOException("无法创建缓存索引目录")
-        val target = indexFile(index.bvid)
-        val temp = File(indexDir, "${target.name}.tmp")
-        temp.writeText(json.encodeToString(index))
-        if (!temp.renameTo(target)) {
-            target.writeText(temp.readText())
-            temp.delete()
-        }
-    }
-
-    private fun indexFile(bvid: String): File {
-        val safe = bvid.map { char ->
-            if (char.isLetterOrDigit() || char == '-' || char == '_') char else '_'
-        }.joinToString("").ifBlank { "unknown" }
-        return File(indexDir, "$safe.json")
-    }
-
-    private fun isMediaAlive(uri: String): Boolean = runCatching {
-        if (uri.isBlank()) return@runCatching false
-        resolver.query(
-            Uri.parse(uri),
-            arrayOf(MediaStore.MediaColumns._ID),
-            null,
-            null,
-            null,
-        )?.use { cursor -> cursor.moveToFirst() } == true
-    }.getOrDefault(false)
 
     private companion object {
         const val PROGRESS_INTERVAL_MS = 80L

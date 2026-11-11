@@ -15,6 +15,10 @@ import kotlinx.serialization.Serializable
 internal data class OnlineCacheIndex(
     val bvid: String = "",
     val episodes: List<OnlineCacheEpisode> = emptyList(),
+    val title: String = "",
+    val author: String = "",
+    val coverUrl: String = "",
+    val totalParts: Int = 1,
 )
 
 @Serializable
@@ -24,6 +28,7 @@ internal data class OnlineCacheEpisode(
     val part: String = "",
     val video: OnlineCacheFile? = null,
     val audio: OnlineCacheFile? = null,
+    val durationMs: Long = 0L,
 )
 
 @Serializable

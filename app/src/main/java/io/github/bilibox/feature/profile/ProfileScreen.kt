@@ -102,6 +102,7 @@ internal fun ProfileScreen(
     backgroundImage: ImageBitmap? = null,
     onToggleDarkMode: (Offset) -> Unit = {},
     onOpenThemeAppearance: () -> Unit = {},
+    onOpenOfflineCache: () -> Unit = {},
     onOpenLibrary: (LocalVideoQuickFilter?) -> Unit = {},
     onOpenFavorites: () -> Unit = {},
     onBannerClick: () -> Unit = {},
@@ -209,7 +210,7 @@ internal fun ProfileScreen(
                 ActionGrid(
                     darkMode = darkMode,
                     background = background,
-                    onOfflineCache = { onOpenLibrary(LocalVideoQuickFilter.BILI_CACHE) },
+                    onOfflineCache = onOpenOfflineCache,
                     onHistory = { onOpenLibrary(LocalVideoQuickFilter.RECENT) },
                     onLocalVideos = { onOpenLibrary(null) },
                     onLoginMethods = { sheet = MySheet.LoginMethods },
