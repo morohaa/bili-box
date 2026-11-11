@@ -223,8 +223,8 @@ internal fun OfflineCacheContent(
                 }
             }
         }
-        HorizontalDivider(color = colors.outlineVariant.copy(alpha = .45f))
         if (managing) {
+            HorizontalDivider(color = colors.outlineVariant.copy(alpha = .45f))
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("已选 ${selectedEntries.size} 项", Modifier.weight(1f), color = colors.onSurfaceVariant, fontSize = 13.sp)
                 Button(onClick = { pendingDelete = selectedEntries }, enabled = selectedEntries.isNotEmpty() && !deleting) {
@@ -232,12 +232,7 @@ internal fun OfflineCacheContent(
                 }
             }
         } else {
-            Text(
-                "已使用 ${formatBytes(library.sizeBytes)}  /  剩余 ${formatBytes(library.freeBytes)}",
-                Modifier.align(Alignment.CenterHorizontally).padding(18.dp),
-                color = colors.onSurfaceVariant,
-                fontSize = 12.sp,
-            )
+            OfflineStorageSummary(cacheBytes = library.sizeBytes, freeBytes = library.freeBytes)
         }
     }
     if (pendingDelete.isNotEmpty()) {
