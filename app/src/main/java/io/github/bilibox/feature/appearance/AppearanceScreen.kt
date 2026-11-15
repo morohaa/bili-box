@@ -274,6 +274,12 @@ internal fun AppearanceScreen(
                         }
                     }
                 }
+                NavigationSettingsCard(
+                    fixed = appearance.fixedBottomNavigation,
+                    accent = accent,
+                    palette = palette,
+                    onFixedChange = { fixed -> onChange(appearance.copy(fixedBottomNavigation = fixed)) },
+                )
                 FontSettingsCard(
                     selected = appearance.font,
                     accent = accent,

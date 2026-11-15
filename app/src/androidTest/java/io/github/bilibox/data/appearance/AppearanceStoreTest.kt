@@ -9,6 +9,7 @@ import io.github.bilibox.core.ui.theme.HomeBackground
 import io.github.bilibox.core.ui.theme.PageBackgroundSettings
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class AppearanceStoreTest {
@@ -85,5 +86,22 @@ class AppearanceStoreTest {
         assertEquals(AppFont.DEFAULT, AppearanceStore(preferences).load().font)
         preferences.edit().putString("font_id", "removed-font").commit()
         assertEquals(AppFont.DEFAULT, AppearanceStore(preferences).load().font)
+    }
+
+    @Test
+    fun navigationDefaultsToAutoHideAndReopensWithSavedChoice() {
+        preferences.edit().clear().commit()
+        assertFalse(AppearanceStore(preferences).load().fixedBottomNavigation)
+        listOf(true, false).forEach { fixed ->
+            val settings = AppearanceSettings(themeId = "blue", font = AppFont.WENKAI, fixedBottomNavigation = fixed)
+            AppearanceStore(preferences).save(settings)
+            val reopened = AppearanceStore(preferences).load()
+            assertEquals(settings, reopened)
+            AppearanceStore(preferences).save(reopened.copy(themeId = "pink"))
+            assertEquals(fixed, AppearanceStore(preferences).load().fixedBottomNavigation)
+        }
+        AppearanceStore(preferences).save(AppearanceSettings(fixedBottomNavigation = true))
+        AppearanceStore(preferences).save(AppearanceSettings())
+        assertFalse(AppearanceStore(preferences).load().fixedBottomNavigation)
     }
 }

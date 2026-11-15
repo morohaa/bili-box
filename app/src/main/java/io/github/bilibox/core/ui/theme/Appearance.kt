@@ -71,7 +71,7 @@ internal data class PageBackgroundSettings(
     val blur: Int = 0,
 )
 
-/** 主题偏好：主题色、字体、明暗模式与三个主页面各自的背景。 */
+/** 主题偏好：主题色、字体、明暗模式、导航栏行为与三个主页面各自的背景。 */
 internal data class AppearanceSettings(
     val themeId: String = DefaultThemeId,
     val mode: AppearanceMode = AppearanceMode.LIGHT,
@@ -82,6 +82,7 @@ internal data class AppearanceSettings(
     val videoBackground: PageBackgroundSettings = PageBackgroundSettings(),
     val profileBackground: PageBackgroundSettings = PageBackgroundSettings(),
     val font: AppFont = AppFont.DEFAULT,
+    val fixedBottomNavigation: Boolean = false,
 ) {
     val theme: ThemeOption get() = themeById(themeId)
 

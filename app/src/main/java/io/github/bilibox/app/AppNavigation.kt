@@ -99,7 +99,10 @@ internal fun AppNavigation(
     val favoritesVideoScroll = rememberLazyListState()
 
     val pageTransition = rememberAppPageTransitionState()
-    val navigation = rememberAutoHideNavigationState(appState.isBottomNavigationEnabled(), appState.selectedTab)
+    val navigation = rememberAutoHideNavigationState(
+        enabled = appState.isBottomNavigationEnabled() && !appearance.fixedBottomNavigation,
+        resetKey = appState.selectedTab,
+    )
     val backdrop = rememberGraphicsLayer()
     val appBackground = if (darkMode) Color(0xFF17191D) else Color(0xFFF4F6FA)
     Box(Modifier.fillMaxSize().background(appBackground).navigationActivity(navigation, appState.isBottomNavigationEnabled())) {

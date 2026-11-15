@@ -28,6 +28,7 @@ internal class AppearanceStore(private val preferences: SharedPreferences) {
             themeId = themeId,
             mode = mode,
             font = AppFont.fromStorageId(preferences.getString("font_id", null)),
+            fixedBottomNavigation = preferences.getBoolean("fixed_bottom_navigation", false),
         ).let { settings ->
             BackgroundPage.entries.fold(settings) { result, page ->
                 result.withBackground(page, loadBackground(page))
@@ -53,6 +54,7 @@ internal class AppearanceStore(private val preferences: SharedPreferences) {
             .putString("theme_id", settings.themeId)
             .putString("appearance_mode", settings.mode.name)
             .putString("font_id", settings.font.storageId)
+            .putBoolean("fixed_bottom_navigation", settings.fixedBottomNavigation)
             .remove("dark_mode")
         BackgroundPage.entries.forEach { page ->
             val background = settings.backgroundFor(page)
