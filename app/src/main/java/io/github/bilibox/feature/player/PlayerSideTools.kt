@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +31,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -37,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.R
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.util.formatSpeedBadge
 import kotlin.math.roundToInt
@@ -273,6 +276,7 @@ internal fun PlayerSideTools(
     screenshotEnabled: Boolean,
     onScreenshot: () -> Unit,
     onToggleLock: () -> Unit,
+    onVerticalFullScreen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -291,6 +295,21 @@ internal fun PlayerSideTools(
                 contentDescription = if (locked) "解锁屏幕" else "锁定屏幕"
             }
         ) { ScreenLockIcon(locked) }
+        if (!locked) {
+            IconButton(
+                onClick = onVerticalFullScreen,
+                modifier = Modifier.size(48.dp).semantics { contentDescription = "切换竖屏全屏" },
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_player_portrait_fullscreen),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        } else {
+            Spacer(Modifier.size(48.dp))
+        }
     }
 }
 

@@ -280,6 +280,7 @@ internal fun VideoPlayerScreen(
     fun toggleVerticalFullScreen() {
         controlsVisible = true
         verticalFullScreen = !verticalFullScreen
+        if (fullScreen) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
 
     fun navigateBack() {
@@ -653,8 +654,9 @@ internal fun VideoPlayerScreen(
                         screenshotEnabled = hasVideoFrame && playbackError == null,
                         onScreenshot = takeScreenshot,
                         onToggleLock = { toggleScreenLock() },
+                        onVerticalFullScreen = { toggleVerticalFullScreen() },
                         modifier = Modifier.align(Alignment.CenterEnd).displayCutoutPadding()
-                            .navigationBarsPadding().padding(end = 10.dp).offset(y = (-36).dp)
+                            .navigationBarsPadding().padding(end = 10.dp).offset(y = (-6).dp)
                     )
                 }
                 gestures.feedback?.let { feedback ->
