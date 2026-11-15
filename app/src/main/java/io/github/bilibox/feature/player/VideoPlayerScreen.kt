@@ -294,13 +294,13 @@ internal fun VideoPlayerScreen(
 
     fun togglePlayback() {
         if (screenLocked) return
+        // 双击只切换播放状态，保留沉浸播放时已隐藏的控件。
         if (player.playbackState == Player.STATE_ENDED) {
             player.seekTo(0L)
             player.playWhenReady = true
         } else {
             player.playWhenReady = !player.playWhenReady
         }
-        controlsVisible = true
     }
 
     fun toggleScreenLock() {
