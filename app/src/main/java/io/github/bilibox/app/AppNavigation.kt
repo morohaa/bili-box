@@ -8,6 +8,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -26,11 +28,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.bilibox.core.ui.component.LiquidNavigation
 import io.github.bilibox.core.ui.theme.AppearanceSettings
@@ -93,9 +99,10 @@ internal fun AppNavigation(
     val favoritesVideoScroll = rememberLazyListState()
 
     val pageTransition = rememberAppPageTransitionState()
+    val navigation = rememberAutoHideNavigationState(appState.isBottomNavigationEnabled(), appState.selectedTab)
     val backdrop = rememberGraphicsLayer()
     val appBackground = if (darkMode) Color(0xFF17191D) else Color(0xFFF4F6FA)
-    Box(Modifier.fillMaxSize().background(appBackground)) {
+    Box(Modifier.fillMaxSize().background(appBackground).navigationActivity(navigation, appState.isBottomNavigationEnabled())) {
         // Capture only the page content for the glass backdrop; the navigation stays outside page transitions.
         Box(
             Modifier.fillMaxSize().drawWithContent {
@@ -256,31 +263,63 @@ internal fun AppNavigation(
                 }
             }
         }
-        if (!appState.appearanceOpen && !appState.bannerPreviewOpen && appState.selectedVideo == null &&
-            !appState.offlineCacheOpen && !appState.favoritesOpen && appState.selectedLocalVideo == null
+        AppBottomNavigation(appState, pageTransition, navigation, backdrop, darkMode)
+    }
+}
+
+private fun BiliBoxAppState.hasBottomNavigation(): Boolean = !appearanceOpen && !bannerPreviewOpen && selectedVideo == null &&
+    !offlineCacheOpen && !favoritesOpen && selectedLocalVideo == null
+
+private fun BiliBoxAppState.isBottomNavigationEnabled(): Boolean = hasBottomNavigation() && !(selectedTab == AppTab.HOME && homeExpanded)
+
+@Composable
+private fun BoxScope.AppBottomNavigation(
+    appState: BiliBoxAppState,
+    pageTransition: AppPageTransitionState,
+    navigation: AutoHideNavigationState,
+    backdrop: GraphicsLayer,
+    darkMode: Boolean,
+) {
+    val navigationEnabled = appState.isBottomNavigationEnabled()
+    if (appState.hasBottomNavigation()) {
+        AnimatedVisibility(
+            visible = navigationEnabled && navigation.visible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = tween(420, easing = BrandSpringEasing),
+            ) + fadeIn(tween(200)),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(360, easing = BrandSpringEasing),
+            ) + fadeOut(tween(140)),
         ) {
-            AnimatedVisibility(
-                visible = !(appState.selectedTab == AppTab.HOME && appState.homeExpanded),
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically(
-                    initialOffsetY = { it },
-                    animationSpec = tween(420, easing = BrandSpringEasing),
-                ) + fadeIn(tween(200)),
-                exit = slideOutVertically(
-                    targetOffsetY = { it },
-                    animationSpec = tween(360, easing = BrandSpringEasing),
-                ) + fadeOut(tween(140)),
-            ) {
-                LiquidNavigation(
-                    appState.selectedTab.ordinal,
-                    { index ->
-                        pageTransition.tab(appState.selectedTab, AppTab.entries[index]) { appState.selectTab(index) }
-                    },
-                    backdrop,
-                    darkMode,
-                    Modifier.testTag("app-bottom-navigation").navigationBarsPadding().padding(bottom = 16.dp)
-                )
-            }
+            LiquidNavigation(
+                appState.selectedTab.ordinal,
+                { index ->
+                    navigation.show()
+                    pageTransition.tab(appState.selectedTab, AppTab.entries[index]) { appState.selectTab(index) }
+                },
+                backdrop,
+                darkMode,
+                Modifier.testTag("app-bottom-navigation").navigationBarsPadding().padding(bottom = 16.dp)
+            )
+        }
+        if (navigationEnabled && !navigation.visible) {
+            // The first tap only restores navigation; it cannot activate content underneath.
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .navigationBarsPadding().height(48.dp)
+                    .testTag("app-bottom-navigation-reveal")
+                    .semantics { contentDescription = "显示底部导航" }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Button,
+                        onClickLabel = "显示底部导航",
+                        onClick = navigation::show,
+                    ),
+            )
         }
     }
 }

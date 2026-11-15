@@ -62,46 +62,48 @@ internal fun OnlineVideoScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val client = remember(video.bvid, session?.cookie) {
-        BiliClient().also { it.cookieHeader = session?.cookie }
+    // Reusing the key avoids excessive Kotlin data-flow analysis across repeated safe calls in remember.
+    val cookie = session?.cookie
+    val client = remember(video.bvid, cookie) {
+        BiliClient().also { it.cookieHeader = cookie }
     }
-    val dataSourceFactory = remember(video.bvid, session?.cookie, context) {
-        DefaultDataSource.Factory(context, BiliPlayback.dataSourceFactory(session?.cookie, video.bvid))
+    val dataSourceFactory = remember(video.bvid, cookie, context) {
+        DefaultDataSource.Factory(context, BiliPlayback.dataSourceFactory(cookie, video.bvid))
     }
-    val exoPlayer = remember(video.bvid, session?.cookie) {
+    val exoPlayer = remember(video.bvid, cookie) {
         val renderersFactory = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
         ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
     }
-    var playbackState by remember(video.bvid, session?.cookie) { mutableStateOf<OnlinePlaybackState>(OnlinePlaybackState.Loading) }
-    var playbackData by remember(video.bvid, session?.cookie) { mutableStateOf<PlayData?>(null) }
-    var playbackCid by remember(video.bvid, session?.cookie) { mutableLongStateOf(0L) }
-    var playbackCandidateIndex by remember(video.bvid, session?.cookie) { mutableIntStateOf(0) }
-    var playbackCandidateCount by remember(video.bvid, session?.cookie) { mutableIntStateOf(1) }
+    var playbackState by remember(video.bvid, cookie) { mutableStateOf<OnlinePlaybackState>(OnlinePlaybackState.Loading) }
+    var playbackData by remember(video.bvid, cookie) { mutableStateOf<PlayData?>(null) }
+    var playbackCid by remember(video.bvid, cookie) { mutableLongStateOf(0L) }
+    var playbackCandidateIndex by remember(video.bvid, cookie) { mutableIntStateOf(0) }
+    var playbackCandidateCount by remember(video.bvid, cookie) { mutableIntStateOf(1) }
     // Candidate lists depend on the qn they were built with; host rotation must reuse it.
-    var playbackCandidateQn by remember(video.bvid, session?.cookie) { mutableIntStateOf(BiliQn.P1080) }
-    var playbackRefreshTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
-    var dashFallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
-    var durlFallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
-    var html5FallbackTried by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
-    var videoInfo by remember(video.bvid, session?.cookie) { mutableStateOf<VideoInfo?>(null) }
-    var selectedPage by rememberSaveable(video.bvid, session?.cookie) { mutableIntStateOf(1) }
-    var selectedQn by rememberSaveable(video.bvid, session?.cookie) { mutableIntStateOf(BiliQn.P1080) }
+    var playbackCandidateQn by remember(video.bvid, cookie) { mutableIntStateOf(BiliQn.P1080) }
+    var playbackRefreshTried by remember(video.bvid, cookie) { mutableStateOf(false) }
+    var dashFallbackTried by remember(video.bvid, cookie) { mutableStateOf(false) }
+    var durlFallbackTried by remember(video.bvid, cookie) { mutableStateOf(false) }
+    var html5FallbackTried by remember(video.bvid, cookie) { mutableStateOf(false) }
+    var videoInfo by remember(video.bvid, cookie) { mutableStateOf<VideoInfo?>(null) }
+    var selectedPage by rememberSaveable(video.bvid, cookie) { mutableIntStateOf(1) }
+    var selectedQn by rememberSaveable(video.bvid, cookie) { mutableIntStateOf(BiliQn.P1080) }
     // The quality the server actually started, which can be lower than the requested one.
-    var actualQn by rememberSaveable(video.bvid, session?.cookie) { mutableIntStateOf(0) }
+    var actualQn by rememberSaveable(video.bvid, cookie) { mutableIntStateOf(0) }
     // Selecting the same quality again must still be able to retry a clamped stream.
-    var qualityRequestToken by remember(video.bvid, session?.cookie) { mutableIntStateOf(0) }
-    var qualityResumeMs by remember(video.bvid, session?.cookie) { mutableLongStateOf(0L) }
-    var qualityResumePlaying by remember(video.bvid, session?.cookie) { mutableStateOf(true) }
-    var episodesSheetVisible by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(false) }
-    var autoPlayNext by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(true) }
-    var episodesInGridView by rememberSaveable(video.bvid, session?.cookie) { mutableStateOf(false) }
-    var creatorCard by remember(video.bvid, session?.cookie) { mutableStateOf<UserCardData?>(null) }
+    var qualityRequestToken by remember(video.bvid, cookie) { mutableIntStateOf(0) }
+    var qualityResumeMs by remember(video.bvid, cookie) { mutableLongStateOf(0L) }
+    var qualityResumePlaying by remember(video.bvid, cookie) { mutableStateOf(true) }
+    var episodesSheetVisible by rememberSaveable(video.bvid, cookie) { mutableStateOf(false) }
+    var autoPlayNext by rememberSaveable(video.bvid, cookie) { mutableStateOf(true) }
+    var episodesInGridView by rememberSaveable(video.bvid, cookie) { mutableStateOf(false) }
+    var creatorCard by remember(video.bvid, cookie) { mutableStateOf<UserCardData?>(null) }
     // Cache sheet data + queue. The controller lives for the whole video screen
     // so downloads keep running after the sheet is dismissed.
-    val cacheDownloader = remember(context, client, session?.cookie) {
-        OnlineVideoCacheStore(context, client, session?.cookie)
+    val cacheDownloader = remember(context, client, cookie) {
+        OnlineVideoCacheStore(context, client, cookie)
     }
     val cacheController = remember(cacheDownloader, video.bvid, scope) {
         OnlineCacheController(
@@ -114,7 +116,7 @@ internal fun OnlineVideoScreen(
             notify = { message -> Toast.makeText(context, message, Toast.LENGTH_SHORT).show() },
         )
     }
-    var cacheSheetVisible by remember(video.bvid, session?.cookie) { mutableStateOf(false) }
+    var cacheSheetVisible by remember(video.bvid, cookie) { mutableStateOf(false) }
     DisposableEffect(cacheController) {
         onDispose { cacheController.dispose() }
     }
@@ -126,7 +128,7 @@ internal fun OnlineVideoScreen(
         )
     }
     // Cache entries belong to one quality, so do not reuse 1080P urls after a quality change.
-    val episodePlayCache = remember(video.bvid, session?.cookie, selectedQn) { EpisodePlayCache() }
+    val episodePlayCache = remember(video.bvid, cookie, selectedQn) { EpisodePlayCache() }
     var retryToken by remember(video.bvid) { mutableIntStateOf(0) }
     // 弹幕偏好跨视频保留；每条分 P 的弹幕列表按 cid 单独加载。
     val danmakuPreferences = remember(context) { DanmakuPreferences(context) }
@@ -193,7 +195,7 @@ internal fun OnlineVideoScreen(
         playbackCandidateIndex = 0
         playbackCandidateQn = qn
         playbackCandidateCount = BiliPlayback.candidateCount(data, preferredQn = qn)
-        BiliPlayback.attach(exoPlayer, data, preferredQn = qn, cookie = session?.cookie, bvid = video.bvid, startPositionMs = resumeMs)
+        BiliPlayback.attach(exoPlayer, data, preferredQn = qn, cookie = cookie, bvid = video.bvid, startPositionMs = resumeMs)
     }
 
     /** Moves to the next CDN host pair of the current playurl response. */
@@ -209,7 +211,7 @@ internal fun OnlineVideoScreen(
             data,
             preferredQn = playbackCandidateQn,
             candidateIndex = nextIndex,
-            cookie = session?.cookie,
+            cookie = cookie,
             bvid = video.bvid,
             startPositionMs = resumeMs,
         )
@@ -419,7 +421,7 @@ internal fun OnlineVideoScreen(
     // Part loading runs in its own scope instead of the effect: when listening in
     // the background, Compose stops recomposing, so the end-of-part listener and the
     // notification "next" start the next part directly through [startLoad].
-    val loadScope = remember(video.bvid, session?.cookie) { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+    val loadScope = remember(video.bvid, cookie) { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
     val loadCoordinator = remember(client, video.bvid, loadScope) {
         OnlinePlaybackLoadCoordinator(client, video.bvid, loadScope)
     }
@@ -471,7 +473,7 @@ internal fun OnlineVideoScreen(
             ),
         )
     }
-    LaunchedEffect(video.bvid, session?.cookie, retryToken, selectedPage, selectedQn, qualityRequestToken) {
+    LaunchedEffect(video.bvid, cookie, retryToken, selectedPage, selectedQn, qualityRequestToken) {
         val key = listOf(retryToken, selectedPage, selectedQn, qualityRequestToken)
         // The background queue may already have started exactly this part.
         if (!loadCoordinator.hasRequested(key)) startLoad(key)
