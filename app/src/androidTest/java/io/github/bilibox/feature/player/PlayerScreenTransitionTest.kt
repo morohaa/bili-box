@@ -16,6 +16,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -58,10 +59,16 @@ class PlayerScreenTransitionTest {
         compose.onNodeWithContentDescription("切换竖屏全屏").performClick()
         // 横屏配置尚未更新时，不能提前清掉竖屏全屏请求。
         compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
         compose.runOnIdle {
             assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, activity.requestedOrientation)
             orientation = Configuration.ORIENTATION_PORTRAIT
         }
+        compose.mainClock.advanceTimeByFrame()
+        assertPortraitFullscreenFrame()
+        compose.mainClock.advanceTimeBy(160)
+        assertPortraitFullscreenFrame()
+        compose.mainClock.autoAdvance = true
         compose.waitForIdle()
         compose.onNodeWithContentDescription("退出竖屏").assertExists()
         compose.onNodeWithContentDescription("切换竖屏全屏").assertDoesNotExist()
@@ -131,6 +138,13 @@ class PlayerScreenTransitionTest {
     }
 
     private fun videoHeight(): Float = compose.onNodeWithTag("player-touch-surface").fetchSemanticsNode().boundsInRoot.height
+
+    private fun assertPortraitFullscreenFrame() {
+        compose.onNodeWithText("视频详情").assertDoesNotExist()
+        val video = compose.onNodeWithTag("player-touch-surface").fetchSemanticsNode().boundsInRoot
+        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        assertEquals("旋转后首帧和中间帧都应保持全屏高度", root.bottom, video.bottom, 1f)
+    }
 
     private fun playerView(): PlayerView {
         var result: PlayerView? = null
