@@ -1,5 +1,7 @@
 package io.github.bilibox.feature.player
 
+import android.content.res.Configuration
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -21,6 +25,9 @@ import androidx.compose.ui.unit.sp
 import io.github.bilibox.R
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
+import io.github.bilibox.core.ui.component.playback.PlayerSidePanel
+import io.github.bilibox.core.ui.component.playback.PlayerSidePanelMuted
+import io.github.bilibox.core.ui.component.playback.PlayerSidePanelTitle
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.PlaybackCard
 import io.github.bilibox.core.ui.theme.PlaybackInk
@@ -30,28 +37,34 @@ import io.github.bilibox.core.util.formatPlaybackTime
 import io.github.bilibox.data.localvideo.LocalVideoBookmark
 
 @Composable
-internal fun LocalVideoBookmarks(state: LocalVideoBookmarkState) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Icon(painterResource(R.drawable.ic_player_bookmark), null, Modifier.size(21.dp), tint = OnlinePink)
-            Spacer(Modifier.width(8.dp))
-            Text("视频标记", color = PlaybackInk, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = state::add, enabled = state.canAdd) {
-                Text("添加标记")
+internal fun LocalVideoBookmarks(state: LocalVideoBookmarkState, inSidePanel: Boolean = false) {
+    val ink = if (inSidePanel) PlayerSidePanelTitle else PlaybackInk
+    val muted = if (inSidePanel) PlayerSidePanelMuted else PlaybackMuted
+    Column(Modifier.fillMaxWidth().padding(horizontal = if (inSidePanel) 0.dp else 18.dp, vertical = 14.dp)) {
+        if (!inSidePanel) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(painterResource(R.drawable.ic_player_bookmark), null, Modifier.size(21.dp), tint = OnlinePink)
+                Spacer(Modifier.width(8.dp))
+                Text("视频标记", color = ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = state::add, enabled = state.canAdd, colors = ButtonDefaults.textButtonColors(contentColor = OnlinePink)) {
+                    Text("添加标记")
+                }
             }
         }
         if (state.items.isEmpty()) {
             Column(Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("还没有标记", color = PlaybackInk, fontSize = 15.sp)
+                Text("还没有标记", color = ink, fontSize = 15.sp)
                 Spacer(Modifier.height(8.dp))
-                Text("播放到关键位置时，点击“添加标记”", color = PlaybackMuted, fontSize = 13.sp)
+                Text(if (inSidePanel) "点击顶部标记图标，记录当前时间点" else "播放到关键位置时，点击“添加标记”", color = muted, fontSize = 13.sp)
             }
         } else {
-            Text("点击跳转 · 按时间排序", color = PlaybackMuted, fontSize = 12.sp)
-            Spacer(Modifier.height(12.dp))
+            if (!inSidePanel) {
+                Text("点击跳转 · 按时间排序", color = muted, fontSize = 12.sp)
+                Spacer(Modifier.height(12.dp))
+            }
             state.items.forEach { bookmark ->
-                key(bookmark.id) { BookmarkRow(bookmark, state) }
+                key(bookmark.id) { BookmarkRow(bookmark, state, inSidePanel) }
                 Spacer(Modifier.height(10.dp))
             }
         }
@@ -59,11 +72,11 @@ internal fun LocalVideoBookmarks(state: LocalVideoBookmarkState) {
 }
 
 @Composable
-private fun BookmarkRow(bookmark: LocalVideoBookmark, state: LocalVideoBookmarkState) {
+private fun BookmarkRow(bookmark: LocalVideoBookmark, state: LocalVideoBookmarkState, inSidePanel: Boolean) {
     val time = formatPlaybackTime(bookmark.positionMs)
     var menuOpen by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().background(PlaybackCard, RoundedCornerShape(12.dp)),
+        Modifier.fillMaxWidth().background(if (inSidePanel) Color.White.copy(alpha = .05f) else PlaybackCard, RoundedCornerShape(12.dp)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
@@ -77,7 +90,7 @@ private fun BookmarkRow(bookmark: LocalVideoBookmark, state: LocalVideoBookmarkS
             Spacer(Modifier.width(14.dp))
             Text(
                 bookmark.note.ifBlank { "未命名标记" },
-                color = PlaybackInk,
+                color = if (inSidePanel) PlayerSidePanelTitle else PlaybackInk,
                 fontSize = 14.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -85,7 +98,7 @@ private fun BookmarkRow(bookmark: LocalVideoBookmark, state: LocalVideoBookmarkS
         }
         Box {
             IconButton(onClick = { menuOpen = true }, modifier = Modifier.semantics { contentDescription = "管理标记 $time" }) {
-                AppGlyphIcon(AppIcon.MORE, PlaybackMuted, Modifier.size(20.dp))
+                AppGlyphIcon(AppIcon.MORE, if (inSidePanel) PlayerSidePanelMuted else PlaybackMuted, Modifier.size(20.dp))
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(text = { Text("修改备注") }, onClick = {
@@ -104,7 +117,26 @@ private fun BookmarkRow(bookmark: LocalVideoBookmark, state: LocalVideoBookmarkS
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LocalVideoBookmarkOverlays(state: LocalVideoBookmarkState) {
-    if (state.sheetOpen) {
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    BackHandler(enabled = landscape && state.sheetOpen) { state.sheetOpen = false }
+    if (landscape) {
+        PlayerSidePanelHost(
+            visible = state.sheetOpen,
+            onDismiss = { state.sheetOpen = false },
+            scrimDescription = "关闭标记面板",
+        ) {
+            PlayerSidePanel(
+                title = "标记",
+                titleBadge = "(${state.items.size})",
+                onDismiss = { state.sheetOpen = false },
+                closeDescription = "收起标记面板",
+            ) {
+                Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
+                    LocalVideoBookmarks(state, inSidePanel = true)
+                }
+            }
+        }
+    } else if (state.sheetOpen) {
         ModalBottomSheet(
             onDismissRequest = { state.sheetOpen = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),

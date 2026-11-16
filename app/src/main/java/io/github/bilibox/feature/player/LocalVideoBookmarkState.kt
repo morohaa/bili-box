@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.media3.common.Player
+import io.github.bilibox.core.util.formatPlaybackTime
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoBookmark
 import io.github.bilibox.data.localvideo.LocalVideoBookmarkStore
@@ -44,6 +45,7 @@ internal class LocalVideoBookmarkState(
             return
         }
         save(items + LocalVideoBookmark(UUID.randomUUID().toString(), position))
+        notify("已添加标记 ${formatPlaybackTime(position)}")
     }
 
     fun rename(bookmark: LocalVideoBookmark, note: String) {

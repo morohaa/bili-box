@@ -58,6 +58,7 @@ class PlayerLandscapeControlsTest {
                         onRetry = {},
                         listenInfo = ListenInfo("测试视频", online),
                         onBookmarksClick = if (online) null else ({}),
+                        onAddBookmark = if (online) null else ({}),
                         playbackModeSheet = if (online) null else ({ dismiss -> TextButtonForTest(dismiss) }),
                         onCache = { cacheVisible = true },
                         cacheSheetVisible = cacheVisible,
@@ -115,7 +116,8 @@ class PlayerLandscapeControlsTest {
     @Test
     fun localLandscapeListenButtonOpensAudioModeAndMoreCanOpenPlaybackOrder() {
         showPlayer(online = false)
-        compose.onNodeWithContentDescription("打开标记列表").assertIsDisplayed()
+        compose.onNodeWithContentDescription("添加标记").assertIsDisplayed()
+        compose.onNodeWithContentDescription("标记").assertIsDisplayed()
         compose.onNodeWithContentDescription("更多").performClick()
         compose.onNodeWithText("更多播放设置").performScrollTo().performClick()
         compose.onNodeWithText("播放顺序").performClick()

@@ -142,6 +142,7 @@ internal fun LocalVideoScreen(
         commentMessage = "本地视频暂时没有评论",
         detailTabs = listOf("简介", "标记"),
         onBookmarksClick = { bookmarks.sheetOpen = true },
+        onAddBookmark = bookmarks::add,
         sourcePill = true,
         listenInfo = ListenInfo(
             subtitle = localListenSubtitle(video),

@@ -75,6 +75,7 @@ internal class PlayerBottomBarActions(
     val onToggleOrientation: () -> Unit,
     val onToggleVerticalFullScreen: () -> Unit,
     val onSeekCanceled: () -> Unit = {},
+    val onBookmarks: (() -> Unit)? = null,
 )
 
 @Composable
@@ -146,6 +147,7 @@ internal fun PlayerBottomBar(
                     }
                 },
                 right = {
+                    actions.onBookmarks?.let { PlayerBarAction("标记", contentDescription = "标记", onClick = it) }
                     if (state.episodesAvailable) {
                         PlayerBarAction("选集", contentDescription = "选集", onClick = actions.onEpisodes)
                     }

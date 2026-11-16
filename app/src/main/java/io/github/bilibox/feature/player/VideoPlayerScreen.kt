@@ -93,6 +93,7 @@ internal fun VideoPlayerScreen(
     showDetailTabs: Boolean = true,
     detailTabs: List<String> = listOf("简介", "评论"),
     onBookmarksClick: (() -> Unit)? = null,
+    onAddBookmark: (() -> Unit)? = null,
     sourcePill: Boolean = false,
     extraDetailPane: (@Composable (duration: Long) -> Unit)? = null,
     playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
@@ -603,6 +604,14 @@ internal fun VideoPlayerScreen(
                             },
                             onToggleOrientation = { toggleOrientation() },
                             onToggleVerticalFullScreen = { toggleVerticalFullScreen() },
+                            onBookmarks = onBookmarksClick?.let { open ->
+                                {
+                                    episodesExpanded = false
+                                    speedMenuExpanded = false
+                                    qualityMenuExpanded = false
+                                    open()
+                                }
+                            },
                         ),
                         modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                             .then(
@@ -628,7 +637,7 @@ internal fun VideoPlayerScreen(
                         onListenClick = { enterListen() },
                         onListenPositioned = { listenOrigin = it },
                         onMoreClick = { settingsSheetOpen = true },
-                        onBookmarksClick = onBookmarksClick,
+                        onBookmarksClick = if (fullScreen) onAddBookmark else onBookmarksClick,
                         modifier = Modifier.align(Alignment.TopStart),
                     )
                 }

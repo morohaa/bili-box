@@ -2,16 +2,18 @@ package io.github.bilibox.feature.player
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -30,7 +32,7 @@ import org.junit.Rule
 import org.junit.Test
 
 class LocalVideoBookmarksTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private lateinit var preferences: SharedPreferences
     private lateinit var store: LocalVideoBookmarkStore
     private lateinit var player: ExoPlayer
@@ -54,6 +56,11 @@ class LocalVideoBookmarksTest {
     }
 
     private fun showPlayer(landscape: Boolean = false) {
+        val orientation = if (landscape) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
+        compose.activityRule.scenario.onActivity {
+            it.requestedOrientation = if (landscape) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        compose.waitUntil(5_000) { compose.activity.resources.configuration.orientation == orientation }
         compose.setContent {
             val context = LocalContext.current
             player = remember {
@@ -68,7 +75,7 @@ class LocalVideoBookmarksTest {
             state = remember { LocalVideoBookmarkState(player, video, store) { messages.add(it) } }
             DisposableEffect(player) { onDispose { player.release() } }
             val configuration = Configuration(LocalConfiguration.current).apply {
-                orientation = if (landscape) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
+                this.orientation = orientation
             }
             CompositionLocalProvider(LocalConfiguration provides configuration) {
                 VideoPlayerScreen(
@@ -79,6 +86,8 @@ class LocalVideoBookmarksTest {
                     commentMessage = "",
                     detailTabs = listOf("简介", "标记"),
                     onBookmarksClick = { state.sheetOpen = true },
+                    onAddBookmark = state::add,
+                    episodes = { Text("测试选集") },
                     extraDetailPane = { LocalVideoBookmarks(state) },
                     onBack = {},
                     onRetry = {},
@@ -190,16 +199,66 @@ class LocalVideoBookmarksTest {
     }
 
     @Test
-    fun fullscreenToolbarOpensListAndJumpClosesItWithoutLeavingFullscreen() {
+    fun landscapeToolbarAddsDirectlyAndBottomEntryManagesMarksWithoutLeavingFullscreen() {
         showPlayer(landscape = true)
-        compose.onNodeWithContentDescription("打开标记列表").performClick()
-        compose.onNodeWithText("还没有标记").assertExists()
         seekTo(8_000L)
-        compose.onNodeWithText("添加标记").performClick()
+        compose.onNodeWithContentDescription("添加标记").performClick()
+        compose.onNodeWithContentDescription("收起标记面板").assertDoesNotExist()
+        compose.runOnIdle {
+            assertFalse(state.sheetOpen)
+            assertEquals(8_000L, store.load(video.key).single().positionMs)
+            assertEquals("已添加标记 00:08", messages.last())
+            assertFalse(player.playWhenReady)
+        }
+        compose.onNodeWithContentDescription("添加标记").performClick()
+        compose.runOnIdle { assertEquals(1, state.items.size) }
+        val entry = compose.onNodeWithContentDescription("标记").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val episodes = compose.onNodeWithContentDescription("选集").fetchSemanticsNode().boundsInRoot
+        val speed = compose.onNodeWithText("倍速").fetchSemanticsNode().boundsInRoot
+        assertTrue(entry.right <= episodes.left && entry.right <= speed.left)
+        compose.onNodeWithContentDescription("标记").performClick()
+        compose.onNodeWithContentDescription("收起标记面板").assertIsDisplayed()
+        compose.onNodeWithContentDescription("管理标记 00:08").performClick()
+        compose.onNodeWithText("修改备注").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("横屏重点")
+        compose.onNodeWithText("保存").performClick()
+        compose.onNodeWithText("横屏重点").assertIsDisplayed()
+        compose.onRoot().captureToImage().asAndroidBitmap().let { bitmap ->
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            File(context.cacheDir, "landscape-bookmarks-panel.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        }
+        seekTo(20_000L)
         compose.onNodeWithContentDescription("跳转到标记 00:08").performClick()
-        compose.onNodeWithText("视频标记").assertDoesNotExist()
+        compose.onNodeWithContentDescription("收起标记面板").assertDoesNotExist()
         compose.onNodeWithContentDescription("切换竖屏全屏").assertExists()
-        compose.runOnIdle { assertEquals(8_000L, player.currentPosition) }
+        compose.runOnIdle {
+            assertEquals(8_000L, player.currentPosition)
+            assertFalse(player.playWhenReady)
+        }
+        compose.onNodeWithContentDescription("标记").performClick()
+        compose.onNodeWithContentDescription("管理标记 00:08").performClick()
+        compose.onNodeWithText("删除标记").performClick()
+        compose.onNodeWithText("删除", substring = false).performClick()
+        compose.onNodeWithText("还没有标记").assertIsDisplayed()
+        androidx.test.espresso.Espresso.pressBack()
+        compose.onNodeWithContentDescription("收起标记面板").assertDoesNotExist()
+        compose.onNodeWithContentDescription("切换竖屏全屏").assertExists()
+        compose.runOnIdle { assertTrue(store.load(video.key).isEmpty()) }
+        compose.onNodeWithContentDescription("标记").performClick()
+        compose.onNodeWithContentDescription("收起标记面板").performClick()
+        compose.onNodeWithContentDescription("收起标记面板").assertDoesNotExist()
+        compose.onNodeWithContentDescription("标记").performClick()
+        compose.onNodeWithContentDescription("关闭标记面板").performClick()
+        compose.onNodeWithContentDescription("收起标记面板").assertDoesNotExist()
+        compose.runOnIdle { player.play() }
+        compose.onNodeWithContentDescription("添加标记").performClick()
+        compose.runOnIdle {
+            assertTrue(player.playWhenReady)
+            assertEquals(1, store.load(video.key).size)
+            player.pause()
+        }
     }
 
     @Test
