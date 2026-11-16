@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
+import io.github.bilibox.core.ui.component.playback.PlayerSidePanelWidth
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.PlaybackSurface
 import io.github.bilibox.core.ui.theme.playbackColor
@@ -153,6 +154,7 @@ internal fun PlayerPlaybackSettingsHost(
     onAdjustVideoPosition: () -> Unit,
     onCache: (() -> Unit)?,
     onUnavailable: (String) -> Unit,
+    fullScreen: Boolean = false,
 ) {
     var moreSettingsOpen by remember(visible) { mutableStateOf(false) }
     BackHandler(enabled = visible && moreSettingsOpen) { moreSettingsOpen = false }
@@ -164,6 +166,7 @@ internal fun PlayerPlaybackSettingsHost(
     PlayerPlaybackSettingsSheet(
         visible = visible,
         topInset = topInset,
+        fullScreen = fullScreen,
         state = state,
         moreSettings = if (moreSettingsOpen) {
             {
@@ -221,7 +224,18 @@ internal fun PlayerPlaybackSettingsSheet(
     state: PlayerSettingsState,
     actions: PlayerSettingsActions,
     moreSettings: (@Composable () -> Unit)? = null,
+    fullScreen: Boolean = false,
 ) {
+    if (fullScreen) {
+        PlayerSidePanelHost(visible, actions.onDismiss, "关闭播放设置") {
+            Box(Modifier.fillMaxSize().displayCutoutPadding(), contentAlignment = Alignment.CenterEnd) {
+                Box(Modifier.widthIn(max = PlayerSidePanelWidth).fillMaxWidth().fillMaxHeight()) {
+                    PlaybackSettingsCard(state, actions, moreSettings)
+                }
+            }
+        }
+        return
+    }
     val scrim = remember { MutableInteractionSource() }
     AnimatedVisibility(
         visible = visible,

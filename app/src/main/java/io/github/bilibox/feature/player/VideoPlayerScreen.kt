@@ -808,65 +808,64 @@ internal fun VideoPlayerScreen(
                 )
             }
         }
-        // 竖屏弹层独立于详情区，竖屏全屏隐藏详情后仍可使用。
-        if (!fullScreen) {
-            PlayerPortraitPlaybackPanels(
-                modifier = Modifier.fillMaxSize().padding(top = portraitPanelTop),
+        // 播放面板独立于详情区，全屏隐藏详情后仍可使用。
+        PlayerPlaybackPanels(
+            modifier = Modifier.fillMaxSize().padding(top = if (fullScreen) 0.dp else portraitPanelTop),
+            fullScreen = fullScreen,
+            speed = speed,
+            remainingMs = (duration - position).coerceAtLeast(0L),
+            speedMenuExpanded = speedMenuExpanded,
+            onDismissSpeedSheet = { speedMenuExpanded = false },
+            onSpeedChange = {
+                player.setPlaybackSpeed(it)
+                speed = it
+            },
+            playbackModeExpanded = playbackModeExpanded,
+            playbackModeSheet = playbackModeSheet,
+            onDismissPlaybackMode = { playbackModeExpanded = false },
+        )
+        PlayerPlaybackSettingsHost(
+            visible = settingsSheetOpen,
+            topInset = portraitPanelTop,
+            fullScreen = fullScreen,
+            state = PlayerSettingsState(
                 speed = speed,
-                remainingMs = (duration - position).coerceAtLeast(0L),
-                speedMenuExpanded = speedMenuExpanded,
-                onDismissSpeedSheet = { speedMenuExpanded = false },
-                onSpeedChange = {
-                    player.setPlaybackSpeed(it)
-                    speed = it
-                },
-                playbackModeExpanded = playbackModeExpanded,
-                playbackModeSheet = playbackModeSheet,
-                onDismissPlaybackMode = { playbackModeExpanded = false },
-            )
-            PlayerPlaybackSettingsHost(
-                visible = settingsSheetOpen,
-                topInset = portraitPanelTop,
-                state = PlayerSettingsState(
-                    speed = speed,
-                    autoPlayNext = settingsAutoPlayNext,
-                    loopMode = settingsLoopMode,
-                    backgroundAudio = listening,
-                    qualityLabel = settingsQualityLabel,
-                    subtitleEnabled = subtitleEnabled,
-                    mirrorEnabled = mirrorEnabled,
-                    cacheLabel = cacheLabel.orEmpty(),
-                    seekPreviewEnabled = previewPreference.enabled,
-                ),
-                qualityAvailable = qualityOptions.isNotEmpty(),
-                danmakuAvailable = danmakuSupported,
-                moreSettingsAvailable = playbackModeSheet != null,
-                onDismiss = { settingsSheetOpen = false },
-                onSpeed = { speedMenuExpanded = true },
-                onSleepTimer = { sleepTimerOpen = true },
-                onQuality = { qualityMenuExpanded = true },
-                onDanmakuSettings = { danmakuSettingsOpen = true },
-                onMoreSettings = { playbackModeExpanded = true },
-                onBackgroundAudioChange = { if (it) enterListen() else restoreVideo() },
-                onAutoPlayNextChange = { onAutoPlayNextChange?.invoke(it) ?: run { localAutoPlayNext = it } },
-                onLoopModeChange = { onLoopModeChange?.invoke(it) ?: run { localLoopMode = it } },
-                onSubtitleChange = { subtitleEnabled = it },
-                onMirrorChange = { mirrorEnabled = it },
-                onSeekPreviewChange = previewPreference::update,
-                videoPosition = videoPosition,
-                onAdjustVideoPosition = {
-                    verticalFullScreen = true
-                    videoPosition.adjusting = true
-                },
-                onCache = onCache,
-                onUnavailable = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() },
-            )
-        }
-        // 缓存面板也贴在视频下沿；播放器只量 topInset，避免反向依赖在线视频包。
-        if (!fullScreen) {
-            cacheSheet?.invoke(cacheSheetVisible, portraitPanelTop) {
-                onCacheSheetVisibleChange(false)
-            }
+                autoPlayNext = settingsAutoPlayNext,
+                loopMode = settingsLoopMode,
+                backgroundAudio = listening,
+                qualityLabel = settingsQualityLabel,
+                subtitleEnabled = subtitleEnabled,
+                mirrorEnabled = mirrorEnabled,
+                cacheLabel = cacheLabel.orEmpty(),
+                seekPreviewEnabled = previewPreference.enabled,
+            ),
+            qualityAvailable = qualityOptions.isNotEmpty(),
+            danmakuAvailable = danmakuSupported,
+            moreSettingsAvailable = playbackModeSheet != null,
+            onDismiss = { settingsSheetOpen = false },
+            onSpeed = { speedMenuExpanded = true },
+            onSleepTimer = { sleepTimerOpen = true },
+            onQuality = { qualityMenuExpanded = true },
+            onDanmakuSettings = { danmakuSettingsOpen = true },
+            onMoreSettings = { playbackModeExpanded = true },
+            onBackgroundAudioChange = { if (it) enterListen() else restoreVideo() },
+            onAutoPlayNextChange = { onAutoPlayNextChange?.invoke(it) ?: run { localAutoPlayNext = it } },
+            onLoopModeChange = { onLoopModeChange?.invoke(it) ?: run { localLoopMode = it } },
+            onSubtitleChange = { subtitleEnabled = it },
+            onMirrorChange = { mirrorEnabled = it },
+            onSeekPreviewChange = previewPreference::update,
+            videoPosition = videoPosition,
+            onAdjustVideoPosition = {
+                if (fullScreen) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                verticalFullScreen = true
+                videoPosition.adjusting = true
+            },
+            onCache = onCache,
+            onUnavailable = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() },
+        )
+        // 缓存面板沿用当前播放布局：竖屏贴视频下沿，横屏覆盖全屏。
+        cacheSheet?.invoke(cacheSheetVisible, if (fullScreen) 0.dp else portraitPanelTop) {
+            onCacheSheetVisibleChange(false)
         }
         // 旋转进入全屏时关闭下沿面板，避免面板停留在已不存在的视频下沿。
         LaunchedEffect(fullScreen, verticalFullScreen) {
@@ -887,19 +886,16 @@ internal fun VideoPlayerScreen(
                 },
             )
         }
-        // The timer outlives the sheet. The card starts at the video's bottom
-        // edge so the picture stays visible while picking a duration.
-        if (!fullScreen) {
-            PlayerDrawerVisibility(visible = sleepTimerOpen, fromBottom = true) {
-                SleepTimerSheet(
-                    timer = sleepTimer,
-                    remainingVideos = remainingVideos,
-                    currentRemainingMs = (duration - position).coerceAtLeast(0L),
-                    durationMs = duration,
-                    topInset = portraitPanelTop,
-                    onDismiss = { sleepTimerOpen = false },
-                )
-            }
+        // 定时状态独立于面板，横竖屏均可从更多入口设置。
+        PlayerDrawerVisibility(visible = sleepTimerOpen, fromBottom = true) {
+            SleepTimerSheet(
+                timer = sleepTimer,
+                remainingVideos = remainingVideos,
+                currentRemainingMs = (duration - position).coerceAtLeast(0L),
+                durationMs = duration,
+                topInset = if (fullScreen) 0.dp else portraitPanelTop,
+                onDismiss = { sleepTimerOpen = false },
+            )
         }
         PlayerVideoPositionAdjustment(videoPosition, verticalFullScreen)
         // 弹幕输入与设置放在播放器外层：弹层要盖住视频和详情，而不是被视频 Box 裁掉。

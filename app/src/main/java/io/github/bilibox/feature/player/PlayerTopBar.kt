@@ -37,9 +37,16 @@ internal fun PlayerTopBar(
 ) {
     Row(
         modifier.fillMaxWidth().testTag("player-top-bar")
-            .then(if (fullScreen) Modifier.displayCutoutPadding() else Modifier)
+            .then(
+                if (fullScreen) {
+                    Modifier.windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.End + WindowInsetsSides.Vertical))
+                } else {
+                    Modifier
+                }
+            )
             .height(if (fullScreen) 48.dp else PortraitPlayerTopBarHeight)
-            .padding(horizontal = 6.dp),
+            // 保持进度条位置不变，仅调整返回箭头，使笔画左缘对齐原进度轨道。
+            .padding(start = if (fullScreen) 8.dp else 6.dp, end = if (fullScreen) 18.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(
@@ -47,7 +54,7 @@ internal fun PlayerTopBar(
             modifier = Modifier.size(if (fullScreen) 48.dp else 40.dp)
                 .semantics { contentDescription = "返回" }
         ) {
-            Canvas(Modifier.size(if (fullScreen) 24.dp else 20.dp)) {
+            Canvas(Modifier.size(if (fullScreen) 24.dp else 20.dp).testTag("player-back-glyph")) {
                 drawPath(
                     Path().apply {
                         moveTo(size.width * .63f, size.height * .15f)
@@ -68,7 +75,7 @@ internal fun PlayerTopBar(
             modifier = Modifier.weight(1f)
         )
         onBookmarksClick?.let { PlayerBookmarkButton(it) }
-        if (!fullScreen && showListenButton) {
+        if (showListenButton) {
             ListenTopBarButton(
                 listening = listening,
                 modifier = Modifier.onGloballyPositioned { coordinates ->
@@ -83,11 +90,9 @@ internal fun PlayerTopBar(
             ) { onListenClick() }
             Spacer(Modifier.width(4.dp))
         }
-        if (!fullScreen) {
-            PlayerMoreButton(
-                expanded = settingsOpen,
-                onClick = onMoreClick,
-            )
-        }
+        PlayerMoreButton(
+            expanded = settingsOpen,
+            onClick = onMoreClick,
+        )
     }
 }

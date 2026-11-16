@@ -173,10 +173,11 @@ internal fun PlayerDetailsPane(
     }
 }
 
-/** Playback panels stay available when portrait fullscreen removes the details pane. */
+/** Playback panels stay available when fullscreen removes the details pane. */
 @Composable
-internal fun PlayerPortraitPlaybackPanels(
+internal fun PlayerPlaybackPanels(
     modifier: Modifier = Modifier,
+    fullScreen: Boolean = false,
     speed: Float,
     remainingMs: Long,
     speedMenuExpanded: Boolean,
@@ -187,7 +188,7 @@ internal fun PlayerPortraitPlaybackPanels(
     onDismissPlaybackMode: () -> Unit,
 ) {
     Box(modifier.navigationBarsPadding().clipToBounds()) {
-        PlayerDrawerVisibility(visible = speedMenuExpanded, fromBottom = true) {
+        PlayerDrawerVisibility(visible = speedMenuExpanded && !fullScreen, fromBottom = true) {
             SpeedPanel(
                 speed = speed,
                 mode = SpeedPanelMode.Sheet,
