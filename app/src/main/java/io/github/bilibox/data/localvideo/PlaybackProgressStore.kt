@@ -35,6 +35,15 @@ internal class PlaybackProgressStore(private val preferences: SharedPreferences)
         }.apply()
     }
 
+    /** Explicitly reset a video's status, resume position and history timestamp. */
+    fun markUnplayed(videoKey: String) {
+        preferences.edit()
+            .remove(videoKey)
+            .remove(completedKey(videoKey))
+            .remove(lastPlayedKey(videoKey))
+            .apply()
+    }
+
     /** Full display state for the local-video browser. */
     fun playback(videoKey: String, durationMs: Long): LocalVideoPlayback {
         val position = load(videoKey, durationMs)

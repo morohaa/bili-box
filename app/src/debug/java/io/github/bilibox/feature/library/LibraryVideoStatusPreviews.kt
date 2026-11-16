@@ -120,9 +120,9 @@ private fun VideoStatesPreview(dark: Boolean = false, grid: Boolean = false, thu
         CompositionLocalProvider(LocalLibraryPalette provides palette) {
             Box(Modifier.fillMaxSize().background(palette.background)) {
                 if (grid) {
-                    VideoGrid(view, settings, playback, 24.dp, {}, {}, {}, {})
+                    VideoGrid(view, settings, playback, 24.dp, {}, {}, {}, {}, {}, {}, {})
                 } else {
-                    VideoList(view, settings, playback, 24.dp, {}, {}, {}, {})
+                    VideoList(view, settings, playback, 24.dp, {}, {}, {}, {}, {}, {}, {})
                 }
             }
         }

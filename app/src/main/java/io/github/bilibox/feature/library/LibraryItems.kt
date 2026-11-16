@@ -29,15 +29,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,8 +39,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -87,6 +79,9 @@ internal fun VideoList(
     onVideo: (LocalVideo) -> Unit,
     onShare: (LocalVideo) -> Unit,
     onInfo: (LocalVideo) -> Unit,
+    onRename: (LocalVideo) -> Unit,
+    onDelete: (LocalVideo) -> Unit,
+    onToggleWatched: (LocalVideo) -> Unit,
 ) {
     val state = rememberLazyListState()
     ResetScroll(
@@ -119,6 +114,9 @@ internal fun VideoList(
                     onClick = { onVideo(video) },
                     onShare = { onShare(video) },
                     onInfo = { onInfo(video) },
+                    onRename = { onRename(video) },
+                    onDelete = { onDelete(video) },
+                    onToggleWatched = { onToggleWatched(video) },
                 )
                 if (index < view.videos.lastIndex) {
                     LibraryRowDivider(inset = if (settings.fields.thumbnail) 124.dp else 60.dp)
@@ -138,6 +136,9 @@ internal fun VideoGrid(
     onVideo: (LocalVideo) -> Unit,
     onShare: (LocalVideo) -> Unit,
     onInfo: (LocalVideo) -> Unit,
+    onRename: (LocalVideo) -> Unit,
+    onDelete: (LocalVideo) -> Unit,
+    onToggleWatched: (LocalVideo) -> Unit,
 ) {
     val state = rememberLazyGridState()
     ResetScroll(
@@ -175,6 +176,9 @@ internal fun VideoGrid(
                 onClick = { onVideo(video) },
                 onShare = { onShare(video) },
                 onInfo = { onInfo(video) },
+                onRename = { onRename(video) },
+                onDelete = { onDelete(video) },
+                onToggleWatched = { onToggleWatched(video) },
             )
         }
     }
@@ -232,6 +236,9 @@ internal fun VideoRow(
     onInfo: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    onRename: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    onToggleWatched: () -> Unit = {},
 ) {
     val palette = LocalLibraryPalette.current
     if (compact) {
@@ -269,7 +276,15 @@ internal fun VideoRow(
             VideoInfoLine(video, playback, settings, modifier = Modifier.padding(top = 6.dp))
         }
         Spacer(Modifier.width(2.dp))
-        VideoMoreMenu(onPlay = onClick, onShare = onShare, onInfo = onInfo)
+        VideoMoreMenu(
+            video,
+            playback.state == LocalVideoPlaybackState.Watched,
+            onShare,
+            onInfo,
+            onRename,
+            onDelete,
+            onToggleWatched,
+        )
     }
 }
 
@@ -329,79 +344,6 @@ private fun FileGlyphTile() {
         contentAlignment = Alignment.Center,
     ) {
         AppGlyphIcon(AppIcon.FILE, palette.accent, Modifier.size(23.dp), 1.7f)
-    }
-}
-
-@Composable
-internal fun VideoMoreMenu(
-    onPlay: () -> Unit,
-    onShare: () -> Unit,
-    onInfo: () -> Unit,
-    onThumbnail: Boolean = false,
-) {
-    val palette = LocalLibraryPalette.current
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        Box(
-            Modifier.size(26.dp)
-                .clip(CircleShape)
-                .background(if (onThumbnail) Color.Black.copy(alpha = .3f) else Color.Transparent)
-                .semantics { contentDescription = "更多操作" }
-                .pressFeedback(onClick = { expanded = true }, shape = CircleShape, scaleTo = .88f),
-            contentAlignment = Alignment.Center,
-        ) {
-            AppGlyphIcon(
-                AppIcon.MORE,
-                if (onThumbnail) Color.White else palette.ink3,
-                Modifier.size(15.dp),
-                2f,
-            )
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = palette.card,
-        ) {
-            DropdownMenuItem(
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppGlyphIcon(AppIcon.PLAY, palette.accent, Modifier.size(15.dp), 1.8f)
-                        Spacer(Modifier.width(9.dp))
-                        Text("播放", color = palette.ink, fontSize = 13.sp)
-                    }
-                },
-                onClick = {
-                    expanded = false
-                    onPlay()
-                },
-            )
-            DropdownMenuItem(
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppGlyphIcon(AppIcon.SHARE, palette.ink2, Modifier.size(15.dp), 1.7f)
-                        Spacer(Modifier.width(9.dp))
-                        Text("分享", color = palette.ink, fontSize = 13.sp)
-                    }
-                },
-                onClick = {
-                    expanded = false
-                    onShare()
-                },
-            )
-            DropdownMenuItem(
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppGlyphIcon(AppIcon.INFO, palette.ink2, Modifier.size(15.dp), 1.7f)
-                        Spacer(Modifier.width(9.dp))
-                        Text("文件信息", color = palette.ink, fontSize = 13.sp)
-                    }
-                },
-                onClick = {
-                    expanded = false
-                    onInfo()
-                },
-            )
-        }
     }
 }
 
@@ -503,6 +445,9 @@ internal fun VideoCard(
     onClick: () -> Unit,
     onShare: () -> Unit,
     onInfo: () -> Unit,
+    onRename: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    onToggleWatched: () -> Unit = {},
 ) {
     val palette = LocalLibraryPalette.current
     val watched = settings.fields.status && playback.state == LocalVideoPlaybackState.Watched
@@ -523,6 +468,12 @@ internal fun VideoCard(
                     AppGlyphIcon(AppIcon.FILE, Color.White.copy(alpha = .9f), Modifier.size(26.dp), 1.5f)
                 }
             }
+            VideoMoreMenu(
+                video, playback.state == LocalVideoPlaybackState.Watched,
+                onShare, onInfo, onRename, onDelete, onToggleWatched,
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+                onThumbnail = true,
+            )
         }
         Column(Modifier.fillMaxWidth().padding(start = 2.dp, end = 2.dp, top = 10.dp, bottom = 4.dp)) {
             Text(

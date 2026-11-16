@@ -128,7 +128,20 @@ internal fun LibraryScreen(
     val ready = scanState as? LocalVideoScanState.Ready
     val videos = ready?.videos ?: emptyList()
     val nomediaFolders = ready?.nomediaFolders ?: emptySet()
-    val playback = remember(videos, refreshToken) {
+    val videoActions = rememberLibraryVideoActions(
+        onFileChanged = { video, name ->
+            val current = scanState as? LocalVideoScanState.Ready
+            if (current != null) {
+                scanState = current.copy(
+                    videos = current.videos.mapNotNull { item ->
+                        if (item.uri != video.uri) item else name?.let { item.copy(name = it) }
+                    }
+                )
+            }
+        },
+        notify = { toastMessage = it },
+    )
+    val playback = remember(videos, refreshToken, videoActions.version) {
         videos.associate { video ->
             video.key to progressStore.playback(video.key, video.durationMs)
         }
@@ -344,6 +357,9 @@ internal fun LibraryScreen(
                                         onVideo = ::play,
                                         onShare = ::share,
                                         onInfo = { infoVideo = it },
+                                        onRename = videoActions::openRename,
+                                        onDelete = videoActions::openDelete,
+                                        onToggleWatched = videoActions::toggleWatched,
                                     )
                                 } else {
                                     VideoList(
@@ -355,6 +371,9 @@ internal fun LibraryScreen(
                                         onVideo = ::play,
                                         onShare = ::share,
                                         onInfo = { infoVideo = it },
+                                        onRename = videoActions::openRename,
+                                        onDelete = videoActions::openDelete,
+                                        onToggleWatched = videoActions::toggleWatched,
                                     )
                                 }
                             }
@@ -443,6 +462,8 @@ internal fun LibraryScreen(
                     },
                 )
             }
+
+            LibraryVideoDialogs(videoActions)
 
             infoVideo?.let { video ->
                 VideoInfoDialog(

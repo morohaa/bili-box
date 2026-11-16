@@ -62,4 +62,20 @@ class PlaybackProgressStoreTest {
         store.save("video", 300_000L, 300_000L, completed = false)
         assertEquals(0L, store.load("video", 300_000L))
     }
+
+    @Test
+    fun markingUnplayedClearsCompletionResumeAndHistoryForOnlyThatVideo() {
+        store.save("finished", 300_000L, 300_000L, completed = true)
+        store.save("watching", 75_000L, 300_000L, completed = false)
+        store.save("other", 25_000L, 300_000L, completed = false)
+        store.markUnplayed("finished")
+        store.markUnplayed("watching")
+
+        val reopened = PlaybackProgressStore(preferences)
+        for (key in listOf("finished", "watching")) {
+            assertEquals(LocalVideoPlayback(LocalVideoPlaybackState.Unplayed), reopened.playback(key, 300_000L))
+            assertEquals(0L, reopened.load(key, 300_000L))
+        }
+        assertEquals(25_000L, reopened.load("other", 300_000L))
+    }
 }
