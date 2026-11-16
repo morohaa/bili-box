@@ -83,6 +83,7 @@ internal data class PlayerSettingsState(
     val mirrorEnabled: Boolean,
     val cacheLabel: String = "",
     val seekPreviewEnabled: Boolean = true,
+    val bookmarkDotsEnabled: Boolean = true,
 )
 
 internal class PlayerSettingsActions(
@@ -155,6 +156,7 @@ internal fun PlayerPlaybackSettingsHost(
     onCache: (() -> Unit)?,
     onUnavailable: (String) -> Unit,
     fullScreen: Boolean = false,
+    onBookmarkDotsChange: (Boolean) -> Unit = {},
 ) {
     var moreSettingsOpen by remember(visible) { mutableStateOf(false) }
     BackHandler(enabled = visible && moreSettingsOpen) { moreSettingsOpen = false }
@@ -173,6 +175,8 @@ internal fun PlayerPlaybackSettingsHost(
                 MorePlaybackSettingsContent(
                     previewEnabled = state.seekPreviewEnabled,
                     onPreviewChange = onSeekPreviewChange,
+                    bookmarkDotsEnabled = state.bookmarkDotsEnabled,
+                    onBookmarkDotsChange = onBookmarkDotsChange,
                     onBack = { moreSettingsOpen = false },
                     videoPositionLabel = videoPosition.label,
                     onVideoPosition = { dismissThen(onAdjustVideoPosition) },

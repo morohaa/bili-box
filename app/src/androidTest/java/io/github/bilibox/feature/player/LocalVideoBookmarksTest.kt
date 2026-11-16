@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.*
@@ -25,6 +26,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoBookmarkStore
+import io.github.bilibox.data.player.BookmarkDisplayPreferences
 import java.io.File
 import org.junit.After
 import org.junit.Assert.*
@@ -40,6 +42,8 @@ class LocalVideoBookmarksTest {
     private lateinit var video: LocalVideo
     private lateinit var state: LocalVideoBookmarkState
     private var messages = mutableListOf<String>()
+    private lateinit var displayPreferences: BookmarkDisplayPreferences
+    private var originalDotsEnabled = true
 
     @Before
     fun setUp() {
@@ -47,6 +51,9 @@ class LocalVideoBookmarksTest {
         preferences = context.getSharedPreferences("bookmark_ui_test", Context.MODE_PRIVATE)
         preferences.edit().clear().commit()
         store = LocalVideoBookmarkStore(preferences)
+        displayPreferences = BookmarkDisplayPreferences(context)
+        originalDotsEnabled = displayPreferences.load()
+        displayPreferences.save(true)
         val fixture = createSeekPreviewFixture(context)
         video = LocalVideo(Uri.fromFile(fixture), "标记测试.mp4", 30_000L, fixture.length())
     }
@@ -54,6 +61,7 @@ class LocalVideoBookmarksTest {
     @After
     fun tearDown() {
         preferences.edit().clear().commit()
+        displayPreferences.save(originalDotsEnabled)
     }
 
     private fun showPlayer(landscape: Boolean = false, darkTheme: Boolean = false) {
@@ -296,6 +304,43 @@ class LocalVideoBookmarksTest {
             assertEquals(1, store.load(video.key).size)
             player.pause()
         }
+    }
+
+    @Test
+    fun moreSettingsToggleHidesDotsWithoutRemovingBookmarksAndPersistsChoice() {
+        showPlayer()
+        seekTo(8_000L)
+        compose.onNodeWithContentDescription("添加标记").performClick()
+        seekTo(20_000L)
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("00:20 / 00:30").fetchSemanticsNodes().isNotEmpty() }
+        fun assertDot(visible: Boolean) {
+            val pixels = compose.onNodeWithTag("player-seek-track", useUnmergedTree = true).captureToImage().toPixelMap()
+            val color = pixels[(pixels.width * 8f / 30).toInt(), pixels.height / 2]
+            assertEquals("标记白点显隐", visible, color.red > .9f && color.green > .9f && color.blue > .9f)
+        }
+        fun openMore() {
+            compose.onNodeWithContentDescription("更多").performClick()
+            compose.onNodeWithText("更多播放设置").performScrollTo().performClick()
+        }
+        assertDot(true)
+        openMore()
+        compose.onNodeWithContentDescription("显示标记点").performScrollTo().assertIsOn().performClick().assertIsOff()
+        compose.runOnIdle {
+            assertFalse(displayPreferences.load())
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            assertFalse(BookmarkDisplayPreferenceState(BookmarkDisplayPreferences(context)).enabled)
+            assertEquals(1, store.load(video.key).size)
+        }
+        androidx.test.espresso.Espresso.pressBack()
+        androidx.test.espresso.Espresso.pressBack()
+        assertDot(false)
+        openMore()
+        compose.onNodeWithContentDescription("显示标记点").performScrollTo().assertIsOff().performClick().assertIsOn()
+        androidx.test.espresso.Espresso.pressBack()
+        androidx.test.espresso.Espresso.pressBack()
+        assertDot(true)
+        compose.onNodeWithText("标记").performClick()
+        compose.onNodeWithContentDescription("跳转到标记 00:08").assertExists()
     }
 
     @Test

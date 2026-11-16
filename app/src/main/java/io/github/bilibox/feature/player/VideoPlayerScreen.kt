@@ -132,6 +132,7 @@ internal fun VideoPlayerScreen(
     var playWhenReady by remember(player) { mutableStateOf(player.playWhenReady) }
     val scrub = remember(player) { PlayerScrubState() }
     val previewPreference = rememberSeekPreviewPreference()
+    val bookmarkDisplay = rememberBookmarkDisplayPreference()
     val videoPosition = rememberPlayerVideoPosition()
     val seekPreview = rememberPlayerSeekPreview(player, previewSource, previewPreference.enabled)
     var speed by remember(player) { mutableFloatStateOf(1f) }
@@ -562,7 +563,7 @@ internal fun VideoPlayerScreen(
                             qualityOptions = qualityOptions,
                             selectedQuality = selectedQuality,
                             verticalFullScreen = verticalFullScreen,
-                            bookmarkPositions = bookmarkPositions,
+                            bookmarkPositions = if (bookmarkDisplay.enabled) bookmarkPositions else emptyList(),
                         ),
                         actions = PlayerBottomBarActions(
                             onSeekStart = scrub::update,
@@ -650,8 +651,7 @@ internal fun VideoPlayerScreen(
                         modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
                     )
                 }
-                // 控件隐藏后的沉浸播放保留一个变淡的全屏入口，不必先唤出底栏。
-                // 位置对齐底栏的横屏按钮，控件显隐时图标不会跳动。
+                // 沉浸播放保留淡色全屏入口，与底栏横屏按钮同位，控件显隐时不会跳动。
                 if (!showChrome && !fullScreen && !verticalFullScreen && !listening) {
                     MiniFullscreenButton(
                         onClick = { toggleOrientation() },
@@ -659,8 +659,7 @@ internal fun VideoPlayerScreen(
                             .padding(end = 6.dp),
                     )
                 }
-                // Locking the screen must keep the unlock affordance reachable, so
-                // this follows the raw chrome state rather than showChrome.
+                // Follow raw chrome state so the unlock affordance stays reachable when locked.
                 if (fullScreen && controlsVisible && !speedMenuExpanded) {
                     PlayerSideTools(
                         locked = screenLocked,
@@ -849,6 +848,7 @@ internal fun VideoPlayerScreen(
                 mirrorEnabled = mirrorEnabled,
                 cacheLabel = cacheLabel.orEmpty(),
                 seekPreviewEnabled = previewPreference.enabled,
+                bookmarkDotsEnabled = bookmarkDisplay.enabled,
             ),
             qualityAvailable = qualityOptions.isNotEmpty(),
             danmakuAvailable = danmakuSupported,
@@ -865,6 +865,7 @@ internal fun VideoPlayerScreen(
             onSubtitleChange = { subtitleEnabled = it },
             onMirrorChange = { mirrorEnabled = it },
             onSeekPreviewChange = previewPreference::update,
+            onBookmarkDotsChange = bookmarkDisplay::update,
             videoPosition = videoPosition,
             onAdjustVideoPosition = {
                 if (fullScreen) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
