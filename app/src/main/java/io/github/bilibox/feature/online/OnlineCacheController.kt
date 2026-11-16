@@ -295,6 +295,7 @@ internal class OnlineCacheController(
                 qualityId = quality.id,
                 page = episode.page,
                 part = episode.part,
+                totalParts = totalParts,
             )
         )
         pump()
@@ -324,6 +325,7 @@ internal class OnlineCacheController(
                         page = task.page,
                         part = task.part,
                         videoTitle = videoTitle,
+                        totalParts = task.totalParts,
                         onProgress = { progress -> onProgress(task, progress) },
                     )
 
@@ -441,6 +443,7 @@ internal class OnlineCacheController(
         val qualityId: Int,
         val page: Int,
         val part: String,
+        val totalParts: Int,
     )
 
     private data class OnlineCacheKey(

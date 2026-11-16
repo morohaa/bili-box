@@ -100,13 +100,21 @@ internal class OnlineCacheRepository(context: Context) {
         var size = file.sizeBytes
         var width = 0
         var height = 0
+        var relativePath = if (audio) "Music/BiliBox" else "Movies/BiliBox"
         resolver.query(Uri.parse(file.uri), null, null, null, null)?.use { cursor ->
             if (cursor.moveToFirst()) {
                 fun number(column: String): Long = cursor.getColumnIndex(column).takeIf { it >= 0 }?.let { cursor.getLong(it) } ?: 0L
+                fun text(column: String): String = cursor.getColumnIndex(column).takeIf { it >= 0 }?.let { cursor.getString(it) }.orEmpty()
                 duration = number(MediaStore.MediaColumns.DURATION).takeIf { it > 0 } ?: duration
                 size = number(MediaStore.MediaColumns.SIZE).takeIf { it > 0 } ?: size
                 width = number(MediaStore.MediaColumns.WIDTH).toInt()
                 height = number(MediaStore.MediaColumns.HEIGHT).toInt()
+                @Suppress("DEPRECATION")
+                val path = text(MediaStore.MediaColumns.RELATIVE_PATH).ifBlank {
+                    text(MediaStore.MediaColumns.DATA).substringBeforeLast('/', "")
+                        .removePrefix("${Environment.getExternalStorageDirectory().absolutePath}/")
+                }
+                relativePath = path.trim('/').ifBlank { relativePath }
             }
         }
         val title = episode.part.ifBlank { index.offlineTitle() }
@@ -122,8 +130,8 @@ internal class OnlineCacheRepository(context: Context) {
                 name = "$title.${if (audio) "m4a" else "mp4"}",
                 durationMs = duration,
                 sizeBytes = size,
-                relativePath = if (audio) "Music/BiliBox" else "Movies/BiliBox",
-                bucketName = "BiliBox",
+                relativePath = relativePath,
+                bucketName = relativePath.substringAfterLast('/'),
                 dateAddedMs = file.cachedAt,
                 width = width,
                 height = height,

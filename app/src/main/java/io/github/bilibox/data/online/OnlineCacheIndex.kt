@@ -67,6 +67,7 @@ internal interface OnlineCacheDownloader {
         page: Int,
         part: String,
         videoTitle: String,
+        totalParts: Int,
         onProgress: (Float) -> Unit,
     ): CachedMediaFile
 

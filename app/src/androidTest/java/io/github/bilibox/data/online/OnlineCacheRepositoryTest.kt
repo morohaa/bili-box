@@ -27,7 +27,8 @@ class OnlineCacheRepositoryTest {
 
     @Test
     fun completedMultiPartCacheLoadsOfflineAndDeletesOnlySelectedTrack() = runBlocking {
-        val video = publish(false, "第一讲.mp4")
+        val videoDirectory = "Movies/BiliBox/离线课程【$bvid】"
+        val video = publish(false, "【P1】第一讲.mp4", videoDirectory)
         val audio = publish(true, "第一讲.m4a")
         val second = publish(false, "第二讲.mp4")
         val unrelated = publish(false, "未登记的本地视频.mp4")
@@ -48,6 +49,8 @@ class OnlineCacheRepositoryTest {
         assertEquals(listOf(1, 1, 2), group.entries.map { it.page })
         assertTrue(group.isCollection)
         assertEquals(90_000L, group.entries.first().media.durationMs)
+        assertEquals(videoDirectory, group.entries.first().media.relativeDirectory)
+        assertEquals("离线课程【$bvid】", group.entries.first().media.bucketName)
         assertFalse(group.entries.any { it.id == unrelated.uri })
 
         val audioEntry = group.entries.single { it.audioOnly }
@@ -74,11 +77,11 @@ class OnlineCacheRepositoryTest {
         assertTrue(persisted.contains(audio.uri))
     }
 
-    private fun publish(audio: Boolean, name: String): OnlineCacheFile {
+    private fun publish(audio: Boolean, name: String, relativeDirectory: String = if (audio) "Music/BiliBox" else "Movies/BiliBox"): OnlineCacheFile {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, "${bvid}_$name")
             put(MediaStore.MediaColumns.MIME_TYPE, if (audio) "audio/mp4" else "video/mp4")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, if (audio) "Music/BiliBox" else "Movies/BiliBox")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relativeDirectory)
         }
         val collection = if (audio) MediaStore.Audio.Media.EXTERNAL_CONTENT_URI else MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         val uri = context.contentResolver.insert(collection, values)!!

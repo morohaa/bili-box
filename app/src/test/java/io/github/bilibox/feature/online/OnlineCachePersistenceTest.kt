@@ -35,8 +35,12 @@ class OnlineCachePersistenceTest {
                 page: Int,
                 part: String,
                 videoTitle: String,
+                totalParts: Int,
                 onProgress: (Float) -> Unit,
-            ) = CachedMediaFile("content://video/1", "课程 P1 起步.mp4", qn, "720P", 512L)
+            ): CachedMediaFile {
+                assertEquals(2, totalParts)
+                return CachedMediaFile("content://video/1", "【P1】起步.mp4", qn, "720P", 512L)
+            }
 
             override suspend fun cacheAudio(
                 bvid: String,

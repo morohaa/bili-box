@@ -49,15 +49,17 @@ internal class OnlineVideoCacheStore(
         page: Int,
         part: String,
         videoTitle: String,
+        totalParts: Int,
         onProgress: (Float) -> Unit,
     ): CachedMediaFile = withContext(Dispatchers.IO) {
         val playData = client.playUrlHtml5(bvid, cid, qn)
         val segments = playData.durl.sortedBy { it.order }
         if (segments.isEmpty()) throw IllegalStateException("没有可缓存的 MP4 视频流")
 
-        val displayName = onlineCacheDisplayName(videoTitle, page, part, "mp4")
+        val destination = onlineCacheVideoDestination(videoTitle, bvid, totalParts, page, part)
+        val displayName = destination.displayName
         val totalHint = segments.sumOf { it.size.coerceAtLeast(0L) }.takeIf { it > 0L } ?: -1L
-        val uri = insertVideo(displayName)
+        val uri = insertVideo(displayName, destination.relativeDirectory)
         try {
             var copied = 0L
             resolver.openOutputStream(uri, "w")?.use { output ->
@@ -237,18 +239,18 @@ internal class OnlineVideoCacheStore(
         throw lastError ?: IOException("没有可用的缓存地址")
     }
 
-    private fun insertVideo(displayName: String): Uri {
+    private fun insertVideo(displayName: String, relativeDirectory: String): Uri {
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, displayName)
             put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Video.Media.RELATIVE_PATH, "$VIDEO_RELATIVE_DIR/")
+                put(MediaStore.Video.Media.RELATIVE_PATH, "$relativeDirectory/")
                 put(MediaStore.Video.Media.IS_PENDING, 1)
             } else {
                 @Suppress("DEPRECATION")
                 val directory = File(
                     Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-                    VIDEO_RELATIVE_DIR.substringAfterLast('/'),
+                    relativeDirectory.substringAfter('/'),
                 )
                 if (!directory.isDirectory && !directory.mkdirs()) throw IOException("无法创建缓存目录")
                 @Suppress("DEPRECATION")
@@ -296,7 +298,6 @@ internal class OnlineVideoCacheStore(
         const val PROGRESS_INTERVAL_MS = 80L
         const val CONNECT_TIMEOUT_MS = 10_000
         const val READ_TIMEOUT_MS = 20_000
-        const val VIDEO_RELATIVE_DIR = "Movies/BiliBox"
         const val AUDIO_RELATIVE_DIR = "Music/BiliBox"
         const val MEDIA_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
