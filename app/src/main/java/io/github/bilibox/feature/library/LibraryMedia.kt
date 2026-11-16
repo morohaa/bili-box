@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import android.text.format.Formatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -12,22 +11,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,7 +28,6 @@ import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.util.formatBytes
-import io.github.bilibox.core.util.formatFullDate
 import io.github.bilibox.core.util.formatRelativeDate
 import io.github.bilibox.core.util.formatVideoDuration
 import io.github.bilibox.core.util.frameRateLabel
@@ -46,7 +38,6 @@ import io.github.bilibox.data.localvideo.LocalVideoPlayback
 import io.github.bilibox.data.localvideo.LocalVideoPlaybackState
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
 import io.github.bilibox.data.localvideo.LocalVideoSettings
-import java.time.format.DateTimeFormatter
 
 @Composable
 internal fun PermissionState(onRequest: () -> Unit, onRecheck: () -> Unit) {
@@ -163,68 +154,6 @@ internal fun LibraryMessage(
                 Text(secondaryLabel, color = palette.accent, fontSize = 12.sp)
             }
         }
-    }
-}
-
-@Composable
-internal fun VideoInfoDialog(
-    video: LocalVideo,
-    playback: LocalVideoPlayback,
-    onDismiss: () -> Unit,
-) {
-    val palette = LocalLibraryPalette.current
-    val context = LocalContext.current
-    val formatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭", color = palette.accent) }
-        },
-        title = {
-            Text("文件信息", color = palette.ink, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-        },
-        text = {
-            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                InfoLine("文件名", video.name)
-                InfoLine("路径", "内部存储 / ${video.relativeDirectory.ifBlank { "根目录" }} / ${video.name}")
-                InfoLine("大小", Formatter.formatFileSize(context, video.sizeBytes))
-                InfoLine(
-                    "时长",
-                    video.durationMs.takeIf { it > 0L }?.let(::formatVideoDuration) ?: "未知",
-                )
-                InfoLine(
-                    "分辨率",
-                    if (video.width > 0 && video.height > 0) {
-                        "${video.width} × ${video.height} · ${resolutionLabel(video.width, video.height)}"
-                    } else {
-                        "未知"
-                    },
-                )
-                InfoLine("帧率", if (video.frameRate > 0f) frameRateLabel(video.frameRate) else "未知")
-                InfoLine("修改时间", formatFullDate(video.dateModifiedMs, formatter))
-                InfoLine("类型", video.mimeType.ifBlank { video.extension.uppercase().ifBlank { "未知" } })
-                InfoLine(
-                    "播放状态",
-                    when (val state = playback.state) {
-                        LocalVideoPlaybackState.Unplayed -> "未播放"
-                        is LocalVideoPlaybackState.Watching -> "看到 ${formatVideoDuration(state.positionMs)}"
-                        LocalVideoPlaybackState.Watched -> "已看完"
-                    },
-                )
-            }
-        },
-        containerColor = palette.card,
-        shape = RoundedCornerShape(20.dp),
-    )
-}
-
-@Composable
-internal fun InfoLine(label: String, value: String) {
-    val palette = LocalLibraryPalette.current
-    Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-        Text(label, color = palette.ink3, fontSize = 10.sp)
-        Spacer(Modifier.height(2.dp))
-        Text(value, color = palette.ink, fontSize = 12.sp, lineHeight = 17.sp)
     }
 }
 
