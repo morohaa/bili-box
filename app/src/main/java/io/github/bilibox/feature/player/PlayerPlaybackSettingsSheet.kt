@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
+import io.github.bilibox.core.ui.component.playback.PlayerSidePanelWidth
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.PlaybackSurface
 import io.github.bilibox.core.ui.theme.playbackColor
@@ -82,6 +83,7 @@ internal data class PlayerSettingsState(
     val mirrorEnabled: Boolean,
     val cacheLabel: String = "",
     val seekPreviewEnabled: Boolean = true,
+    val bookmarkDotsEnabled: Boolean = true,
 )
 
 internal class PlayerSettingsActions(
@@ -153,6 +155,8 @@ internal fun PlayerPlaybackSettingsHost(
     onAdjustVideoPosition: () -> Unit,
     onCache: (() -> Unit)?,
     onUnavailable: (String) -> Unit,
+    fullScreen: Boolean = false,
+    onBookmarkDotsChange: (Boolean) -> Unit = {},
 ) {
     var moreSettingsOpen by remember(visible) { mutableStateOf(false) }
     BackHandler(enabled = visible && moreSettingsOpen) { moreSettingsOpen = false }
@@ -164,12 +168,15 @@ internal fun PlayerPlaybackSettingsHost(
     PlayerPlaybackSettingsSheet(
         visible = visible,
         topInset = topInset,
+        fullScreen = fullScreen,
         state = state,
         moreSettings = if (moreSettingsOpen) {
             {
                 MorePlaybackSettingsContent(
                     previewEnabled = state.seekPreviewEnabled,
                     onPreviewChange = onSeekPreviewChange,
+                    bookmarkDotsEnabled = state.bookmarkDotsEnabled,
+                    onBookmarkDotsChange = onBookmarkDotsChange,
                     onBack = { moreSettingsOpen = false },
                     videoPositionLabel = videoPosition.label,
                     onVideoPosition = { dismissThen(onAdjustVideoPosition) },
@@ -221,7 +228,18 @@ internal fun PlayerPlaybackSettingsSheet(
     state: PlayerSettingsState,
     actions: PlayerSettingsActions,
     moreSettings: (@Composable () -> Unit)? = null,
+    fullScreen: Boolean = false,
 ) {
+    if (fullScreen) {
+        PlayerSidePanelHost(visible, actions.onDismiss, "关闭播放设置") {
+            Box(Modifier.fillMaxSize().displayCutoutPadding(), contentAlignment = Alignment.CenterEnd) {
+                Box(Modifier.widthIn(max = PlayerSidePanelWidth).fillMaxWidth().fillMaxHeight()) {
+                    PlaybackSettingsCard(state, actions, moreSettings)
+                }
+            }
+        }
+        return
+    }
     val scrim = remember { MutableInteractionSource() }
     AnimatedVisibility(
         visible = visible,

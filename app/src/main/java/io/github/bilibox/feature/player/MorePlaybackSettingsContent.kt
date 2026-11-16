@@ -31,6 +31,8 @@ internal fun MorePlaybackSettingsContent(
     onQueueSettings: (() -> Unit)?,
     videoPositionLabel: String,
     onVideoPosition: () -> Unit,
+    bookmarkDotsEnabled: Boolean = true,
+    onBookmarkDotsChange: (Boolean) -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth().testTag("more-playback-settings")) {
         Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -48,6 +50,19 @@ internal fun MorePlaybackSettingsContent(
             )
             Text(
                 "拖动进度条时显示目标画面，视频继续播放",
+                color = SettingsSecondary,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
+            )
+            SettingsDivider()
+            ToggleSettingRow(
+                label = "显示标记点",
+                checked = bookmarkDotsEnabled,
+                icon = PlayerSettingsIcon.PLAYBACK_SETTINGS,
+                onCheckedChange = onBookmarkDotsChange,
+            )
+            Text(
+                "在进度条上显示标记位置的白点",
                 color = SettingsSecondary,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp),

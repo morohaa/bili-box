@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -26,6 +27,7 @@ internal fun VideoSeekBar(
     scrubbing: Boolean = false,
     preview: PlayerSeekPreviewController? = null,
     onSeekCanceled: () -> Unit = {},
+    bookmarkPositions: List<Long> = emptyList(),
 ) {
     // Keep the visual layout compact; Compose still expands the touch target.
     val accent = OnlinePink
@@ -50,7 +52,7 @@ internal fun VideoSeekBar(
                 interactionSource = interactionSource,
                 thumb = { TelevisionSeekThumb() },
                 track = { sliderState ->
-                    Canvas(Modifier.fillMaxWidth().height(2.5.dp)) {
+                    Canvas(Modifier.fillMaxWidth().height(2.5.dp).testTag("player-seek-track")) {
                         val played = (sliderState.value / duration.coerceAtLeast(1L)).coerceIn(0f, 1f)
                         val buffered = (bufferedPosition.toFloat() / duration.coerceAtLeast(1L)).coerceIn(0f, 1f)
                         val start = Offset(0f, center.y)
@@ -78,6 +80,17 @@ internal fun VideoSeekBar(
                                 size.height,
                                 StrokeCap.Round
                             )
+                        }
+                        if (duration > 0L) {
+                            bookmarkPositions.forEach { markedAt ->
+                                if (markedAt in 0L..duration) {
+                                    drawCircle(
+                                        color = Color.White,
+                                        radius = 3.dp.toPx(),
+                                        center = Offset(size.width * (markedAt.toDouble() / duration).toFloat(), center.y),
+                                    )
+                                }
+                            }
                         }
                     }
                 }

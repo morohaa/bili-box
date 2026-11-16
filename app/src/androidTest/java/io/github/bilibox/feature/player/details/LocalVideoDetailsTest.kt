@@ -2,14 +2,10 @@ package io.github.bilibox.feature.player.details
 
 import android.net.Uri
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -18,7 +14,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
-import androidx.media3.exoplayer.ExoPlayer
 import io.github.bilibox.core.playback.LocalQueueMode
 import io.github.bilibox.core.playback.PlaybackSleepTimer
 import io.github.bilibox.core.playback.SleepTimerMode
@@ -26,7 +21,6 @@ import io.github.bilibox.core.ui.component.playback.SleepTimerSheet
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.feature.player.LocalPlayerDetailActions
 import io.github.bilibox.feature.player.PlayerDetailActions
-import io.github.bilibox.feature.player.VideoPlayerScreen
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -183,42 +177,5 @@ class LocalVideoDetailsTest {
         compose.onNodeWithText("播完暂停").assertExists()
         compose.onNodeWithText("随机播放").performClick()
         compose.runOnIdle { assertEquals(LocalQueueMode.SHUFFLE, picked) }
-    }
-
-    @Test
-    fun mediaInfoTabListsFileFactsAndCustomPane() {
-        val item = video("250228 第三堂课-场景角度切换.mp4")
-        compose.setContent {
-            Box(Modifier.fillMaxSize()) {
-                val context = LocalContext.current
-                val player = remember { ExoPlayer.Builder(context).build() }
-                DisposableEffect(player) { onDispose { player.release() } }
-                VideoPlayerScreen(
-                    player = player,
-                    title = item.name,
-                    defaultDurationMs = item.durationMs,
-                    sourceLabel = "本地视频",
-                    commentMessage = "",
-                    detailTabs = listOf("简介", "媒体信息"),
-                    sourcePill = true,
-                    extraDetailPane = { duration ->
-                        LocalVideoMediaInfo(video = item, durationMs = duration)
-                    },
-                    onBack = {},
-                    onRetry = {},
-                    details = { Text("简介内容") },
-                )
-            }
-        }
-        compose.onNodeWithText("简介内容").assertExists()
-        compose.onNodeWithText("媒体信息").performClick()
-        // Let the tab underline/content transition settle before asserting the swap.
-        compose.mainClock.advanceTimeBy(500)
-        compose.onNodeWithText("简介内容").assertDoesNotExist()
-        compose.onNodeWithText("文件名").assertExists()
-        compose.onNodeWithText(item.name).assertExists()
-        compose.onNodeWithText("内部存储 / Movies / 666 / ${item.name}").assertExists()
-        compose.onNodeWithText("1920 × 1080（1080P）").assertExists()
-        compose.onNodeWithText("复制文件路径").assertExists()
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -264,10 +265,11 @@ class VideoPlayerScreenTest {
     @Test
     fun hiddenChromeKeepsDimmedFullscreenEntryAtVideoBottom() {
         var density = 1f
+        lateinit var player: ExoPlayer
         compose.setContent {
             density = LocalDensity.current.density
             val context = LocalContext.current
-            val player = remember { ExoPlayer.Builder(context).build() }
+            player = remember { ExoPlayer.Builder(context).build() }
             DisposableEffect(player) { onDispose { player.release() } }
             VideoPlayerScreen(
                 player = player,
@@ -301,6 +303,23 @@ class VideoPlayerScreenTest {
             entry.right >= root.right - 48.dp.value * density
         )
         assertTrue("全屏入口应留在视频画面内", entry.bottom < root.height * .75f)
+
+        // 沉浸播放时双击暂停和继续都不唤出底栏；单击仍可主动显示控件。
+        compose.runOnIdle { player.playWhenReady = true }
+        val surface = compose.onNodeWithTag("player-touch-surface")
+        surface.performTouchInput { doubleClick(center) }
+        compose.runOnIdle { assertFalse(player.playWhenReady) }
+        compose.onNodeWithContentDescription("播放进度").assertDoesNotExist()
+        compose.onNodeWithContentDescription("更多").assertDoesNotExist()
+        surface.performTouchInput { doubleClick(center) }
+        compose.runOnIdle { assertTrue(player.playWhenReady) }
+        compose.onNodeWithContentDescription("播放进度").assertDoesNotExist()
+        surface.performClick()
+        compose.waitUntil(3_000) {
+            compose.onAllNodesWithTag("mini-fullscreen").fetchSemanticsNodes().isEmpty()
+        }
+        compose.onNodeWithContentDescription("播放进度").assertExists()
+        compose.onNodeWithContentDescription("暂停").assertExists()
     }
 
     @Test

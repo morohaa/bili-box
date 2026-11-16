@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -15,10 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.model.VideoSummary
@@ -62,10 +58,6 @@ internal fun SearchResults(
     onVideoClick: (VideoSummary) -> Unit,
     onPageChange: (Int) -> Unit,
 ) {
-    SearchResultBar(
-        count = if (state.total > 0) state.total else state.items.size,
-        darkMode = darkMode,
-    )
     if (state.items.isEmpty()) {
         Spacer(Modifier.height(8.dp))
         EmptyCard("没有找到视频", "换个关键词再试试，或调整筛选条件。", darkMode)
@@ -114,19 +106,4 @@ private fun SearchGrid(items: List<VideoSummary>, darkMode: Boolean, onVideoClic
             }
         }
     }
-}
-
-@Composable
-private fun SearchResultBar(count: Int, darkMode: Boolean) {
-    val muted = if (darkMode) Color(0xFF9BA3AE) else Muted
-    val strong = if (darkMode) DarkInkSoft else Ink
-    Text(
-        text = buildAnnotatedString {
-            withStyle(SpanStyle(color = muted)) { append("找到 ") }
-            withStyle(SpanStyle(color = strong, fontWeight = FontWeight.SemiBold)) { append(count.toString()) }
-            withStyle(SpanStyle(color = muted)) { append(" 个视频") }
-        },
-        fontSize = 12.sp,
-        modifier = Modifier.offset(x = (-2).dp).padding(top = 12.dp, bottom = 2.dp),
-    )
 }

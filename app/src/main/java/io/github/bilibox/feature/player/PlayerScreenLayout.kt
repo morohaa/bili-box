@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -22,11 +23,15 @@ import androidx.compose.ui.unit.Constraints
 import kotlin.math.roundToInt
 
 @Composable
-internal fun rememberVerticalFullScreenProgress(fullScreen: Boolean, verticalFullScreen: Boolean): State<Float> = animateFloatAsState(
-    targetValue = if (!fullScreen && verticalFullScreen) 1f else 0f,
-    animationSpec = tween(360, easing = FastOutSlowInEasing),
-    label = "竖屏全屏展开",
-)
+internal fun rememberVerticalFullScreenProgress(fullScreen: Boolean, verticalFullScreen: Boolean): State<Float> = key(fullScreen) {
+    // 旋转后直接以目标布局开始，避免从横屏进入竖屏全屏时先露出简介页。
+    // 同一方向内继续沿用展开、收起和中途反转的动画。
+    animateFloatAsState(
+        targetValue = if (!fullScreen && verticalFullScreen) 1f else 0f,
+        animationSpec = tween(360, easing = FastOutSlowInEasing),
+        label = "竖屏全屏展开",
+    )
+}
 
 /** Resize the existing video surface; keep details at their normal height as they slide away. */
 @OptIn(ExperimentalLayoutApi::class)

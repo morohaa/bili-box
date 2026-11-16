@@ -24,7 +24,6 @@ import io.github.bilibox.data.localvideo.localListenSubtitle
 import io.github.bilibox.feature.listen.ListenControls
 import io.github.bilibox.feature.listen.ListenInfo
 import io.github.bilibox.feature.player.details.LocalVideoIntro
-import io.github.bilibox.feature.player.details.LocalVideoMediaInfo
 import io.github.bilibox.feature.player.details.PlaybackModeSheet
 import kotlinx.coroutines.delay
 
@@ -42,6 +41,7 @@ internal fun LocalVideoScreen(
     // directly, so 连播 also works while the screen is locked (no recomposition).
     val queue = remember { LocalPlaybackQueue(context, createCompatiblePlayer(context), progressStore, video) }
     val player = queue.player
+    val bookmarks = rememberLocalVideoBookmarks(player, video)
     var playbackError by remember(player) { mutableStateOf<String?>(null) }
     var playbackState by remember(player) { mutableIntStateOf(Player.STATE_IDLE) }
     // Survives a switch to the next folder item so 连播 keeps working.
@@ -140,7 +140,10 @@ internal fun LocalVideoScreen(
         sourceLabel = "本地视频 ${playlist.size}",
         remainingVideos = (playlist.size - currentIndex).coerceAtLeast(1),
         commentMessage = "本地视频暂时没有评论",
-        detailTabs = listOf("简介", "媒体信息"),
+        detailTabs = listOf("简介", "标记"),
+        onBookmarksClick = { bookmarks.sheetOpen = true },
+        onAddBookmark = bookmarks::add,
+        bookmarkPositions = bookmarks.items.map { it.positionMs },
         sourcePill = true,
         listenInfo = ListenInfo(
             subtitle = localListenSubtitle(video),
@@ -185,9 +188,7 @@ internal fun LocalVideoScreen(
                 switchTo(it)
             })
         },
-        extraDetailPane = { duration ->
-            LocalVideoMediaInfo(video = video, durationMs = duration)
-        },
+        extraDetailPane = { LocalVideoBookmarks(bookmarks) },
         playbackModeSheet = { dismiss ->
             PlaybackModeSheet(
                 selected = queueMode,
@@ -228,4 +229,5 @@ internal fun LocalVideoScreen(
             )
         }
     )
+    LocalVideoBookmarkOverlays(bookmarks)
 }

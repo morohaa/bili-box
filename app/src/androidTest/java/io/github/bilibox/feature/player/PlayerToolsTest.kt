@@ -52,6 +52,7 @@ class PlayerToolsTest {
         var locked by mutableStateOf(false)
         var playbackToggles = 0
         var controlToggles = 0
+        var verticalFullScreenToggles = 0
         compose.setContent {
             Box(Modifier.fillMaxSize()) {
                 PlayerTouchSurface(
@@ -65,14 +66,21 @@ class PlayerToolsTest {
                     screenshotEnabled = true,
                     onScreenshot = {},
                     onToggleLock = { locked = !locked },
+                    onVerticalFullScreen = { verticalFullScreenToggles++ },
                     modifier = Modifier.align(Alignment.CenterEnd)
                 )
             }
         }
         compose.onNodeWithTag("video-touch").performTouchInput { doubleClick(center) }
         compose.runOnIdle { assertEquals(1, playbackToggles) }
+        val lock = compose.onNodeWithContentDescription("锁定屏幕").fetchSemanticsNode().boundsInRoot
+        val verticalFullScreen = compose.onNodeWithContentDescription("切换竖屏全屏")
+        assertTrue("竖屏全屏入口应在锁定按钮下方", verticalFullScreen.fetchSemanticsNode().boundsInRoot.top >= lock.bottom)
+        verticalFullScreen.performClick()
+        compose.runOnIdle { assertEquals(1, verticalFullScreenToggles) }
         compose.onNodeWithContentDescription("锁定屏幕").performClick()
         compose.onNodeWithContentDescription("截取视频画面").assertDoesNotExist()
+        compose.onNodeWithContentDescription("切换竖屏全屏").assertDoesNotExist()
         compose.onNodeWithContentDescription("解锁屏幕").assertExists()
         compose.onNodeWithTag("video-touch").performTouchInput { doubleClick(center) }
         compose.runOnIdle {
@@ -81,6 +89,7 @@ class PlayerToolsTest {
         }
         compose.onNodeWithContentDescription("解锁屏幕").performClick()
         compose.onNodeWithContentDescription("截取视频画面").assertExists()
+        compose.onNodeWithContentDescription("切换竖屏全屏").assertExists()
         compose.onNodeWithTag("video-touch").performTouchInput { doubleClick(center) }
         compose.runOnIdle { assertEquals(2, playbackToggles) }
     }

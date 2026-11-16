@@ -58,6 +58,7 @@ internal data class PlayerBottomBarState(
     val qualityOptions: List<PlayerQualityOption>,
     val selectedQuality: Int?,
     val verticalFullScreen: Boolean,
+    val bookmarkPositions: List<Long> = emptyList(),
 )
 
 /** 底栏操作回调，避免把播放器的全部状态继续作为参数传进来。 */
@@ -75,6 +76,7 @@ internal class PlayerBottomBarActions(
     val onToggleOrientation: () -> Unit,
     val onToggleVerticalFullScreen: () -> Unit,
     val onSeekCanceled: () -> Unit = {},
+    val onBookmarks: (() -> Unit)? = null,
 )
 
 @Composable
@@ -96,6 +98,7 @@ internal fun PlayerBottomBar(
             scrubbing = state.scrubbing,
             preview = preview,
             onSeekCanceled = actions.onSeekCanceled,
+            bookmarkPositions = state.bookmarkPositions,
         )
     }
 
@@ -146,6 +149,7 @@ internal fun PlayerBottomBar(
                     }
                 },
                 right = {
+                    actions.onBookmarks?.let { PlayerBarAction("标记", contentDescription = "标记", onClick = it) }
                     if (state.episodesAvailable) {
                         PlayerBarAction("选集", contentDescription = "选集", onClick = actions.onEpisodes)
                     }

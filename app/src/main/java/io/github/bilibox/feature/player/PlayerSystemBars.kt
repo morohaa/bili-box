@@ -33,9 +33,11 @@ internal fun PlayerSystemBarsEffects(
     onVerticalFullScreenChange: (Boolean) -> Unit,
     onScreenLockedChange: (Boolean) -> Unit,
 ) {
-    LaunchedEffect(activity, fullScreen, verticalFullScreen) {
-        // 横屏全屏时以方向为准，避免退出横屏后又回到竖屏全屏。
+    LaunchedEffect(fullScreen) {
+        // 只在进入横屏时重置，允许从横屏主动切到竖屏全屏。
         if (fullScreen) onVerticalFullScreenChange(false)
+    }
+    LaunchedEffect(activity, fullScreen, verticalFullScreen) {
         onResetOverlays()
         if (!fullScreen) onScreenLockedChange(false)
         activity?.let {
