@@ -58,6 +58,7 @@ internal data class PlayerBottomBarState(
     val qualityOptions: List<PlayerQualityOption>,
     val selectedQuality: Int?,
     val verticalFullScreen: Boolean,
+    val bookmarkPositions: List<Long> = emptyList(),
 )
 
 /** 底栏操作回调，避免把播放器的全部状态继续作为参数传进来。 */
@@ -97,6 +98,7 @@ internal fun PlayerBottomBar(
             scrubbing = state.scrubbing,
             preview = preview,
             onSeekCanceled = actions.onSeekCanceled,
+            bookmarkPositions = state.bookmarkPositions,
         )
     }
 

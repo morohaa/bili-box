@@ -87,6 +87,7 @@ class LocalVideoBookmarksTest {
                     detailTabs = listOf("简介", "标记"),
                     onBookmarksClick = { state.sheetOpen = true },
                     onAddBookmark = state::add,
+                    bookmarkPositions = state.items.map { it.positionMs },
                     episodes = { Text("测试选集") },
                     extraDetailPane = { LocalVideoBookmarks(state) },
                     onBack = {},
@@ -223,13 +224,14 @@ class LocalVideoBookmarksTest {
         compose.onNode(hasSetTextAction()).performTextInput("横屏重点")
         compose.onNodeWithText("保存").performClick()
         compose.onNodeWithText("横屏重点").assertIsDisplayed()
+        seekTo(20_000L)
+        compose.waitUntil(5_000) { compose.onAllNodesWithText("00:20 / 00:30").fetchSemanticsNodes().isNotEmpty() }
         compose.onRoot().captureToImage().asAndroidBitmap().let { bitmap ->
             val context = InstrumentationRegistry.getInstrumentation().targetContext
-            File(context.cacheDir, "landscape-bookmarks-panel.png").outputStream().use {
+            File(context.cacheDir, "landscape-bookmark-dots.png").outputStream().use {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
             }
         }
-        seekTo(20_000L)
         compose.onNodeWithContentDescription("跳转到标记 00:08").performClick()
         compose.onNodeWithContentDescription("收起标记面板").assertDoesNotExist()
         compose.onNodeWithContentDescription("切换竖屏全屏").assertExists()

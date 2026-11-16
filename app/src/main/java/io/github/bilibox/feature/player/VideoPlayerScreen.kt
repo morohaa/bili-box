@@ -94,6 +94,7 @@ internal fun VideoPlayerScreen(
     detailTabs: List<String> = listOf("简介", "评论"),
     onBookmarksClick: (() -> Unit)? = null,
     onAddBookmark: (() -> Unit)? = null,
+    bookmarkPositions: List<Long> = emptyList(),
     sourcePill: Boolean = false,
     extraDetailPane: (@Composable (duration: Long) -> Unit)? = null,
     playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
@@ -561,6 +562,7 @@ internal fun VideoPlayerScreen(
                             qualityOptions = qualityOptions,
                             selectedQuality = selectedQuality,
                             verticalFullScreen = verticalFullScreen,
+                            bookmarkPositions = bookmarkPositions,
                         ),
                         actions = PlayerBottomBarActions(
                             onSeekStart = scrub::update,

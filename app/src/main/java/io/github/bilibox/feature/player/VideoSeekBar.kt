@@ -27,6 +27,7 @@ internal fun VideoSeekBar(
     scrubbing: Boolean = false,
     preview: PlayerSeekPreviewController? = null,
     onSeekCanceled: () -> Unit = {},
+    bookmarkPositions: List<Long> = emptyList(),
 ) {
     // Keep the visual layout compact; Compose still expands the touch target.
     val accent = OnlinePink
@@ -79,6 +80,17 @@ internal fun VideoSeekBar(
                                 size.height,
                                 StrokeCap.Round
                             )
+                        }
+                        if (duration > 0L) {
+                            bookmarkPositions.forEach { markedAt ->
+                                if (markedAt in 0L..duration) {
+                                    drawCircle(
+                                        color = Color.White,
+                                        radius = 3.dp.toPx(),
+                                        center = Offset(size.width * (markedAt.toDouble() / duration).toFloat(), center.y),
+                                    )
+                                }
+                            }
                         }
                     }
                 }

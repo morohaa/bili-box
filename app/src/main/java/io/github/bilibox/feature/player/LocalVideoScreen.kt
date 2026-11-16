@@ -143,6 +143,7 @@ internal fun LocalVideoScreen(
         detailTabs = listOf("简介", "标记"),
         onBookmarksClick = { bookmarks.sheetOpen = true },
         onAddBookmark = bookmarks::add,
+        bookmarkPositions = bookmarks.items.map { it.positionMs },
         sourcePill = true,
         listenInfo = ListenInfo(
             subtitle = localListenSubtitle(video),
