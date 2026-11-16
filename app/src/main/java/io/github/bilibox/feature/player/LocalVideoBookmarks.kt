@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -22,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.bilibox.R
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.playback.PlayerSidePanel
@@ -32,37 +30,18 @@ import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.PlaybackCard
 import io.github.bilibox.core.ui.theme.PlaybackInk
 import io.github.bilibox.core.ui.theme.PlaybackMuted
-import io.github.bilibox.core.ui.theme.PlaybackSurface
 import io.github.bilibox.core.util.formatPlaybackTime
 import io.github.bilibox.data.localvideo.LocalVideoBookmark
 
 @Composable
 internal fun LocalVideoBookmarks(state: LocalVideoBookmarkState, inSidePanel: Boolean = false) {
     val ink = if (inSidePanel) PlayerSidePanelTitle else PlaybackInk
-    val muted = if (inSidePanel) PlayerSidePanelMuted else PlaybackMuted
     Column(Modifier.fillMaxWidth().padding(horizontal = if (inSidePanel) 0.dp else 18.dp, vertical = 14.dp)) {
-        if (!inSidePanel) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Icon(painterResource(R.drawable.ic_player_bookmark), null, Modifier.size(21.dp), tint = OnlinePink)
-                Spacer(Modifier.width(8.dp))
-                Text("视频标记", color = ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = state::add, enabled = state.canAdd, colors = ButtonDefaults.textButtonColors(contentColor = OnlinePink)) {
-                    Text("添加标记")
-                }
-            }
-        }
         if (state.items.isEmpty()) {
-            Column(Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("还没有标记", color = ink, fontSize = 15.sp)
-                Spacer(Modifier.height(8.dp))
-                Text(if (inSidePanel) "点击顶部标记图标，记录当前时间点" else "播放到关键位置时，点击“添加标记”", color = muted, fontSize = 13.sp)
             }
         } else {
-            if (!inSidePanel) {
-                Text("点击跳转 · 按时间排序", color = muted, fontSize = 12.sp)
-                Spacer(Modifier.height(12.dp))
-            }
             state.items.forEach { bookmark ->
                 key(bookmark.id) { BookmarkRow(bookmark, state, inSidePanel) }
                 Spacer(Modifier.height(10.dp))
@@ -100,21 +79,11 @@ private fun BookmarkRow(bookmark: LocalVideoBookmark, state: LocalVideoBookmarkS
             IconButton(onClick = { menuOpen = true }, modifier = Modifier.semantics { contentDescription = "管理标记 $time" }) {
                 AppGlyphIcon(AppIcon.MORE, if (inSidePanel) PlayerSidePanelMuted else PlaybackMuted, Modifier.size(20.dp))
             }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(text = { Text("修改备注") }, onClick = {
-                    menuOpen = false
-                    state.editing = bookmark
-                })
-                DropdownMenuItem(text = { Text("删除标记") }, onClick = {
-                    menuOpen = false
-                    state.deleting = bookmark
-                })
-            }
+            BookmarkActionsMenu(bookmark, state, menuOpen, inSidePanel) { menuOpen = false }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LocalVideoBookmarkOverlays(state: LocalVideoBookmarkState) {
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -136,46 +105,6 @@ internal fun LocalVideoBookmarkOverlays(state: LocalVideoBookmarkState) {
                 }
             }
         }
-    } else if (state.sheetOpen) {
-        ModalBottomSheet(
-            onDismissRequest = { state.sheetOpen = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = PlaybackSurface,
-        ) {
-            Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-                LocalVideoBookmarks(state)
-            }
-        }
     }
-    state.editing?.let { bookmark ->
-        var note by remember(bookmark.id) { mutableStateOf(bookmark.note) }
-        AlertDialog(
-            onDismissRequest = { state.editing = null },
-            title = { Text("修改标记备注") },
-            text = {
-                Column {
-                    Text(formatPlaybackTime(bookmark.positionMs), color = OnlinePink)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = note,
-                        onValueChange = { note = it.take(200) },
-                        label = { Text("备注（可选）") },
-                        supportingText = { Text("${note.length}/200") },
-                        maxLines = 4,
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = { state.rename(bookmark, note) }) { Text("保存") } },
-            dismissButton = { TextButton(onClick = { state.editing = null }) { Text("取消") } },
-        )
-    }
-    state.deleting?.let { bookmark ->
-        AlertDialog(
-            onDismissRequest = { state.deleting = null },
-            title = { Text("删除标记？") },
-            text = { Text("将删除 ${formatPlaybackTime(bookmark.positionMs)} 的标记。") },
-            confirmButton = { TextButton(onClick = { state.delete(bookmark) }) { Text("删除") } },
-            dismissButton = { TextButton(onClick = { state.deleting = null }) { Text("取消") } },
-        )
-    }
+    LocalVideoBookmarkDialogs(state, forceDark = landscape)
 }

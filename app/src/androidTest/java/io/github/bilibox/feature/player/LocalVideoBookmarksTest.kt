@@ -22,6 +22,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.ui.PlayerView
 import androidx.test.platform.app.InstrumentationRegistry
+import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoBookmarkStore
 import java.io.File
@@ -55,7 +56,7 @@ class LocalVideoBookmarksTest {
         preferences.edit().clear().commit()
     }
 
-    private fun showPlayer(landscape: Boolean = false) {
+    private fun showPlayer(landscape: Boolean = false, darkTheme: Boolean = false) {
         val orientation = if (landscape) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
         compose.activityRule.scenario.onActivity {
             it.requestedOrientation = if (landscape) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
@@ -78,27 +79,43 @@ class LocalVideoBookmarksTest {
                 this.orientation = orientation
             }
             CompositionLocalProvider(LocalConfiguration provides configuration) {
-                VideoPlayerScreen(
-                    player = player,
-                    title = video.name,
-                    defaultDurationMs = video.durationMs,
-                    sourceLabel = "本地视频",
-                    commentMessage = "",
-                    detailTabs = listOf("简介", "标记"),
-                    onBookmarksClick = { state.sheetOpen = true },
-                    onAddBookmark = state::add,
-                    bookmarkPositions = state.items.map { it.positionMs },
-                    episodes = { Text("测试选集") },
-                    extraDetailPane = { LocalVideoBookmarks(state) },
-                    onBack = {},
-                    onRetry = {},
-                    details = { Text("视频简介") },
-                )
-                LocalVideoBookmarkOverlays(state)
+                BiliBoxTheme(darkTheme = darkTheme, dynamicColor = false) {
+                    VideoPlayerScreen(
+                        player = player,
+                        title = video.name,
+                        defaultDurationMs = video.durationMs,
+                        sourceLabel = "本地视频",
+                        commentMessage = "",
+                        detailTabs = listOf("简介", "标记"),
+                        onBookmarksClick = { state.sheetOpen = true },
+                        onAddBookmark = state::add,
+                        bookmarkPositions = state.items.map { it.positionMs },
+                        episodes = { Text("测试选集") },
+                        extraDetailPane = { LocalVideoBookmarks(state) },
+                        onBack = {},
+                        onRetry = {},
+                        details = { Text("视频简介") },
+                    )
+                    LocalVideoBookmarkOverlays(state)
+                }
             }
         }
         compose.waitUntil(15_000) { compose.runOnIdle { player.playbackState == Player.STATE_READY } }
         compose.runOnIdle { state.refresh() }
+    }
+
+    private fun savePopupScreenshot(name: String) {
+        compose.waitForIdle()
+        // 等待平台窗口的进场动画结束，再截取包含菜单或 Dialog 的屏幕。
+        android.os.SystemClock.sleep(900)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        val pending = File(instrumentation.targetContext.cacheDir, "$name.pending")
+        pending.outputStream().use {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        check(pending.renameTo(File(instrumentation.targetContext.cacheDir, name)))
+        bitmap.recycle()
     }
 
     private fun seekTo(position: Long) {
@@ -137,8 +154,17 @@ class LocalVideoBookmarksTest {
         compose.onNodeWithText("媒体信息").assertDoesNotExist()
         compose.onNodeWithText("标记").performClick()
         seekTo(6_000L)
-        compose.onNodeWithText("添加标记").performClick()
+        compose.onNodeWithContentDescription("添加标记").performClick()
         compose.onNodeWithContentDescription("跳转到标记 00:06").assertExists()
+        compose.onNodeWithContentDescription("管理标记 00:06").performClick()
+        savePopupScreenshot("bookmark-menu-light.png")
+        compose.onNodeWithText("修改备注").performClick()
+        savePopupScreenshot("bookmark-edit-light.png")
+        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithContentDescription("管理标记 00:06").performClick()
+        compose.onNodeWithText("删除标记").performClick()
+        savePopupScreenshot("bookmark-delete-light.png")
+        compose.onNodeWithText("取消").performClick()
         compose.onRoot().captureToImage().asAndroidBitmap().let { bitmap ->
             File(context.cacheDir, "local-bookmarks-preview.png").outputStream().use {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
@@ -158,26 +184,32 @@ class LocalVideoBookmarksTest {
 
     @Test
     fun marksCanBeAddedEditedJumpedAndDeletedWithoutChangingPlaybackIntent() {
-        showPlayer()
+        showPlayer(darkTheme = true)
         compose.onNodeWithText("媒体信息").assertDoesNotExist()
         compose.onNodeWithText("标记").performClick()
         compose.onNodeWithText("还没有标记").assertExists()
+        compose.onNodeWithText("视频标记").assertDoesNotExist()
+        compose.onNodeWithText("添加标记").assertDoesNotExist()
+        compose.onNodeWithText("点击跳转 · 按时间排序").assertDoesNotExist()
         seekTo(5_000L)
-        compose.onNodeWithText("添加标记").performClick()
+        compose.onNodeWithContentDescription("添加标记").performClick()
+        compose.runOnIdle { assertFalse(state.sheetOpen) }
         compose.onNodeWithContentDescription("跳转到标记 00:05").assertExists()
-        compose.onNodeWithText("添加标记").performClick()
+        compose.onNodeWithContentDescription("添加标记").performClick()
         compose.runOnIdle {
             assertEquals(1, state.items.size)
             assertEquals("该时间点已有标记", messages.last())
         }
         compose.onNodeWithContentDescription("管理标记 00:05").performClick()
+        savePopupScreenshot("bookmark-menu-dark.png")
         compose.onNodeWithText("修改备注").performClick()
+        savePopupScreenshot("bookmark-edit-dark.png")
         compose.onNode(hasSetTextAction()).performTextInput("重点讲解")
-        compose.onNodeWithText("保存").performClick()
+        compose.onNodeWithText("保存").assertIsDisplayed().performClick()
         compose.onNodeWithText("重点讲解").assertExists()
         compose.runOnIdle { assertEquals("重点讲解", LocalVideoBookmarkStore(preferences).load(video.key).single().note) }
         seekTo(15_000L)
-        compose.onNodeWithText("添加标记").performClick()
+        compose.onNodeWithContentDescription("添加标记").performClick()
         compose.runOnIdle { assertEquals(listOf(5_000L, 15_000L), state.items.map { it.positionMs }) }
         compose.onNodeWithContentDescription("跳转到标记 00:05").performClick()
         compose.runOnIdle {
@@ -190,6 +222,7 @@ class LocalVideoBookmarksTest {
         }
         compose.onNodeWithContentDescription("管理标记 00:05").performClick()
         compose.onNodeWithText("删除标记").performClick()
+        savePopupScreenshot("bookmark-delete-dark.png")
         compose.onNodeWithText("取消").performClick()
         compose.runOnIdle { assertEquals(2, state.items.size) }
         compose.onNodeWithContentDescription("管理标记 00:05").performClick()
@@ -221,8 +254,10 @@ class LocalVideoBookmarksTest {
         compose.onNodeWithContentDescription("收起标记面板").assertIsDisplayed()
         compose.onNodeWithContentDescription("管理标记 00:08").performClick()
         compose.onNodeWithText("修改备注").performClick()
-        compose.onNode(hasSetTextAction()).performTextInput("横屏重点")
-        compose.onNodeWithText("保存").performClick()
+        savePopupScreenshot("bookmark-edit-landscape.png")
+        compose.onNode(hasSetTextAction()).performClick().performTextInput("横屏重点")
+        savePopupScreenshot("bookmark-edit-keyboard.png")
+        compose.onNodeWithText("保存").assertIsDisplayed().performClick()
         compose.onNodeWithText("横屏重点").assertIsDisplayed()
         seekTo(20_000L)
         compose.waitUntil(5_000) { compose.onAllNodesWithText("00:20 / 00:30").fetchSemanticsNodes().isNotEmpty() }
@@ -264,13 +299,17 @@ class LocalVideoBookmarksTest {
     }
 
     @Test
-    fun verticalFullscreenCanOpenBookmarksAndOldVideoCannotWriteToNextFile() {
+    fun verticalFullscreenAddsDirectlyAndOldVideoCannotWriteToNextFile() {
         showPlayer()
         compose.onNodeWithContentDescription("竖屏").performClick()
-        compose.onNodeWithContentDescription("打开标记列表").performClick()
         seekTo(3_000L)
-        compose.onNodeWithText("添加标记").performClick()
+        compose.onNodeWithContentDescription("添加标记").performClick()
+        compose.onNodeWithText("还没有标记").assertDoesNotExist()
+        compose.onNodeWithContentDescription("退出竖屏").assertExists()
         compose.runOnIdle {
+            assertFalse(state.sheetOpen)
+            assertEquals(3_000L, state.items.single().positionMs)
+            assertFalse(player.playWhenReady)
             player.setMediaItem(MediaItem.fromUri("file:///other-video.mp4"))
             state.add()
             state.jump(state.items.single())

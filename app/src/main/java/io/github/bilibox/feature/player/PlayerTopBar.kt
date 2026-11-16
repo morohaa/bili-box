@@ -74,7 +74,7 @@ internal fun PlayerTopBar(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        onBookmarksClick?.let { PlayerBookmarkButton(it, adding = fullScreen) }
+        onBookmarksClick?.let { PlayerBookmarkButton(it) }
         if (showListenButton) {
             ListenTopBarButton(
                 listening = listening,

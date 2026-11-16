@@ -639,7 +639,7 @@ internal fun VideoPlayerScreen(
                         onListenClick = { enterListen() },
                         onListenPositioned = { listenOrigin = it },
                         onMoreClick = { settingsSheetOpen = true },
-                        onBookmarksClick = if (fullScreen) onAddBookmark else onBookmarksClick,
+                        onBookmarksClick = onAddBookmark,
                         modifier = Modifier.align(Alignment.TopStart),
                     )
                 }

@@ -69,6 +69,8 @@ internal enum class AppIcon {
     ROTATE_LEFT,
     IMAGE,
     FOLDER_ALL,
+    EDIT,
+    DELETE,
 }
 
 @Composable
@@ -191,6 +193,10 @@ internal fun DrawScope.drawAppGlyph(
             }
 
             AppIcon.CLOSE -> path("M6 6l12 12M18 6L6 18")
+
+            AppIcon.EDIT -> path("M14 5l5 5M4 20l5-1L20 8a2.1 2.1 0 0 0-5-5L4 14z")
+
+            AppIcon.DELETE -> path("M4 6h16M9 6V3h6v3M6 6l1 14h10l1-14M10 10v6M14 10v6")
 
             AppIcon.SHARE -> {
                 circle(18f, 5f, 2.5f)
