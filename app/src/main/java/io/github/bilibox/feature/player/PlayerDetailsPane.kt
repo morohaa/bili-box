@@ -130,7 +130,7 @@ internal fun PlayerDetailsPane(
                             )
                         enter togetherWith exit
                     },
-                    label = "简介与媒体信息切换",
+                    label = "播放详情标签切换",
                 ) { tab ->
                     when {
                         tab == 0 -> Column(Modifier.fillMaxWidth()) {

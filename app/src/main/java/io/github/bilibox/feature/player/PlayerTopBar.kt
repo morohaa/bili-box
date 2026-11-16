@@ -32,6 +32,7 @@ internal fun PlayerTopBar(
     onListenClick: () -> Unit,
     onListenPositioned: (Offset) -> Unit,
     onMoreClick: () -> Unit,
+    onBookmarksClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -66,6 +67,7 @@ internal fun PlayerTopBar(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
+        onBookmarksClick?.let { PlayerBookmarkButton(it) }
         if (!fullScreen && showListenButton) {
             ListenTopBarButton(
                 listening = listening,

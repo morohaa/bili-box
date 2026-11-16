@@ -10,7 +10,7 @@ import io.github.bilibox.data.localvideo.LocalVideo
  * 本地视频播放页下半部分的详情设计。
  *
  * 参考「B 站本地播放器」原型：来源卡、可展开标题、图标元信息、五个快捷操作、
- * 续播条，以及同文件夹队列；第二个标签页直接展示完整的媒体信息。
+ * 续播条，以及同文件夹队列；第二个标签页展示当前视频的时间标记。
  */
 
 internal val DetailBlue = Color(0xFF00AEEC)
@@ -41,5 +41,3 @@ internal fun localVideoFolderPath(video: LocalVideo): String {
         .ifBlank { "根目录" }
     return "内部存储 / $folder"
 }
-
-internal fun localVideoFullPath(video: LocalVideo): String = "${localVideoFolderPath(video)} / ${video.name}"

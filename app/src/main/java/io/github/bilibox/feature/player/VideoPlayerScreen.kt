@@ -92,6 +92,7 @@ internal fun VideoPlayerScreen(
     detailsBackground: Color = PlaybackSurface,
     showDetailTabs: Boolean = true,
     detailTabs: List<String> = listOf("简介", "评论"),
+    onBookmarksClick: (() -> Unit)? = null,
     sourcePill: Boolean = false,
     extraDetailPane: (@Composable (duration: Long) -> Unit)? = null,
     playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
@@ -627,6 +628,7 @@ internal fun VideoPlayerScreen(
                         onListenClick = { enterListen() },
                         onListenPositioned = { listenOrigin = it },
                         onMoreClick = { settingsSheetOpen = true },
+                        onBookmarksClick = onBookmarksClick,
                         modifier = Modifier.align(Alignment.TopStart),
                     )
                 }
