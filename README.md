@@ -9,9 +9,7 @@
 <p align="center">原生 Android 哔哩哔哩客户端，支持视频搜索、在线播放、弹幕、本地视频管理与后台听视频。</p>
 
 <p align="center">
-  <a href="#环境要求"><img src="https://img.shields.io/badge/平台-Android%209%2B-343742?style=for-the-badge" alt="平台：Android 9 及以上"></a>
-  <a href="#技术栈"><img src="https://img.shields.io/badge/UI-Jetpack%20Compose-73B8D5?style=for-the-badge" alt="UI：Jetpack Compose"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-F16C99?style=for-the-badge" alt="许可证：MIT"></a>
+  Android 9+ · Kotlin · Jetpack Compose · <a href="LICENSE">MIT License</a>
 </p>
 
 <p align="center">
