@@ -622,8 +622,14 @@ internal fun OnlineVideoScreen(
             }
         }
     }
-    val replyCount = videoInfo?.stat?.reply ?: video.commentCount
+    val replyCount = videoInfo?.stat?.reply ?: 0L
     val commentTabLabel = if (replyCount > 0) "评论 ${formatCompactCount(replyCount)}" else "评论"
+    val commentsPane = rememberOnlineVideoComments(
+        client = client,
+        aid = videoInfo?.aid,
+        awaitingVideoInfo = videoInfo == null && playbackState !is OnlinePlaybackState.Error,
+        onRetryVideoInfo = { retryToken++ },
+    )
     VideoPlayerScreen(
         player = exoPlayer,
         previewSource = remember(playbackData, dataSourceFactory) {
@@ -638,8 +644,9 @@ internal fun OnlineVideoScreen(
             null
         },
         sourceLabel = "哔哩哔哩",
-        commentMessage = "暂不支持查看在线评论",
+        commentMessage = "暂无评论",
         detailTabs = listOf("简介", commentTabLabel),
+        extraDetailPane = commentsPane,
         onBack = onBack,
         onRetry = { retryToken++ },
         onNextEpisode = nextPage?.let { page -> { advanceToPart(page.page) } },

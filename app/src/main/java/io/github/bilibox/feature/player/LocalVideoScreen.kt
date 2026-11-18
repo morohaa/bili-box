@@ -188,7 +188,7 @@ internal fun LocalVideoScreen(
                 switchTo(it)
             })
         },
-        extraDetailPane = { LocalVideoBookmarks(bookmarks) },
+        extraDetailPane = PlayerExtraDetailPane.Content { LocalVideoBookmarks(bookmarks) },
         playbackModeSheet = { dismiss ->
             PlaybackModeSheet(
                 selected = queueMode,

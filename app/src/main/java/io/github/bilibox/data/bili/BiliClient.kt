@@ -62,6 +62,21 @@ class BiliClient(
         return response.data ?: throw BiliException(response.code, "card 返回空 data")
     }
 
+    internal suspend fun videoComments(aid: Long, offset: String, order: VideoCommentOrder): VideoCommentPage<String> {
+        require(aid > 0L)
+        val query = WbiSigner.sign(videoCommentParameters(aid, offset, order), obtainMixinKey(force = false))
+        val response = getJson<VideoCommentListPayload>("$COMMENTS_URL/wbi/main?$query")
+        ensureOk(response)
+        return response.data?.toPage(firstPage = offset.isEmpty()) ?: throw BiliException(-1, "评论接口未返回数据")
+    }
+
+    internal suspend fun videoCommentReplies(aid: Long, rootId: Long, page: Int): VideoCommentPage<Int> {
+        require(aid > 0L && rootId > 0L && page > 0)
+        val response = getJson<VideoCommentRepliesPayload>("$COMMENTS_URL/reply?type=1&oid=$aid&root=$rootId&pn=$page&ps=20")
+        ensureOk(response)
+        return response.data?.toPage(page) ?: throw BiliException(-1, "回复接口未返回数据")
+    }
+
     /** 收藏接口沿用当前客户端的登录 Cookie 与请求头。 */
     internal suspend fun favoriteData(path: String, parameters: Map<String, String> = emptyMap()): JsonObject {
         val query = parameters.entries.joinToString("&") { (key, value) -> "$key=${encodeQuery(value)}" }
@@ -354,6 +369,7 @@ class BiliClient(
         private const val NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
         private const val VIEW_URL = "https://api.bilibili.com/x/web-interface/view"
         private const val USER_CARD_URL = "https://api.bilibili.com/x/web-interface/card"
+        private const val COMMENTS_URL = "https://api.bilibili.com/x/v2/reply"
         private const val DANMAKU_URL = "https://api.bilibili.com/x/v1/dm/list.so"
         private const val DANMAKU_POST_URL = "https://api.bilibili.com/x/v2/dm/post"
         private const val PLAY_URL = "https://api.bilibili.com/x/player/wbi/playurl"

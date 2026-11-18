@@ -11,6 +11,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -30,6 +32,11 @@ import io.github.bilibox.core.ui.theme.PlaybackDivider
 import io.github.bilibox.core.ui.theme.PlaybackInk
 import io.github.bilibox.core.ui.theme.PlaybackMuted
 import io.github.bilibox.data.player.LightsOffMode
+
+internal sealed interface PlayerExtraDetailPane {
+    class Content(val render: @Composable (Long) -> Unit) : PlayerExtraDetailPane
+    class ScrollableList(val render: LazyListScope.() -> Unit) : PlayerExtraDetailPane
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +70,7 @@ internal fun PlayerDetailsPane(
     onTakeScreenshot: () -> Unit,
     onSeekTo: (Long) -> Unit,
     details: @Composable (Long) -> Unit,
-    extraDetailPane: (@Composable (Long) -> Unit)?,
+    extraDetailPane: PlayerExtraDetailPane?,
     episodeOverlay: (@Composable () -> Unit)?,
     episodeOverlayVisible: Boolean,
 ) {
@@ -76,80 +83,89 @@ internal fun PlayerDetailsPane(
         animationSpec = tween(220),
         label = "关灯模糊半径",
     )
+    val blurModifier = if (blurRadius > 0.dp) Modifier.blur(blurRadius) else Modifier
+    val tabBar: @Composable () -> Unit = {
+        PlayerDetailBar(
+            tabs = detailTabs,
+            selectedTab = detailsTab,
+            onSelectTab = onDetailsTabChange,
+            sourcePill = sourcePill,
+            sourceLabel = sourceLabel,
+            danmakuEnabled = danmakuEnabled,
+            onOpenDanmakuComposer = onOpenDanmakuComposer,
+            onToggleDanmaku = onToggleDanmaku,
+            lightsOffMode = lightsOffMode,
+            onToggleLights = onToggleLights,
+            onSelectLightsOffMode = onSelectLightsOffMode,
+        )
+        HorizontalDivider(color = PlaybackDivider, thickness = 1.dp)
+    }
     Box(
         modifier.testTag("playerDetails").fillMaxWidth().background(detailsBackground)
             .navigationBarsPadding().clipToBounds()
     ) {
-        Column(
-            Modifier.fillMaxSize()
-                .verticalScroll(detailScroll, enabled = !lightsOff)
-                .then(if (blurRadius > 0.dp) Modifier.blur(blurRadius) else Modifier)
-        ) {
-            if (showDetailTabs) {
-                PlayerDetailBar(
-                    tabs = detailTabs,
-                    selectedTab = detailsTab,
-                    onSelectTab = onDetailsTabChange,
-                    sourcePill = sourcePill,
-                    sourceLabel = sourceLabel,
-                    danmakuEnabled = danmakuEnabled,
-                    onOpenDanmakuComposer = onOpenDanmakuComposer,
-                    onToggleDanmaku = onToggleDanmaku,
-                    lightsOffMode = lightsOffMode,
-                    onToggleLights = onToggleLights,
-                    onSelectLightsOffMode = onSelectLightsOffMode,
-                )
-                HorizontalDivider(color = PlaybackDivider, thickness = 1.dp)
+        if (activePane != 0 && extraDetailPane is PlayerExtraDetailPane.ScrollableList) {
+            LazyColumn(Modifier.fillMaxSize().then(blurModifier), userScrollEnabled = !lightsOff) {
+                stickyHeader { Column(Modifier.fillMaxWidth().background(detailsBackground)) { tabBar() } }
+                extraDetailPane.render(this)
             }
+        } else {
+            Column(
+                Modifier.fillMaxSize()
+                    .verticalScroll(detailScroll, enabled = !lightsOff)
+                    .then(blurModifier)
+            ) {
+                if (showDetailTabs) tabBar()
 
-            val detailActions = PlayerDetailActions(
-                speed = speed,
-                positionMs = positionMs,
-                screenshotEnabled = screenshotEnabled,
-                openSpeedPanel = onOpenSpeedPanel,
-                openPlaybackModeSheet = onOpenPlaybackModeSheet,
-                openSleepTimerSheet = onOpenSleepTimerSheet,
-                sleepTimerActive = sleepTimerActive,
-                takeScreenshot = onTakeScreenshot,
-                seekTo = onSeekTo,
-            )
-            CompositionLocalProvider(LocalPlayerDetailActions provides detailActions) {
-                AnimatedContent(
-                    targetState = activePane,
-                    transitionSpec = {
-                        val forward = targetState > initialState
-                        val enter = fadeIn(tween(180)) +
-                            slideInHorizontally(
-                                animationSpec = tween(220, easing = FastOutSlowInEasing),
-                                initialOffsetX = { width -> if (forward) width / 8 else -width / 8 },
-                            )
-                        val exit = fadeOut(tween(120)) +
-                            slideOutHorizontally(
-                                animationSpec = tween(160, easing = FastOutSlowInEasing),
-                                targetOffsetX = { width -> if (forward) -width / 8 else width / 8 },
-                            )
-                        enter togetherWith exit
-                    },
-                    label = "播放详情标签切换",
-                ) { tab ->
-                    when {
-                        tab == 0 -> Column(Modifier.fillMaxWidth()) {
-                            details(duration)
-                            playbackError?.let { message ->
-                                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                                    Text("播放失败：$message", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                                    TextButton(onClick = onRetry) { Text("重试", color = Pink) }
+                val detailActions = PlayerDetailActions(
+                    speed = speed,
+                    positionMs = positionMs,
+                    screenshotEnabled = screenshotEnabled,
+                    openSpeedPanel = onOpenSpeedPanel,
+                    openPlaybackModeSheet = onOpenPlaybackModeSheet,
+                    openSleepTimerSheet = onOpenSleepTimerSheet,
+                    sleepTimerActive = sleepTimerActive,
+                    takeScreenshot = onTakeScreenshot,
+                    seekTo = onSeekTo,
+                )
+                CompositionLocalProvider(LocalPlayerDetailActions provides detailActions) {
+                    AnimatedContent(
+                        targetState = activePane,
+                        transitionSpec = {
+                            val forward = targetState > initialState
+                            val enter = fadeIn(tween(180)) +
+                                slideInHorizontally(
+                                    animationSpec = tween(220, easing = FastOutSlowInEasing),
+                                    initialOffsetX = { width -> if (forward) width / 8 else -width / 8 },
+                                )
+                            val exit = fadeOut(tween(120)) +
+                                slideOutHorizontally(
+                                    animationSpec = tween(160, easing = FastOutSlowInEasing),
+                                    targetOffsetX = { width -> if (forward) -width / 8 else width / 8 },
+                                )
+                            enter togetherWith exit
+                        },
+                        label = "播放详情标签切换",
+                    ) { tab ->
+                        when {
+                            tab == 0 -> Column(Modifier.fillMaxWidth()) {
+                                details(duration)
+                                playbackError?.let { message ->
+                                    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                                        Text("播放失败：$message", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                                        TextButton(onClick = onRetry) { Text("重试", color = Pink) }
+                                    }
                                 }
                             }
-                        }
 
-                        extraDetailPane != null -> extraDetailPane(duration)
+                            extraDetailPane is PlayerExtraDetailPane.Content -> extraDetailPane.render(duration)
 
-                        else -> {
-                            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
-                                Text(detailTabs.getOrNull(1) ?: "评论", color = PlaybackInk, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                Spacer(Modifier.height(8.dp))
-                                Text(commentMessage, color = PlaybackMuted, fontSize = 13.sp)
+                            else -> {
+                                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
+                                    Text(detailTabs.getOrNull(1) ?: "评论", color = PlaybackInk, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(commentMessage, color = PlaybackMuted, fontSize = 13.sp)
+                                }
                             }
                         }
                     }

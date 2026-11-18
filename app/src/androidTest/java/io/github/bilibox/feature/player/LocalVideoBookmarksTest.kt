@@ -99,7 +99,7 @@ class LocalVideoBookmarksTest {
                         onAddBookmark = state::add,
                         bookmarkPositions = state.items.map { it.positionMs },
                         episodes = { Text("测试选集") },
-                        extraDetailPane = { LocalVideoBookmarks(state) },
+                        extraDetailPane = PlayerExtraDetailPane.Content { LocalVideoBookmarks(state) },
                         onBack = {},
                         onRetry = {},
                         details = { Text("视频简介") },

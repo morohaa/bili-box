@@ -96,7 +96,7 @@ internal fun VideoPlayerScreen(
     onAddBookmark: (() -> Unit)? = null,
     bookmarkPositions: List<Long> = emptyList(),
     sourcePill: Boolean = false,
-    extraDetailPane: (@Composable (duration: Long) -> Unit)? = null,
+    extraDetailPane: PlayerExtraDetailPane? = null,
     playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     // 播放设置卡片的偏好：在线视频由外层持有自动连播，本地队列持有循环模式。
     autoPlayNext: Boolean? = null,

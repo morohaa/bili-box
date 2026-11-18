@@ -1,0 +1,90 @@
+package io.github.bilibox.data.bili
+
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class BiliCommentsTest {
+    @Test
+    fun requestsRealCommentEndpointsWithVideoIdCursorAndThreadId() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val client = client(requests) { request ->
+            when (request.url.encodedPath) {
+                "/x/web-interface/nav" -> """{"code":0,"data":{"wbi_img":{"img_url":"https://example.com/7cd084941338484aae1ad9425b84077c.png","sub_url":"https://example.com/4932caff0ff746eab6f01bf08b70ac45.png"}}}"""
+
+                "/x/v2/reply/wbi/main" -> """
+                    {"code":0,"data":{
+                      "cursor":{"is_end":false,"pagination_reply":{"next_offset":"{\"page\":2}"}},
+                      "top_replies":[{"rpid_str":"9007199254740995","like":12,"rcount":3,"member":{"uname":"作者"},"content":{"message":"置顶内容"}}],
+                      "replies":[{"rpid":9007199254740995},{"rpid":2,"content":{"message":"普通评论"}}]
+                    }}
+                """.trimIndent()
+
+                "/x/v2/reply/reply" -> """{"code":0,"data":{"page":{"size":20,"count":42},"replies":[{"rpid":3,"content":{"message":"楼中楼回复"}}]}}"""
+
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val page = client.videoComments(aid = 42L, offset = "", order = VideoCommentOrder.HOT)
+        val nextOffset = checkNotNull(page.nextKey)
+        assertEquals(listOf(9007199254740995L, 2L), page.comments.map(VideoComment::id))
+        assertTrue(page.comments.first().pinned)
+        assertEquals("置顶内容", page.comments.first().message)
+        assertEquals(3, page.comments.first().replyCount)
+        assertEquals(12L, page.comments.first().likes)
+        assertEquals("{\"page\":2}", nextOffset)
+
+        val next = client.videoComments(42L, nextOffset, VideoCommentOrder.NEWEST)
+        assertTrue(next.comments.none(VideoComment::pinned))
+        val thread = client.videoCommentReplies(42L, page.comments.first().id, 2)
+        assertEquals("楼中楼回复", thread.comments.single().message)
+        assertEquals(3, thread.nextKey)
+
+        assertEquals(4, requests.size)
+        assertTrue(requests.all { it.method == "GET" })
+        val first = requests[1].url
+        assertEquals("1", first.queryParameter("type"))
+        assertEquals("42", first.queryParameter("oid"))
+        assertEquals("3", first.queryParameter("mode"))
+        assertEquals("""{"offset":""}""", first.queryParameter("pagination_str"))
+        assertNotNull(first.queryParameter("w_rid"))
+        val nextRequest = requests[2].url
+        assertEquals("2", nextRequest.queryParameter("mode"))
+        assertEquals("""{"offset":"{\"page\":2}"}""", nextRequest.queryParameter("pagination_str"))
+        val threadRequest = requests[3].url
+        assertEquals("42", threadRequest.queryParameter("oid"))
+        assertEquals("9007199254740995", threadRequest.queryParameter("root"))
+        assertEquals("2", threadRequest.queryParameter("pn"))
+    }
+
+    @Test
+    fun emptyAndFinalPagesDoNotOfferAnotherRequest() {
+        val top = Json.decodeFromString<VideoCommentListPayload>(
+            """{"cursor":{"is_end":true,"pagination_reply":{"next_offset":"unused"}},"replies":null}""",
+        ).toPage(firstPage = true)
+        val thread = Json.decodeFromString<VideoCommentRepliesPayload>(
+            """{"page":{"size":20,"count":21},"replies":[{"rpid":5}]}""",
+        ).toPage(requestedPage = 2)
+        assertTrue(top.comments.isEmpty())
+        assertNull(top.nextKey)
+        assertNull(thread.nextKey)
+    }
+
+    private fun client(requests: MutableList<Request>, respond: (Request) -> String): BiliClient = BiliClient(
+        OkHttpClient.Builder().addInterceptor { chain ->
+            val request = chain.request()
+            requests += request
+            Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(200).message("OK")
+                .body(respond(request).toResponseBody()).build()
+        }.build(),
+    )
+}
