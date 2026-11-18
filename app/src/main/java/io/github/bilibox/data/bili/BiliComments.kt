@@ -19,6 +19,8 @@ internal data class VideoComment(
     val likes: Long,
     val replyCount: Int,
     val pinned: Boolean = false,
+    val authorId: Long = 0L,
+    val previewReply: VideoComment? = null,
 )
 
 internal data class VideoCommentPage<Key : Any>(
@@ -42,8 +44,8 @@ internal data class VideoCommentListPayload(
 ) {
     fun toPage(firstPage: Boolean): VideoCommentPage<String> {
         val pageCursor = cursor ?: throw BiliException(-1, "评论接口未返回分页信息")
-        val pinned = if (firstPage) topReplies.orEmpty().mapNotNull { it.toComment(pinned = true) } else emptyList()
-        val comments = (pinned + replies.orEmpty().mapNotNull { it.toComment() }).distinctBy(VideoComment::id)
+        val pinned = if (firstPage) topReplies.orEmpty().mapNotNull { it.toComment(pinned = true, includePreview = true) } else emptyList()
+        val comments = (pinned + replies.orEmpty().mapNotNull { it.toComment(includePreview = true) }).distinctBy(VideoComment::id)
         if (comments.isEmpty() && !control?.message.isNullOrBlank()) {
             throw BiliException(-1, control?.message.orEmpty())
         }
@@ -90,8 +92,9 @@ internal data class VideoCommentPayload(
     @SerialName("rcount") private val replyCount: Int = 0,
     private val member: VideoCommentMember? = null,
     private val content: VideoCommentContent? = null,
+    private val replies: List<VideoCommentPayload>? = null,
 ) {
-    fun toComment(pinned: Boolean = false): VideoComment? {
+    fun toComment(pinned: Boolean = false, includePreview: Boolean = false): VideoComment? {
         val commentId = (id?.toLongOrNull() ?: rpid).takeIf { it > 0 } ?: return null
         return VideoComment(
             id = commentId,
@@ -102,12 +105,14 @@ internal data class VideoCommentPayload(
             likes = likes.coerceAtLeast(0L),
             replyCount = replyCount.coerceAtLeast(0),
             pinned = pinned,
+            authorId = member?.mid ?: 0L,
+            previewReply = if (includePreview) replies.orEmpty().firstNotNullOfOrNull { it.toComment() } else null,
         )
     }
 }
 
 @Serializable
-internal data class VideoCommentMember(@SerialName("uname") val name: String = "", val avatar: String = "")
+internal data class VideoCommentMember(@SerialName("uname") val name: String = "", val avatar: String = "", val mid: Long = 0L)
 
 @Serializable
 internal data class VideoCommentContent(val message: String = "")

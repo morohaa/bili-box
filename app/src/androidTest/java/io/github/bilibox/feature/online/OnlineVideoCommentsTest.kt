@@ -5,7 +5,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.media3.exoplayer.ExoPlayer
@@ -15,6 +17,7 @@ import io.github.bilibox.data.bili.VideoComment
 import io.github.bilibox.data.bili.VideoCommentOrder
 import io.github.bilibox.data.bili.VideoCommentPage
 import io.github.bilibox.feature.player.VideoPlayerScreen
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -26,7 +29,13 @@ class OnlineVideoCommentsTest {
     fun readsCommentsAndRepliesAndRetriesOnlyTheFailedPage() {
         val requests = mutableListOf<Pair<VideoCommentOrder, String>>()
         val threadRequests = mutableListOf<Pair<Long, Int>>()
-        val root = comment(10L, "第一条热门评论", replyCount = 2)
+        val sheetReplies = CompletableDeferred<VideoCommentPage<Int>>()
+        val root = comment(10L, "第一条热门评论", replyCount = 12).copy(
+            authorId = 1L,
+            pinned = true,
+            previewReply = comment(20L, "第一条回复预览"),
+        )
+        val newest = comment(12L, "最新评论", replyCount = 2)
         compose.setContent {
             val context = LocalContext.current
             val player = remember { ExoPlayer.Builder(context).build() }
@@ -42,10 +51,12 @@ class OnlineVideoCommentsTest {
                         canLoad = true,
                         awaitingVideoInfo = false,
                         onRetryVideoInfo = {},
+                        ownerId = 1L,
+                        totalCount = 24L,
                         loadComments = { order, offset ->
                             requests += order to offset
                             when {
-                                order == VideoCommentOrder.NEWEST -> VideoCommentPage(listOf(comment(12L, "最新评论")), null)
+                                order == VideoCommentOrder.NEWEST -> VideoCommentPage(listOf(newest), null)
                                 offset.isEmpty() -> VideoCommentPage(listOf(root), "next")
                                 requests.count { it.second == "next" } == 1 -> throw BiliException(-412, "受限")
                                 else -> VideoCommentPage(listOf(root, comment(11L, "下一页评论")), null)
@@ -53,7 +64,11 @@ class OnlineVideoCommentsTest {
                         },
                         loadReplies = { rootId, page ->
                             threadRequests += rootId to page
-                            VideoCommentPage(listOf(comment(20L, "楼中楼详情")), null)
+                            if (rootId == root.id) {
+                                sheetReplies.await()
+                            } else {
+                                VideoCommentPage(listOf(comment(20L, "页内回复")), null)
+                            }
                         },
                     ),
                     onBack = {},
@@ -66,19 +81,34 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("视频简介").assertIsDisplayed()
         compose.runOnIdle { assertEquals(emptyList<Pair<VideoCommentOrder, String>>(), requests) }
         compose.onNodeWithText("评论").performClick()
+        compose.onNodeWithText("热门").assertIsSelected()
+        compose.onNodeWithText("共 24 条评论").assertIsDisplayed()
         compose.onNodeWithText("第一条热门评论").assertIsDisplayed()
-        compose.onNodeWithText("查看 2 条回复").performClick()
-        compose.onNodeWithText("楼中楼详情").assertIsDisplayed()
-        compose.onNodeWithText("关闭").performClick()
+        compose.onNodeWithText("置顶").assertIsDisplayed()
+        compose.onNodeWithText("UP").assertIsDisplayed()
+        compose.onNodeWithText("第一条回复预览", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("查看 12 条回复").performClick()
+        compose.onNodeWithText("评论详情").assertIsDisplayed()
+        compose.onNodeWithText("全部回复（12）").assertIsDisplayed()
+        val replies = List(12) { index -> comment(20L + index, "抽屉回复 ${index + 1}") }
+        compose.runOnIdle { sheetReplies.complete(VideoCommentPage(replies, null)) }
+        compose.onNodeWithText("抽屉回复 1").assertIsDisplayed()
+        compose.onNodeWithContentDescription("关闭评论详情").performClick()
         compose.onNodeWithText("加载更多").performClick()
         compose.onNodeWithText("哔哩哔哩暂时限制了评论请求，请稍后再试").assertIsDisplayed()
         compose.onNodeWithText("重试").performClick()
         compose.onNodeWithText("下一页评论").assertIsDisplayed()
         compose.onNodeWithText("最新").performClick()
+        compose.onNodeWithText("最新").assertIsSelected()
         compose.onNodeWithText("最新评论").assertIsDisplayed()
         compose.onNodeWithText("第一条热门评论").assertDoesNotExist()
+        compose.onNodeWithText("查看 2 条回复").performClick()
+        compose.onNodeWithText("页内回复").assertIsDisplayed()
+        compose.onNodeWithText("评论详情").assertDoesNotExist()
+        compose.onNodeWithText("收起回复").performClick()
+        compose.onNodeWithText("页内回复").assertDoesNotExist()
         compose.runOnIdle {
-            assertEquals(listOf(10L to 1), threadRequests)
+            assertEquals(listOf(10L to 1, 12L to 1), threadRequests)
             assertEquals(
                 listOf(VideoCommentOrder.HOT to "", VideoCommentOrder.HOT to "next", VideoCommentOrder.HOT to "next", VideoCommentOrder.NEWEST to ""),
                 requests,

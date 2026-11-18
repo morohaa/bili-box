@@ -24,7 +24,8 @@ class BiliCommentsTest {
                 "/x/v2/reply/wbi/main" -> """
                     {"code":0,"data":{
                       "cursor":{"is_end":false,"pagination_reply":{"next_offset":"{\"page\":2}"}},
-                      "top_replies":[{"rpid_str":"9007199254740995","like":12,"rcount":3,"member":{"uname":"作者"},"content":{"message":"置顶内容"}}],
+                      "top_replies":[{"rpid_str":"9007199254740995","like":12,"rcount":3,"member":{"uname":"作者","mid":"42"},"content":{"message":"置顶内容"},
+                        "replies":[{"rpid":0},{"rpid":7,"member":{"uname":"回复者","mid":11},"content":{"message":"真实回复预览"}}]}],
                       "replies":[{"rpid":9007199254740995},{"rpid":2,"content":{"message":"普通评论"}}]
                     }}
                 """.trimIndent()
@@ -41,6 +42,12 @@ class BiliCommentsTest {
         assertEquals("置顶内容", page.comments.first().message)
         assertEquals(3, page.comments.first().replyCount)
         assertEquals(12L, page.comments.first().likes)
+        assertEquals(42L, page.comments.first().authorId)
+        val preview = checkNotNull(page.comments.first().previewReply)
+        assertEquals(7L, preview.id)
+        assertEquals(11L, preview.authorId)
+        assertEquals("真实回复预览", preview.message)
+        assertNull(page.comments[1].previewReply)
         assertEquals("{\"page\":2}", nextOffset)
 
         val next = client.videoComments(42L, nextOffset, VideoCommentOrder.NEWEST)
