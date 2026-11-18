@@ -1,13 +1,9 @@
 package io.github.bilibox.data.auth
 
-import android.util.Base64
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLDecoder
 import java.net.URLEncoder
-import java.security.KeyFactory
-import java.security.spec.X509EncodedKeySpec
-import javax.crypto.Cipher
 import org.json.JSONObject
 
 internal data class LoginResponse(val json: JSONObject, val cookies: String)
@@ -23,7 +19,7 @@ private const val loginUserAgent =
 
 /**
  * 访问哔哩哔哩通行证（passport）接口，统一带上 Referer 并收集 Set-Cookie。
- * 扫码登录与账号密码/短信登录共用这一份请求逻辑。
+ * 扫码登录与短信登录共用这一份请求逻辑。
  */
 internal fun biliLoginRequest(endpoint: String, cookie: String? = null, includeCookies: Boolean = true): LoginResponse = executeLoginRequest(endpoint, cookie, body = null, includeCookies = includeCookies)
 
@@ -122,10 +118,10 @@ internal fun fetchBiliSession(cookie: String): BiliSession {
 internal fun secureImageUrl(url: String): String = if (url.startsWith("http://")) url.replaceFirst("http://", "https://") else url
 
 // ---------------------------------------------------------------------------
-// 账号密码 / 短信验证码登录
+// 短信验证码登录
 //
 // 两步：先申请 captcha（token + 极验 gt/challenge），在 WebView 里完成极验验证，
-// 再用 validate/seccode 调登录接口。密码需先用接口公钥做 RSA 加密。
+// 再用 validate/seccode 申请短信验证码。
 // ---------------------------------------------------------------------------
 
 internal fun requestLoginCaptcha(): LoginCaptcha {
@@ -144,36 +140,6 @@ internal fun requestLoginCaptcha(): LoginCaptcha {
         error("人机验证响应无效")
     }
     return captcha
-}
-
-internal fun loginWithPassword(
-    username: String,
-    password: String,
-    captcha: LoginCaptcha,
-    proof: GeetestProof,
-): String {
-    val keyData = biliLoginRequest("https://passport.bilibili.com/x/passport-login/web/key").json.optJSONObject("data")
-        ?: throw IllegalStateException("无法获取登录公钥，请稍后重试")
-    val encrypted = try {
-        rsaEncryptPassword(keyData.optString("hash") + password, keyData.optString("key"))
-    } catch (error: Exception) {
-        throw IllegalStateException("密码加密失败，请重试")
-    }
-    val response = biliLoginPost(
-        "https://passport.bilibili.com/x/passport-login/web/login",
-        mapOf(
-            "username" to username,
-            "password" to encrypted,
-            "keep" to "0",
-            "token" to captcha.token,
-            "challenge" to captcha.challenge,
-            "validate" to proof.validate,
-            "seccode" to proof.seccode,
-            "source" to "main_web",
-            "go_url" to "https://www.bilibili.com",
-        ),
-    )
-    return loginCookieOf(response)
 }
 
 internal fun sendLoginSmsCode(tel: String, captcha: LoginCaptcha, proof: GeetestProof): String {
@@ -231,12 +197,9 @@ private fun loginCookieOf(response: LoginResponse): String {
 private fun loginFailure(code: Int, message: String): IllegalStateException {
     val text = when (code) {
         -105 -> "人机验证未通过，请重新验证"
-        -629 -> "账号或密码错误"
         -662 -> "提交超时，请重新登录"
         -2100 -> "本次登录环境存在风险，请改用扫码或网页登录"
-        2400 -> "登录密钥已失效，请重试"
         2406 -> "人机验证服务异常，请稍后重试"
-        86000 -> "密码校验失败，请重试"
         1002 -> "手机号格式不正确"
         1003 -> "验证码已发送，请稍后重试"
         1006 -> "短信验证码不正确"
@@ -246,17 +209,4 @@ private fun loginFailure(code: Int, message: String): IllegalStateException {
         else -> message.ifBlank { "登录失败（$code）" }
     }
     return IllegalStateException(text)
-}
-
-/** B 站要求先用接口公钥对「盐 + 明文密码」做 RSA(PKCS#1) 加密，再做 Base64。 */
-private fun rsaEncryptPassword(plain: String, pem: String): String {
-    val key = pem
-        .replace("-----BEGIN PUBLIC KEY-----", "")
-        .replace("-----END PUBLIC KEY-----", "")
-        .replace("\\s".toRegex(), "")
-    val spec = X509EncodedKeySpec(Base64.decode(key, Base64.DEFAULT))
-    val publicKey = KeyFactory.getInstance("RSA").generatePublic(spec)
-    val cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding")
-    cipher.init(Cipher.ENCRYPT_MODE, publicKey)
-    return Base64.encodeToString(cipher.doFinal(plain.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
 }

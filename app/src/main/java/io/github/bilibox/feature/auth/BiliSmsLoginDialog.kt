@@ -1,7 +1,6 @@
 package io.github.bilibox.feature.auth
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,8 +40,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -54,7 +51,6 @@ import io.github.bilibox.data.auth.BiliSession
 import io.github.bilibox.data.auth.GeetestProof
 import io.github.bilibox.data.auth.LoginCaptcha
 import io.github.bilibox.data.auth.fetchBiliSession
-import io.github.bilibox.data.auth.loginWithPassword
 import io.github.bilibox.data.auth.loginWithSmsCode
 import io.github.bilibox.data.auth.requestLoginCaptcha
 import io.github.bilibox.data.auth.sendLoginSmsCode
@@ -64,16 +60,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private enum class CredentialTab { Password, Sms }
-
-private enum class CredentialAction { PasswordLogin, SendSms }
-
-/**
- * 原生账号密码 / 短信验证码登录面板：
- * 输入框与提交都在原生界面完成，只有在需要极验人机验证时弹出 WebView。
- */
 @Composable
-internal fun BiliNativeLoginDialog(
+internal fun BiliSmsLoginDialog(
     darkMode: Boolean,
     onDismiss: () -> Unit,
     onSuccess: (BiliSession) -> Unit,
@@ -83,12 +71,6 @@ internal fun BiliNativeLoginDialog(
     val panelColor = if (darkMode) Color(0xFF22252B) else Color.White
     val ink = if (darkMode) Color(0xFFE7E9ED) else Ink
     val muted = if (darkMode) Color(0xFF9BA3AE) else Muted
-    val trackColor = if (darkMode) Color(0xFF2C3037) else Color(0xFFF0F2F5)
-
-    var tab by remember { mutableStateOf(CredentialTab.Password) }
-    var account by rememberSaveable { mutableStateOf("") }
-    // 密码不写入 saved instance state，避免随界面状态落盘。
-    var password by remember { mutableStateOf("") }
     var phone by rememberSaveable { mutableStateOf("") }
     var smsCode by rememberSaveable { mutableStateOf("") }
     var captchaKey by rememberSaveable { mutableStateOf("") }
@@ -97,12 +79,9 @@ internal fun BiliNativeLoginDialog(
     var error by remember { mutableStateOf<String?>(null) }
     var hint by remember { mutableStateOf<String?>(null) }
     var captcha by remember { mutableStateOf<LoginCaptcha?>(null) }
-    var pending by remember { mutableStateOf<CredentialAction?>(null) }
 
     val phoneNumber = phone.trim()
     val phoneValid = phoneNumber.matches(Regex("1\\d{10}"))
-    val accountValid = account.isNotBlank()
-    val passwordValid = password.isNotBlank()
     val codeValid = smsCode.trim().length >= 4
 
     LaunchedEffect(countdown) {
@@ -111,16 +90,18 @@ internal fun BiliNativeLoginDialog(
         countdown -= 1
     }
 
-    fun beginCaptcha(action: CredentialAction) {
-        if (busy) return
+    fun requestSmsCode() {
+        if (busy || countdown > 0 || captcha != null) return
+        if (!phoneValid) {
+            error = "请输入正确的手机号"
+            return
+        }
         error = null
         hint = null
         busy = true
         scope.launch {
             try {
-                val ticket = withContext(Dispatchers.IO) { requestLoginCaptcha() }
-                pending = action
-                captcha = ticket
+                captcha = withContext(Dispatchers.IO) { requestLoginCaptcha() }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -131,36 +112,16 @@ internal fun BiliNativeLoginDialog(
         }
     }
 
-    suspend fun finishLogin(cookie: String) {
-        val session = withContext(Dispatchers.IO) { fetchBiliSession(cookie) }
-        busy = false
-        onSuccess(session)
-    }
-
     fun handleProof(proof: GeetestProof) {
         val ticket = captcha ?: return
-        val action = pending ?: CredentialAction.PasswordLogin
         captcha = null
-        pending = null
         busy = true
         error = null
         scope.launch {
             try {
-                when (action) {
-                    CredentialAction.SendSms -> {
-                        val key = withContext(Dispatchers.IO) { sendLoginSmsCode(phoneNumber, ticket, proof) }
-                        captchaKey = key
-                        countdown = 60
-                        hint = "验证码已发送至 +86 $phoneNumber"
-                    }
-
-                    CredentialAction.PasswordLogin -> {
-                        val cookie = withContext(Dispatchers.IO) {
-                            loginWithPassword(account.trim(), password, ticket, proof)
-                        }
-                        finishLogin(cookie)
-                    }
-                }
+                captchaKey = withContext(Dispatchers.IO) { sendLoginSmsCode(phoneNumber, ticket, proof) }
+                countdown = 60
+                hint = "验证码已发送至 +86 $phoneNumber"
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
@@ -171,54 +132,25 @@ internal fun BiliNativeLoginDialog(
         }
     }
 
-    fun requestSmsCode() {
-        if (busy || countdown > 0) return
-        if (!phoneValid) {
-            error = "请输入正确的手机号"
-            return
-        }
-        beginCaptcha(CredentialAction.SendSms)
-    }
-
-    fun loginWithPasswordOrSms() {
+    fun loginWithSms() {
         if (busy) return
-        when (tab) {
-            CredentialTab.Password -> {
-                if (!accountValid || !passwordValid) {
-                    error = "请输入账号和密码"
-                    return
+        val code = smsCode.trim()
+        val key = captchaKey
+        error = null
+        hint = null
+        busy = true
+        scope.launch {
+            try {
+                val session = withContext(Dispatchers.IO) {
+                    fetchBiliSession(loginWithSmsCode(phoneNumber, code, key))
                 }
-                beginCaptcha(CredentialAction.PasswordLogin)
-            }
-
-            CredentialTab.Sms -> {
-                if (!phoneValid) {
-                    error = "请输入正确的手机号"
-                    return
-                }
-                if (captchaKey.isBlank()) {
-                    error = "请先获取短信验证码"
-                    return
-                }
-                if (!codeValid) {
-                    error = "请输入短信验证码"
-                    return
-                }
-                error = null
-                hint = null
-                busy = true
-                scope.launch {
-                    try {
-                        val cookie = withContext(Dispatchers.IO) { loginWithSmsCode(phoneNumber, smsCode.trim(), captchaKey) }
-                        finishLogin(cookie)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (failure: Exception) {
-                        error = failure.message ?: "登录失败"
-                    } finally {
-                        busy = false
-                    }
-                }
+                onSuccess(session)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                error = failure.message ?: "登录失败"
+            } finally {
+                busy = false
             }
         }
     }
@@ -244,123 +176,58 @@ internal fun BiliNativeLoginDialog(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("登录哔哩哔哩", color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text("使用账号密码或短信验证码登录", color = muted, fontSize = 11.sp)
+                        Text("短信验证码登录", color = ink, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     }
                     TextButton(onClick = { if (!busy) onDismiss() }) {
                         Text("关闭", color = Pink, fontSize = 14.sp)
                     }
                 }
 
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 16.dp)
-                        .clip(RoundedCornerShape(12.dp)).background(trackColor).padding(4.dp),
-                ) {
-                    listOf(CredentialTab.Password to "密码登录", CredentialTab.Sms to "短信登录").forEach { (value, label) ->
-                        val selected = tab == value
-                        Box(
-                            Modifier.weight(1f).clip(RoundedCornerShape(9.dp))
-                                .background(if (selected) Pink else Color.Transparent)
-                                .clickable(enabled = !busy) {
-                                    tab = value
-                                    error = null
-                                    hint = null
-                                }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                label,
-                                color = if (selected) Color.White else muted,
-                                fontSize = 13.sp,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            )
-                        }
-                    }
-                }
-
                 Spacer(Modifier.height(14.dp))
-                when (tab) {
-                    CredentialTab.Password -> {
-                        CredentialField(
-                            value = account,
-                            onValueChange = {
-                                account = it
-                                error = null
-                            },
-                            label = "手机号 / 邮箱",
-                            darkMode = darkMode,
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next,
+                CredentialField(
+                    value = phone,
+                    onValueChange = {
+                        phone = it
+                        error = null
+                        captchaKey = ""
+                        countdown = 0
+                    },
+                    label = "手机号（+86）",
+                    darkMode = darkMode,
+                    keyboardType = KeyboardType.Phone,
+                    imeAction = ImeAction.Next,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CredentialField(
+                        value = smsCode,
+                        onValueChange = {
+                            smsCode = it
+                            error = null
+                        },
+                        label = "短信验证码",
+                        darkMode = darkMode,
+                        keyboardType = KeyboardType.Number,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { requestSmsCode() },
+                        enabled = !busy && countdown == 0,
+                    ) {
+                        Text(
+                            if (countdown > 0) "${countdown}s 后重发" else "获取验证码",
+                            color = if (!busy && countdown == 0) Pink else muted,
+                            fontSize = 12.sp,
                         )
-                        Spacer(Modifier.height(10.dp))
-                        CredentialField(
-                            value = password,
-                            onValueChange = {
-                                password = it
-                                error = null
-                            },
-                            label = "密码",
-                            darkMode = darkMode,
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done,
-                            isPassword = true,
-                        )
-                        Spacer(Modifier.height(18.dp))
-                        PrimaryAction(
-                            label = "登录",
-                            busy = busy,
-                            enabled = accountValid && passwordValid,
-                        ) { loginWithPasswordOrSms() }
-                    }
-
-                    CredentialTab.Sms -> {
-                        CredentialField(
-                            value = phone,
-                            onValueChange = {
-                                phone = it
-                                error = null
-                                captchaKey = ""
-                                countdown = 0
-                            },
-                            label = "手机号（+86）",
-                            darkMode = darkMode,
-                            keyboardType = KeyboardType.Phone,
-                            imeAction = ImeAction.Next,
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CredentialField(
-                                value = smsCode,
-                                onValueChange = {
-                                    smsCode = it
-                                    error = null
-                                },
-                                label = "短信验证码",
-                                darkMode = darkMode,
-                                keyboardType = KeyboardType.Number,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            TextButton(
-                                onClick = { requestSmsCode() },
-                                enabled = !busy && countdown == 0,
-                            ) {
-                                Text(
-                                    if (countdown > 0) "${countdown}s 后重发" else "获取验证码",
-                                    color = if (!busy && countdown == 0) Pink else muted,
-                                    fontSize = 12.sp,
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(18.dp))
-                        PrimaryAction(
-                            label = "登录",
-                            busy = busy,
-                            enabled = phoneValid && codeValid && captchaKey.isNotBlank(),
-                        ) { loginWithPasswordOrSms() }
                     }
                 }
+                Spacer(Modifier.height(18.dp))
+                PrimaryAction(
+                    label = "登录",
+                    busy = busy,
+                    enabled = phoneValid && codeValid && captchaKey.isNotBlank(),
+                ) { loginWithSms() }
 
                 error?.let { message ->
                     Spacer(Modifier.height(12.dp))
@@ -402,10 +269,7 @@ internal fun BiliNativeLoginDialog(
         GeetestCaptchaDialog(
             captcha = ticket,
             darkMode = darkMode,
-            onDismiss = {
-                captcha = null
-                pending = null
-            },
+            onDismiss = { captcha = null },
             onSolved = { proof -> handleProof(proof) },
         )
     }
@@ -420,7 +284,6 @@ private fun CredentialField(
     modifier: Modifier = Modifier.fillMaxWidth(),
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Done,
-    isPassword: Boolean = false,
 ) {
     OutlinedTextField(
         value = value,
@@ -434,7 +297,6 @@ private fun CredentialField(
             color = if (darkMode) Color(0xFFE7E9ED) else Ink,
         ),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
-        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Pink,
             unfocusedBorderColor = if (darkMode) Color(0xFF3A3F47) else Color(0xFFE1E5EA),

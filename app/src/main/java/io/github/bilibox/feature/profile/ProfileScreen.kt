@@ -40,7 +40,7 @@ import io.github.bilibox.data.auth.hasLoginCookies
 import io.github.bilibox.data.auth.mergeCookies
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
 import io.github.bilibox.data.profile.BannerAdjustments
-import io.github.bilibox.feature.auth.BiliNativeLoginDialog
+import io.github.bilibox.feature.auth.BiliSmsLoginDialog
 import io.github.bilibox.feature.auth.BiliWebLoginDialog
 import java.net.HttpURLConnection
 import java.net.URL
@@ -116,7 +116,7 @@ internal fun ProfileScreen(
     var creating by rememberSaveable { mutableIntStateOf(0) }
     var loginOpen by rememberSaveable { mutableStateOf(false) }
     var webLoginOpen by remember { mutableStateOf(false) }
-    var nativeLoginOpen by remember { mutableStateOf(false) }
+    var smsLoginOpen by remember { mutableStateOf(false) }
     var sheet by remember { mutableStateOf<MySheet?>(null) }
 
     fun applySession(loggedIn: BiliSession) {
@@ -125,7 +125,7 @@ internal fun ProfileScreen(
         state = LoginUiState.SignedOut
         loginOpen = false
         webLoginOpen = false
-        nativeLoginOpen = false
+        smsLoginOpen = false
     }
 
     LaunchedEffect(creating, loginOpen, session) {
@@ -312,21 +312,28 @@ internal fun ProfileScreen(
             },
             onLogin = { creating++ },
             onRetry = { creating++ },
-            onCredentialLogin = {
+            onPasswordLogin = {
                 loginOpen = false
                 state = LoginUiState.SignedOut
-                nativeLoginOpen = true
+                creating = 0
+                webLoginOpen = true
+            },
+            onSmsLogin = {
+                loginOpen = false
+                state = LoginUiState.SignedOut
+                creating = 0
+                smsLoginOpen = true
             },
         )
     }
 
-    if (nativeLoginOpen) {
-        BiliNativeLoginDialog(
+    if (smsLoginOpen) {
+        BiliSmsLoginDialog(
             darkMode = darkMode,
-            onDismiss = { nativeLoginOpen = false },
+            onDismiss = { smsLoginOpen = false },
             onSuccess = { applySession(it) },
             onUseWebLogin = {
-                nativeLoginOpen = false
+                smsLoginOpen = false
                 webLoginOpen = true
             },
         )
@@ -335,7 +342,10 @@ internal fun ProfileScreen(
     if (webLoginOpen) {
         BiliWebLoginDialog(
             darkMode = darkMode,
-            onDismiss = { webLoginOpen = false },
+            onDismiss = {
+                webLoginOpen = false
+                loginOpen = true
+            },
             onSuccess = { applySession(it) },
         )
     }

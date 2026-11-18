@@ -62,16 +62,19 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 private const val LOGIN_PAGE = "https://passport.bilibili.com/login?gourl=https%3A%2F%2Fwww.bilibili.com%2F"
-
-// 默认的 WebView UA 带 "wv" 标记，容易被风控拦截，这里伪装成普通移动版 Chrome。
-private const val WEB_LOGIN_UA =
-    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+private const val LOGIN_AGREEMENT_LAYOUT = """
+    (() => {
+        if (location.origin !== 'https://passport.bilibili.com' || location.pathname !== '/h5-app/passport/login') return;
+        if (document.getElementById('bilibox-agreement-layout')) return;
+        const style = document.createElement('style');
+        style.id = 'bilibox-agreement-layout';
+        style.textContent = '.login-wrap > .explain-tips { position: static; margin-top: 16px; }';
+        document.head.appendChild(style);
+    })();
+"""
 
 /**
- * 账号密码 / 短信验证码登录。
- *
- * 哔哩哔哩的密码与短信登录接口都强制要求极验（geetest）验证码，纯原生表单无法通过，
- * 因此这里内嵌官方登录页完成验证，登录成功后再从 WebView 的 Cookie 中取出会话凭证。
+ * 在哔哩哔哩官方页面完成登录和安全验证，成功后从 WebView 的 Cookie 中获取会话凭证。
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -107,7 +110,6 @@ internal fun BiliWebLoginDialog(
             setSupportZoom(false)
             builtInZoomControls = false
             displayZoomControls = false
-            userAgentString = WEB_LOGIN_UA
         }
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
@@ -140,6 +142,7 @@ internal fun BiliWebLoginDialog(
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
+                view?.evaluateJavascript(LOGIN_AGREEMENT_LAYOUT, null)
                 loading = false
                 progress = 100
             }
@@ -213,9 +216,9 @@ internal fun BiliWebLoginDialog(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text("密码 / 短信登录", color = ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                        Text("在哔哩哔哩官方页面完成验证，成功后自动返回", color = muted, fontSize = 11.sp)
+                        Text("在哔哩哔哩官方页面选择登录方式并完成验证", color = muted, fontSize = 11.sp)
                     }
-                    TextButton(onClick = { dismissEvent.value() }) { Text("关闭", color = Pink, fontSize = 14.sp) }
+                    TextButton(onClick = { dismissEvent.value() }) { Text("返回", color = Pink, fontSize = 14.sp) }
                 }
                 if (loading) {
                     LinearProgressIndicator(

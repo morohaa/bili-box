@@ -42,7 +42,8 @@ internal fun ProfileLoginDialog(
     onDismiss: () -> Unit,
     onLogin: () -> Unit,
     onRetry: () -> Unit,
-    onCredentialLogin: () -> Unit,
+    onPasswordLogin: () -> Unit,
+    onSmsLogin: () -> Unit,
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -53,7 +54,8 @@ internal fun ProfileLoginDialog(
             darkMode = darkMode,
             onLogin = onLogin,
             onRetry = onRetry,
-            onCredentialLogin = onCredentialLogin,
+            onPasswordLogin = onPasswordLogin,
+            onSmsLogin = onSmsLogin,
         )
     }
 }
@@ -64,7 +66,8 @@ private fun LoginCard(
     darkMode: Boolean,
     onLogin: () -> Unit,
     onRetry: () -> Unit,
-    onCredentialLogin: () -> Unit,
+    onPasswordLogin: () -> Unit,
+    onSmsLogin: () -> Unit,
 ) {
     val card = if (darkMode) MyCardDark else MyCardLight
     val ink = if (darkMode) MyInkDark else MyInkLight
@@ -77,7 +80,7 @@ private fun LoginCard(
     ) {
         Text("登录哔哩哔哩", color = ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(6.dp))
-        Text("扫码登录后可获取更高画质与账号权限", color = muted, fontSize = 12.sp, textAlign = TextAlign.Center)
+        Text("登录后可获取更高画质与账号权限", color = muted, fontSize = 12.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
         when (state) {
             LoginUiState.SignedOut -> {
@@ -109,13 +112,16 @@ private fun LoginCard(
             }
         }
         if (state is LoginUiState.SignedOut || state is LoginUiState.Failed) {
-            TextButton(onClick = onCredentialLogin) {
-                Text("密码 / 短信验证码登录", color = MyPink, fontSize = 13.sp)
+            TextButton(onClick = onPasswordLogin) {
+                Text("密码登录（哔哩哔哩官网）", color = MyPink, fontSize = 13.sp)
+            }
+            TextButton(onClick = onSmsLogin) {
+                Text("短信验证码登录", color = MyPink, fontSize = 13.sp)
             }
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            "二维码由哔哩哔哩提供；密码与短信登录在应用内完成，仅人机验证使用官方组件。会话凭证使用 Android Keystore 加密存储。",
+            "密码仅在哔哩哔哩官方页面输入。会话凭证使用 Android Keystore 加密存储。",
             color = muted,
             fontSize = 10.sp,
             lineHeight = 15.sp,
@@ -152,7 +158,7 @@ internal fun MyInfoDialog(
                     MySheet.LoginMethods -> {
                         Text(
                             "当前账号：${session?.username ?: "未登录"}\n\n" +
-                                "支持扫码登录、账号密码登录和短信验证码登录。密码与短信登录在应用内完成，仅人机验证使用哔哩哔哩官方组件。",
+                                "支持扫码、密码和短信验证码登录。密码登录及附加安全验证在内嵌的哔哩哔哩官方页面完成。",
                             color = muted,
                             fontSize = 13.sp,
                             lineHeight = 20.sp,
@@ -183,6 +189,7 @@ internal fun MyInfoDialog(
                         Text(
                             "· 视频无法播放：先确认账号已登录，部分视频需要大会员或登录后才能取流。\n" +
                                 "· 扫码后无反应：在哔哩哔哩 App 中确认登录，或改用密码 / 短信登录。\n" +
+                                "· 密码登录提示风险：按官方页面提示完成验证；若仍受限，请勿反复提交，可返回使用扫码登录。\n" +
                                 "· 本地视频缺失：在系统设置中授予媒体权限，部分目录含 .nomedia 会被跳过。\n" +
                                 "· 缓存位置：视频缓存写入 Movies/BiliBox，可在「我的 → 离线缓存」查看。",
                             color = muted,
