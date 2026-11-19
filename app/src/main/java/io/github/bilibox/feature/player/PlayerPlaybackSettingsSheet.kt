@@ -63,7 +63,7 @@ import kotlinx.coroutines.launch
 /*
  * 播放器「更多」播放设置卡片。
  *
- * 卡片从视频画面下沿开始铺满剩余屏幕：上半部分是五个快捷入口，下半部分是
+ * 卡片从视频画面下沿开始铺满剩余屏幕：上半部分是四个快捷入口，下半部分是
  * 播放偏好列表。卡片本身可以下拉收起，也可以通过遮罩、返回键关闭。
  */
 
@@ -82,7 +82,8 @@ internal data class PlayerSettingsState(
 
 internal class PlayerSettingsActions(
     val onDismiss: () -> Unit,
-    val onSpeed: () -> Unit,
+    val onOpenSpeedPanel: () -> Unit,
+    val onSpeedChange: (Float) -> Unit,
     val onWatchLater: () -> Unit,
     val onCache: () -> Unit,
     val onPictureInPicture: () -> Unit,
@@ -132,7 +133,8 @@ internal fun PlayerPlaybackSettingsHost(
     danmakuAvailable: Boolean,
     moreSettingsAvailable: Boolean,
     onDismiss: () -> Unit,
-    onSpeed: () -> Unit,
+    onOpenSpeedPanel: () -> Unit,
+    onSpeedChange: (Float) -> Unit,
     onSleepTimer: () -> Unit,
     onQualitySelected: (Int) -> Unit,
     onDanmakuSettings: () -> Unit,
@@ -183,7 +185,8 @@ internal fun PlayerPlaybackSettingsHost(
         },
         actions = PlayerSettingsActions(
             onDismiss = onDismiss,
-            onSpeed = { dismissThen(onSpeed) },
+            onOpenSpeedPanel = { dismissThen(onOpenSpeedPanel) },
+            onSpeedChange = onSpeedChange,
             onWatchLater = { dismissThen { onUnavailable("「稍后再看」暂未接入") } },
             onCache = {
                 dismissThen {
@@ -338,15 +341,6 @@ private fun QuickActions(state: PlayerSettingsState, actions: PlayerSettingsActi
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         QuickAction(
-            label = "倍速",
-            description = "倍速 ${formatSpeedBadge(state.speed)}",
-            modifier = Modifier.weight(1f),
-            onClick = actions.onSpeed,
-            glyph = {
-                PlayerSpeedGlyph(state.speed, SettingsGlyphTint, Modifier.size(30.dp))
-            },
-        )
-        QuickAction(
             label = "稍后再看",
             description = "稍后再看",
             modifier = Modifier.weight(1f),
@@ -434,18 +428,49 @@ private fun QuickAction(
 
 @Composable
 private fun SettingsList(state: PlayerSettingsState, actions: PlayerSettingsActions) {
+    val playbackModeLabel = "播放模式"
+    val labelStyle = LocalTextStyle.current.copy(fontSize = ChoiceSettingLabelFontSize)
+    val modeLabelWidthPx = rememberTextMeasurer().measure(playbackModeLabel, labelStyle, maxLines = 1).size.width
+    val modeLabelWidth = with(LocalDensity.current) { modeLabelWidthPx.toDp() }
+    val modeOptionsWidth = playbackModeOptionsWidth(state.playbackMode)
+    val speedOptionsWidth = with(LocalDensity.current) {
+        (modeOptionsWidth.roundToPx() - SpeedMoreButtonWidth.roundToPx()).coerceAtLeast(0).toDp()
+    }
     Column(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(SettingsCardSurface)
     ) {
         ChoiceSettingRow(
-            label = "播放模式",
+            label = "倍速",
+            icon = PlayerSettingsIcon.SPEED,
+            options = QuickPlaybackSpeeds,
+            selected = state.speed,
+            optionLabel = ::formatSpeedBadge,
+            optionDescription = { "切换倍速 $it" },
+            labelWidth = modeLabelWidth,
+            maxOptionsWidth = speedOptionsWidth,
+            trailingContent = {
+                Box(
+                    Modifier.size(width = SpeedMoreButtonWidth, height = 48.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable(role = Role.Button, onClick = actions.onOpenSpeedPanel)
+                        .semantics { contentDescription = "更多倍速" },
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    AppGlyphIcon(AppIcon.CHEVRON_RIGHT, SettingsSecondary, Modifier.size(14.dp), 2f)
+                }
+            },
+            onSelect = actions.onSpeedChange,
+        )
+        SettingsDivider()
+        ChoiceSettingRow(
+            label = playbackModeLabel,
             icon = PlayerSettingsIcon.LOOP,
             options = PlaybackMode.standard,
             selected = state.playbackMode,
             optionLabel = { it.label },
-            visibleOptionCount = 3,
+            maxOptionsWidth = modeOptionsWidth,
             onSelect = actions.onPlaybackModeChange,
         )
         SettingsDivider()
@@ -522,6 +547,28 @@ internal fun ToggleSettingRow(
     }
 }
 
+private val QuickPlaybackSpeeds = listOf(0.5f, 1f, 1.5f, 2f, 2.5f, 3f)
+private val SpeedMoreButtonWidth = 40.dp
+private val ChoiceSettingLabelFontSize = 15.sp
+private val ChoiceSettingOptionFontSize = 11.5.sp
+private val ChoiceSettingOptionPadding = 7.dp
+private val ChoiceSettingDividerWidth = 1.dp
+
+@Composable
+private fun playbackModeOptionsWidth(selected: PlaybackMode): Dp {
+    val visibleModes = PlaybackMode.standard.take(3)
+    val measurer = rememberTextMeasurer()
+    val style = LocalTextStyle.current.copy(fontSize = ChoiceSettingOptionFontSize)
+    return with(LocalDensity.current) {
+        val optionsWidth = visibleModes.sumOf { mode ->
+            val weight = if (mode == selected) FontWeight.Medium else FontWeight.Normal
+            measurer.measure(mode.label, style.copy(fontWeight = weight), maxLines = 1).size.width +
+                2 * ChoiceSettingOptionPadding.roundToPx()
+        }
+        (optionsWidth + (visibleModes.size - 1) * ChoiceSettingDividerWidth.roundToPx()).toDp()
+    }
+}
+
 @Composable
 private fun <Option> ChoiceSettingRow(
     label: String,
@@ -531,72 +578,65 @@ private fun <Option> ChoiceSettingRow(
     optionLabel: (Option) -> String,
     optionDescription: (String) -> String = { it },
     emptyLabel: String = "",
-    visibleOptionCount: Int? = null,
+    labelWidth: Dp? = null,
+    maxOptionsWidth: Dp? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
     onSelect: (Option) -> Unit,
 ) {
-    val fontSize = 11.5.sp
-    val optionPadding = 7.dp
-    val dividerWidth = 1.dp
     Row(
         Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RowSettingIcon(icon)
         Spacer(Modifier.width(12.dp))
-        Text(label, color = SettingsInk, fontSize = 15.sp, maxLines = 1)
-        Spacer(Modifier.weight(1f))
-        if (options.isEmpty()) {
-            Text(emptyLabel, color = SettingsMuted, fontSize = 12.sp, maxLines = 1)
-            return@Row
-        }
-        val viewport = if (visibleOptionCount != null && options.size > visibleOptionCount) {
-            val measurer = rememberTextMeasurer()
-            val style = LocalTextStyle.current.copy(fontSize = fontSize)
-            val width = with(LocalDensity.current) {
-                val choices = options.take(visibleOptionCount).sumOf { option ->
-                    val weight = if (option == selected) FontWeight.Medium else FontWeight.Normal
-                    measurer.measure(optionLabel(option), style.copy(fontWeight = weight), maxLines = 1).size.width +
-                        2 * optionPadding.roundToPx()
-                }
-                (choices + (visibleOptionCount - 1) * dividerWidth.roundToPx()).toDp()
+        Text(
+            label,
+            color = SettingsInk,
+            fontSize = ChoiceSettingLabelFontSize,
+            maxLines = 1,
+            modifier = if (labelWidth != null) Modifier.width(labelWidth) else Modifier,
+        )
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+            if (options.isEmpty()) {
+                Text(emptyLabel, color = SettingsMuted, fontSize = 12.sp, maxLines = 1)
+                return@Box
             }
-            Modifier.widthIn(max = width)
-        } else {
-            Modifier
-        }
-        Row(
-            viewport.horizontalScroll(rememberScrollState()).selectableGroup(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            options.forEachIndexed { index, option ->
-                if (index > 0) {
-                    Box(
-                        Modifier.width(dividerWidth).height(12.dp)
-                            .background(SettingsLine)
+            val viewport = if (maxOptionsWidth != null) Modifier.widthIn(max = maxOptionsWidth) else Modifier
+            Row(
+                viewport.horizontalScroll(rememberScrollState()).selectableGroup(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                options.forEachIndexed { index, option ->
+                    if (index > 0) {
+                        Box(
+                            Modifier.width(ChoiceSettingDividerWidth).height(12.dp)
+                                .background(SettingsLine)
+                        )
+                    }
+                    val active = option == selected
+                    val text = optionLabel(option)
+                    Text(
+                        text = text,
+                        color = if (active) OnlinePink else SettingsSecondary,
+                        fontSize = ChoiceSettingOptionFontSize,
+                        fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .selectable(
+                                selected = active,
+                                role = Role.RadioButton,
+                                onClick = { onSelect(option) },
+                            )
+                            .semantics {
+                                contentDescription = optionDescription(text)
+                            }
+                            .padding(ChoiceSettingOptionPadding),
                     )
                 }
-                val active = option == selected
-                val text = optionLabel(option)
-                Text(
-                    text = text,
-                    color = if (active) OnlinePink else SettingsSecondary,
-                    fontSize = fontSize,
-                    fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .selectable(
-                            selected = active,
-                            role = Role.RadioButton,
-                            onClick = { onSelect(option) },
-                        )
-                        .semantics {
-                            contentDescription = optionDescription(text)
-                        }
-                        .padding(optionPadding),
-                )
             }
         }
+        trailingContent?.invoke()
     }
 }
 

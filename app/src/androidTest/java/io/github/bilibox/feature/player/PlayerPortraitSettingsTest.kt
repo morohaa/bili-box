@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
@@ -95,17 +96,58 @@ class PlayerPortraitSettingsTest {
     }
 
     @Test
-    fun speedAndTimerOpenInsideFullscreen() {
-        showPlayer()
+    fun speedPresetsAndMoreArrowWorkInsideFullscreen() {
+        showPlayer(Modifier.width(400.dp))
         compose.onNodeWithContentDescription("竖屏").performClick()
         val expanded = surfaceBounds()
 
         openSettings()
-        compose.onNodeWithText("倍速").performClick()
-        compose.onNodeWithText("1.5x").assertIsDisplayed().performClick()
-        compose.runOnIdle { assertEquals(1.5f, player.playbackParameters.speed, 0f) }
-        compose.onNodeWithContentDescription("关闭倍速面板").assertDoesNotExist()
+        val label = compose.onNodeWithText("倍速").performScrollTo().assertHasNoClickAction()
+        val labelBounds = label.fetchSemanticsNode().boundsInRoot
+        val more = compose.onNodeWithContentDescription("更多倍速").assertIsDisplayed()
+        val moreBounds = more.fetchSemanticsNode().boundsInRoot
+        val firstSpeed = compose.onNodeWithContentDescription("切换倍速 0.5x").assertIsDisplayed()
+        val firstMode = compose.onNodeWithText("播完停止").assertIsDisplayed()
+        val firstModeBounds = firstMode.fetchSemanticsNode().boundsInRoot
+        val thirdMode = compose.onNodeWithText("单集循环").assertIsDisplayed()
+        assertEquals(moreBounds.right, thirdMode.fetchSemanticsNode().boundsInRoot.right, 1f)
+        assertEquals(firstModeBounds.left, firstSpeed.fetchSemanticsNode().boundsInRoot.left, 1f)
+        val normal = compose.onNodeWithContentDescription("切换倍速 1x").assertIsSelected()
+        val fastest = compose.onNodeWithContentDescription("切换倍速 3x").assertIsNotDisplayed()
+        compose.onNode(
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.HorizontalScrollAxisRange) and
+                hasAnyDescendant(hasText("3x")),
+        ).performTouchInput { swipeLeft() }
+        fastest.assertIsDisplayed()
+        assertEquals(moreBounds, more.fetchSemanticsNode().boundsInRoot)
+        assertEquals(labelBounds, label.fetchSemanticsNode().boundsInRoot)
+        assertEquals(firstModeBounds, firstMode.fetchSemanticsNode().boundsInRoot)
+
+        for ((speed, text) in listOf(0.5f to "0.5x", 1.5f to "1.5x", 2f to "2x", 2.5f to "2.5x", 3f to "3x", 1f to "1x")) {
+            val preset = compose.onNodeWithContentDescription("切换倍速 $text").performScrollTo().assertIsDisplayed()
+            val bounds = preset.fetchSemanticsNode().boundsInRoot
+            assertEquals(labelBounds.center.y, bounds.center.y, 1f)
+            assertTrue(bounds.right <= moreBounds.left)
+            preset.performClick().assertIsSelected()
+            compose.runOnIdle { assertEquals(speed, player.playbackParameters.speed, 0f) }
+            compose.onNodeWithTag("player-settings-sheet").assertIsDisplayed()
+            compose.onNodeWithText("1.25x").assertDoesNotExist()
+        }
+        more.performTouchInput { click(center) }
+        compose.onNodeWithText("1.25x").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1.25f, player.playbackParameters.speed, 0f) }
+        compose.onNodeWithText("1.25x").assertDoesNotExist()
         assertFullscreen(expanded)
+
+        openSettings()
+        normal.assertIsNotSelected()
+    }
+
+    @Test
+    fun timerOpensInsideFullscreen() {
+        showPlayer()
+        compose.onNodeWithContentDescription("竖屏").performClick()
+        val expanded = surfaceBounds()
 
         openSettings()
         compose.onNodeWithText("定时关闭").performClick()

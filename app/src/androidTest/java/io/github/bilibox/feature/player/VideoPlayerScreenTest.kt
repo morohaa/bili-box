@@ -99,7 +99,7 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("正在获取视频流…").assertExists()
         assertSame(initialSurface, findPlayerView())
         compose.onNodeWithContentDescription("更多").performClick()
-        compose.onNodeWithText("倍速").performClick()
+        compose.onNodeWithContentDescription("更多倍速").performClick()
         compose.onNodeWithText("1.5x").performClick()
         compose.onNodeWithText("评论", useUnmergedTree = true).performClick()
         compose.onNodeWithText("暂不支持查看在线评论").assertExists()

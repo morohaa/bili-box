@@ -93,7 +93,10 @@ class PlayerLandscapeControlsTest {
         compose.onNodeWithTag("player-settings-sheet").assertIsDisplayed()
         saveScreenshot("landscape-player-settings.png")
         // 从设置进入既有横屏倍速面板，验证新增入口确实能操作。
-        compose.onNodeWithContentDescription("倍速 1x").performClick()
+        compose.onNodeWithContentDescription("切换倍速 1.5x").performClick().assertIsSelected()
+        compose.runOnIdle { assertEquals(1.5f, player.playbackParameters.speed, 0f) }
+        compose.onNodeWithContentDescription("收起倍速面板").assertDoesNotExist()
+        compose.onNodeWithContentDescription("更多倍速").performClick()
         compose.onNodeWithContentDescription("收起倍速面板").assertExists()
         compose.onNodeWithContentDescription("收起倍速面板").performClick()
         compose.onNodeWithContentDescription("更多").performClick()

@@ -134,6 +134,10 @@ internal fun VideoPlayerScreen(
     val videoPosition = rememberPlayerVideoPosition()
     val seekPreview = rememberPlayerSeekPreview(player, previewSource, previewPreference.enabled)
     var speed by remember(player) { mutableFloatStateOf(1f) }
+    val changePlaybackSpeed: (Float) -> Unit = {
+        player.setPlaybackSpeed(it)
+        speed = it
+    }
     var speedMenuExpanded by remember(player) { mutableStateOf(false) }
     var settingsSheetOpen by remember(player) { mutableStateOf(false) }
     var subtitleEnabled by rememberSaveable(player) { mutableStateOf(true) }
@@ -703,10 +707,7 @@ internal fun VideoPlayerScreen(
                             speed = speed,
                             mode = SpeedPanelMode.Drawer,
                             onDismiss = { speedMenuExpanded = false },
-                            onSpeedChange = {
-                                player.setPlaybackSpeed(it)
-                                speed = it
-                            },
+                            onSpeedChange = changePlaybackSpeed,
                             remainingMs = (duration - position).coerceAtLeast(0L),
                         )
                     }
@@ -817,10 +818,7 @@ internal fun VideoPlayerScreen(
             remainingMs = (duration - position).coerceAtLeast(0L),
             speedMenuExpanded = speedMenuExpanded,
             onDismissSpeedSheet = { speedMenuExpanded = false },
-            onSpeedChange = {
-                player.setPlaybackSpeed(it)
-                speed = it
-            },
+            onSpeedChange = changePlaybackSpeed,
             playbackModeExpanded = playbackModeExpanded,
             playbackModeSheet = playbackModeSheet,
             onDismissPlaybackMode = { playbackModeExpanded = false },
@@ -844,7 +842,8 @@ internal fun VideoPlayerScreen(
             danmakuAvailable = danmakuSupported,
             moreSettingsAvailable = playbackModeSheet != null,
             onDismiss = { settingsSheetOpen = false },
-            onSpeed = { speedMenuExpanded = true },
+            onOpenSpeedPanel = { speedMenuExpanded = true },
+            onSpeedChange = changePlaybackSpeed,
             onSleepTimer = { sleepTimerOpen = true },
             onQualitySelected = { onQualitySelected?.invoke(it) },
             onDanmakuSettings = { danmakuSettingsOpen = true },
@@ -963,10 +962,7 @@ internal fun VideoPlayerScreen(
                 },
                 onPrevious = listenControls?.onPrevious ?: {},
                 onNext = { (listenControls?.onNext ?: onNextEpisode)?.invoke() },
-                onSpeedChange = {
-                    player.setPlaybackSpeed(it)
-                    speed = it
-                },
+                onSpeedChange = changePlaybackSpeed,
                 onCycleMode = {
                     val modes = if (listenInfo?.online == false) PlaybackMode.entries else PlaybackMode.standard
                     onPlaybackModeChange(modes[(modes.indexOf(playbackMode) + 1) % modes.size])

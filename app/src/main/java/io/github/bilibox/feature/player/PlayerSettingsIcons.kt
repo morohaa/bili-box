@@ -2,8 +2,6 @@ package io.github.bilibox.feature.player
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.offset
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -23,19 +21,13 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.PathParser
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import io.github.bilibox.core.util.formatSpeedBadge
-import java.util.Locale
 import kotlin.math.min
 
 /*
  * 播放设置卡片的图标。
  *
- * 路径直接取自设计稿 index.html 的 SVG symbol：快捷入口按设计稿给填充路径叠加
- * 描边（倍速 11、稍后再看/小窗 24、定时 6、缓存不描边），列表入口使用原始填充，
+ * 多数路径取自设计稿 index.html 的 SVG symbol：快捷入口按设计稿给填充路径叠加
+ * 描边（稍后再看/小窗 24、定时 6、缓存不描边），列表入口使用原始填充，
  * 镜像翻转和更多播放设置再额外描边 12。这样图标轮廓和设计稿保持一致。
  */
 
@@ -72,6 +64,15 @@ private data class GlyphSpec(
 )
 
 private val GlyphSpecs: Map<PlayerSettingsIcon, GlyphSpec> = mapOf(
+    PlayerSettingsIcon.SPEED to GlyphSpec(
+        left = -128f,
+        top = -128f,
+        width = 1280f,
+        height = 1280f,
+        paths = listOf(
+            GlyphPath("M92.416 1023.232c-15.616 0-30.976-5.12-45.312-15.36C18.688 987.392 1.792 951.04 1.792 910.08V113.152c0-40.96 16.896-77.568 45.312-97.792 27.904-19.968 61.184-20.48 89.344-0.768l228.608 139.52V113.408c0-40.704 16.896-77.312 45.312-97.792 28.416-20.48 62.464-20.48 90.624 0 0.768 0.512 1.536 1.024 2.304 1.792l476.16 397.824c27.648 20.736 44.032 56.832 43.776 97.28-0.256 39.936-16.64 75.52-44.032 95.744l-476.16 397.568c-0.768 0.512-1.536 1.28-2.304 1.792-28.416 20.48-62.208 20.48-90.624 0-28.416-20.48-45.312-56.832-45.312-97.792v-40.704L136.192 1008.64c-13.568 9.728-28.672 14.592-43.776 14.592z m0-924.16c-2.304 0-4.096 1.024-5.632 2.048-2.048 1.536-5.632 5.12-5.632 12.032v797.184c0 6.912 3.584 10.496 5.632 12.032 2.56 1.792 6.656 3.328 11.264 0l2.304-1.536 286.72-175.104c12.288-7.424 26.88-6.656 38.4 2.56 11.52 8.96 18.688 24.832 18.688 41.984v120.064c0 6.912 3.584 10.496 5.632 12.032 2.56 1.792 6.144 3.072 10.496 0.512l475.648-397.312c0.768-0.768 1.792-1.536 2.56-2.048 4.096-2.816 5.12-7.68 5.12-11.008 0-3.072-0.768-8.704-5.376-12.032-0.768-0.512-1.536-1.28-2.304-1.792L460.544 100.864c-4.352-2.816-8.192-1.28-10.496 0.512-2.048 1.536-5.632 5.12-5.632 12.032v120.064c0 17.152-7.168 33.024-18.688 41.984s-26.112 9.984-38.4 2.56l-286.72-175.104-2.304-1.536c-2.304-1.792-4.096-2.304-5.888-2.304z"),
+        ),
+    ),
     PlayerSettingsIcon.REPLAY to GlyphSpec(
         paths = listOf(
             GlyphPath("M619.054545 423.563636l-214.10909-151.272727c-4.654545-4.654545-9.309091-4.654545-16.29091-4.654545-13.963636 0-25.6 11.636364-25.6 23.272727V600.436364c0 13.963636 11.636364 23.272727 25.6 23.272727 4.654545 0 11.636364-2.327273 13.963637-4.654546l216.436363-151.272727c6.981818-4.654545 11.636364-11.636364 11.636364-20.945454 0-11.636364-4.654545-18.618182-11.636364-23.272728z m-211.781818 137.309091v-232.727272l167.563637 116.363636-167.563637 116.363636z"),
@@ -137,9 +138,6 @@ private val GlyphSpecs: Map<PlayerSettingsIcon, GlyphSpec> = mapOf(
             GlyphPath("M725.952 609.536a83.648 83.648 0 1 0 0 167.296 83.648 83.648 0 0 0 0-167.296z m0 114.688a31.04 31.04 0 1 1 0-62.08 31.04 31.04 0 0 1 0 62.08z"),
         ),
     ),
-    PlayerSettingsIcon.SPEED to GlyphSpec(
-        paths = listOf(GlyphPath("M187.093333 743.04v74.666667c0 32.341333 26.24 58.538667 58.538667 58.538666h552.704a58.538667 58.538667 0 0 0 58.538667-58.496v-74.709333h59.050666v74.709333a117.589333 117.589333 0 0 1-117.589333 117.589334H245.589333A117.589333 117.589333 0 0 1 128 817.749333v-74.709333h59.093333z m0-410.88V257.408c0-32.341333 26.24-58.538667 58.538667-58.538667h320.554667V139.818667H245.589333A117.589333 117.589333 0 0 0 128 257.450667v74.709333h59.093333z m456.106667-253.44v253.44l129.962667-115.157333-129.962667-138.24v-0.042667z m132.693333 0v253.44l130.005334-115.2-130.005334-138.24z")),
-    ),
     PlayerSettingsIcon.DANMAKU to GlyphSpec(
         left = 2f,
         top = 1f,
@@ -191,48 +189,6 @@ internal fun PlayerSettingsGlyph(
             }
         }
     }
-}
-
-@Composable
-internal fun PlayerSpeedGlyph(
-    speed: Float,
-    tint: Color,
-    modifier: Modifier = Modifier,
-) {
-    val spec = remember { GlyphSpecs.getValue(PlayerSettingsIcon.SPEED) }
-    val path = remember(spec) { PathParser().parsePathString(spec.paths.first().data).toPath() }
-    Box(modifier, contentAlignment = Alignment.Center) {
-        Canvas(Modifier.matchParentSize()) {
-            val scaleFactor = min(size.width / spec.width, size.height / spec.height)
-            val dx = (size.width - spec.width * scaleFactor) / 2f
-            val dy = (size.height - spec.height * scaleFactor) / 2f
-            withTransform({ translate(dx, dy) }) {
-                scale(scaleFactor, scaleFactor, pivot = Offset.Zero) {
-                    drawPath(path, tint)
-                    drawPath(
-                        path,
-                        tint,
-                        style = Stroke(11f, cap = StrokeCap.Round, join = StrokeJoin.Round),
-                    )
-                }
-            }
-        }
-        Text(
-            speedLabel(speed),
-            color = tint,
-            fontSize = 7.5.sp,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            modifier = Modifier.align(Alignment.Center).offset(y = 1.dp),
-        )
-    }
-}
-
-private fun speedLabel(speed: Float): String = if (speed == speed.toInt().toFloat()) {
-    String.format(Locale.US, "%.1fX", speed)
-} else {
-    formatSpeedBadge(speed).uppercase()
 }
 
 private fun DrawScope.drawDanmakuGlyph(tint: Color, spec: GlyphSpec) {
