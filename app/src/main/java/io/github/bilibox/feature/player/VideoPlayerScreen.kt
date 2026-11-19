@@ -425,9 +425,6 @@ internal fun VideoPlayerScreen(
 
         SleepTimerMode.OFF -> 0L
     }
-    val settingsQualityLabel = qualityOptions.firstOrNull { it.qn == selectedQuality }?.label
-        ?: qualityOptions.maxByOrNull { it.qn }?.label
-        ?: "自动"
     val settingsAutoPlayNext = autoPlayNext ?: localAutoPlayNext
     val settingsLoopMode = loopMode ?: localLoopMode
     Box(Modifier.fillMaxSize().onGloballyPositioned { screenRootOffset = it.positionInRoot() }) {
@@ -843,20 +840,20 @@ internal fun VideoPlayerScreen(
                 autoPlayNext = settingsAutoPlayNext,
                 loopMode = settingsLoopMode,
                 backgroundAudio = listening,
-                qualityLabel = settingsQualityLabel,
+                qualityOptions = qualityOptions,
+                selectedQuality = selectedQuality,
                 subtitleEnabled = subtitleEnabled,
                 mirrorEnabled = mirrorEnabled,
                 cacheLabel = cacheLabel.orEmpty(),
                 seekPreviewEnabled = previewPreference.enabled,
                 bookmarkDotsEnabled = bookmarkDisplay.enabled,
             ),
-            qualityAvailable = qualityOptions.isNotEmpty(),
             danmakuAvailable = danmakuSupported,
             moreSettingsAvailable = playbackModeSheet != null,
             onDismiss = { settingsSheetOpen = false },
             onSpeed = { speedMenuExpanded = true },
             onSleepTimer = { sleepTimerOpen = true },
-            onQuality = { qualityMenuExpanded = true },
+            onQualitySelected = { onQualitySelected?.invoke(it) },
             onDanmakuSettings = { danmakuSettingsOpen = true },
             onMoreSettings = { playbackModeExpanded = true },
             onBackgroundAudioChange = { if (it) enterListen() else restoreVideo() },
@@ -885,18 +882,6 @@ internal fun VideoPlayerScreen(
                 onCacheSheetVisibleChange(false)
                 sleepTimerOpen = false
             }
-        }
-        // 竖屏的画质选择使用底部弹层；横屏仍沿用侧边抽屉。
-        if (!fullScreen && qualityMenuExpanded && qualityOptions.isNotEmpty()) {
-            PlayerQualitySheet(
-                options = qualityOptions,
-                selectedQuality = selectedQuality,
-                onDismiss = { qualityMenuExpanded = false },
-                onQualitySelected = { qn ->
-                    onQualitySelected?.invoke(qn)
-                    qualityMenuExpanded = false
-                },
-            )
         }
         // 定时状态独立于面板，横竖屏均可从更多入口设置。
         PlayerDrawerVisibility(visible = sleepTimerOpen, fromBottom = true) {

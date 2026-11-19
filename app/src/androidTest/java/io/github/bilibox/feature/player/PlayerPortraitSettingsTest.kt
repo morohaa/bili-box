@@ -15,6 +15,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -83,7 +85,7 @@ class PlayerPortraitSettingsTest {
     }
 
     @Test
-    fun speedQualityAndTimerOpenInsideFullscreen() {
+    fun speedAndTimerOpenInsideFullscreen() {
         showPlayer()
         compose.onNodeWithContentDescription("竖屏").performClick()
         val expanded = surfaceBounds()
@@ -96,17 +98,36 @@ class PlayerPortraitSettingsTest {
         assertFullscreen(expanded)
 
         openSettings()
-        compose.onNodeWithText("画质").performClick()
-        compose.onNodeWithContentDescription("选择清晰度 720P").assertIsDisplayed().performClick()
-        compose.runOnIdle { assertEquals(64, selectedQuality) }
-        assertFullscreen(expanded)
-
-        openSettings()
         compose.onNodeWithText("定时关闭").performClick()
         compose.onNodeWithTag("player-sleep-timer-sheet").assertIsDisplayed()
         assertFullscreen(expanded)
         compose.onNodeWithText("完成").performClick()
         compose.onNodeWithTag("player-sleep-timer-sheet").assertDoesNotExist()
+        assertFullscreen(expanded)
+    }
+
+    @Test
+    fun qualityOptionsGoFromLowToHighAndStayInSettingsInsideFullscreen() {
+        showPlayer()
+        compose.onNodeWithContentDescription("竖屏").performClick()
+        val expanded = surfaceBounds()
+        openSettings()
+
+        val current = compose.onNodeWithContentDescription("选择清晰度 1080P")
+        val target = compose.onNodeWithContentDescription("选择清晰度 720P")
+        current.performScrollTo().assertIsDisplayed().assertIsSelected()
+        target.assertIsDisplayed().assertIsNotSelected()
+        val currentCenter = current.fetchSemanticsNode().boundsInRoot.center
+        val targetCenter = target.fetchSemanticsNode().boundsInRoot.center
+        assertTrue(targetCenter.x < currentCenter.x)
+        assertEquals(currentCenter.y, targetCenter.y, 1f)
+        target.performClick()
+        compose.runOnIdle { assertEquals(64, selectedQuality) }
+        current.assertIsNotSelected()
+        target.assertIsSelected()
+        compose.onNodeWithTag("player-settings-sheet").assertIsDisplayed()
+        pressBack()
+        compose.onNodeWithTag("player-settings-sheet").assertDoesNotExist()
         assertFullscreen(expanded)
     }
 

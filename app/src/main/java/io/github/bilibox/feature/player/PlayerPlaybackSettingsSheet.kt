@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,11 +24,8 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -54,7 +52,6 @@ import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.playback.PlayerSidePanelWidth
 import io.github.bilibox.core.ui.theme.OnlinePink
-import io.github.bilibox.core.ui.theme.PlaybackSurface
 import io.github.bilibox.core.ui.theme.playbackColor
 import io.github.bilibox.core.util.formatSpeedBadge
 import kotlin.math.roundToInt
@@ -78,7 +75,8 @@ internal data class PlayerSettingsState(
     val autoPlayNext: Boolean,
     val loopMode: PlayerLoopMode,
     val backgroundAudio: Boolean,
-    val qualityLabel: String,
+    val qualityOptions: List<PlayerQualityOption>,
+    val selectedQuality: Int?,
     val subtitleEnabled: Boolean,
     val mirrorEnabled: Boolean,
     val cacheLabel: String = "",
@@ -96,7 +94,7 @@ internal class PlayerSettingsActions(
     val onAutoPlayNextChange: (Boolean) -> Unit,
     val onLoopModeChange: (PlayerLoopMode) -> Unit,
     val onBackgroundAudioChange: (Boolean) -> Unit,
-    val onQuality: () -> Unit,
+    val onQualitySelected: (Int) -> Unit,
     val onDanmakuSettings: () -> Unit,
     val onSubtitleChange: (Boolean) -> Unit,
     val onMirrorChange: (Boolean) -> Unit,
@@ -136,13 +134,12 @@ internal fun PlayerPlaybackSettingsHost(
     visible: Boolean,
     topInset: Dp,
     state: PlayerSettingsState,
-    qualityAvailable: Boolean,
     danmakuAvailable: Boolean,
     moreSettingsAvailable: Boolean,
     onDismiss: () -> Unit,
     onSpeed: () -> Unit,
     onSleepTimer: () -> Unit,
-    onQuality: () -> Unit,
+    onQualitySelected: (Int) -> Unit,
     onDanmakuSettings: () -> Unit,
     onMoreSettings: () -> Unit,
     onBackgroundAudioChange: (Boolean) -> Unit,
@@ -204,11 +201,7 @@ internal fun PlayerPlaybackSettingsHost(
             onAutoPlayNextChange = onAutoPlayNextChange,
             onLoopModeChange = onLoopModeChange,
             onBackgroundAudioChange = { enabled -> dismissThen { onBackgroundAudioChange(enabled) } },
-            onQuality = {
-                dismissThen {
-                    if (qualityAvailable) onQuality() else onUnavailable("当前视频暂不支持切换画质")
-                }
-            },
+            onQualitySelected = onQualitySelected,
             onDanmakuSettings = {
                 dismissThen {
                     if (danmakuAvailable) onDanmakuSettings() else onUnavailable("本地视频没有弹幕")
@@ -460,8 +453,18 @@ private fun SettingsList(state: PlayerSettingsState, actions: PlayerSettingsActi
             onCheckedChange = actions.onAutoPlayNextChange,
         )
         SettingsDivider()
-        LoopSettingRow(
+        ChoiceSettingRow(
+            label = "循环播放",
+            icon = PlayerSettingsIcon.LOOP,
+            options = PlayerLoopMode.entries,
             selected = state.loopMode,
+            optionLabel = { mode ->
+                when (mode) {
+                    PlayerLoopMode.SINGLE_LOOP -> "单集循环"
+                    PlayerLoopMode.LIST_LOOP -> "列表循环"
+                    PlayerLoopMode.NONE -> "不循环"
+                }
+            },
             onSelect = actions.onLoopModeChange,
         )
         SettingsDivider()
@@ -472,11 +475,15 @@ private fun SettingsList(state: PlayerSettingsState, actions: PlayerSettingsActi
             onCheckedChange = actions.onBackgroundAudioChange,
         )
         SettingsDivider()
-        ActionSettingRow(
+        ChoiceSettingRow(
             label = "画质",
-            value = state.qualityLabel,
             icon = PlayerSettingsIcon.QUALITY,
-            onClick = actions.onQuality,
+            options = state.qualityOptions.sortedBy { it.qn },
+            selected = state.qualityOptions.firstOrNull { it.qn == state.selectedQuality },
+            optionLabel = { it.label },
+            optionDescription = { "选择清晰度 $it" },
+            emptyLabel = "自动",
+            onSelect = { actions.onQualitySelected(it.qn) },
         )
         SettingsDivider()
         ActionSettingRow(
@@ -535,33 +542,43 @@ internal fun ToggleSettingRow(
 }
 
 @Composable
-private fun LoopSettingRow(
-    selected: PlayerLoopMode,
-    onSelect: (PlayerLoopMode) -> Unit,
+private fun <Option> ChoiceSettingRow(
+    label: String,
+    icon: PlayerSettingsIcon,
+    options: List<Option>,
+    selected: Option?,
+    optionLabel: (Option) -> String,
+    optionDescription: (String) -> String = { it },
+    emptyLabel: String = "",
+    onSelect: (Option) -> Unit,
 ) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RowSettingIcon(PlayerSettingsIcon.LOOP)
+        RowSettingIcon(icon)
         Spacer(Modifier.width(12.dp))
-        Text("循环播放", color = SettingsInk, fontSize = 15.sp, maxLines = 1)
+        Text(label, color = SettingsInk, fontSize = 15.sp, maxLines = 1)
         Spacer(Modifier.weight(1f))
-        Row(Modifier.selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
-            PlayerLoopMode.entries.forEachIndexed { index, mode ->
+        if (options.isEmpty()) {
+            Text(emptyLabel, color = SettingsMuted, fontSize = 12.sp, maxLines = 1)
+            return@Row
+        }
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).selectableGroup(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            options.forEachIndexed { index, option ->
                 if (index > 0) {
                     Box(
                         Modifier.width(1.dp).height(12.dp)
                             .background(SettingsLine)
                     )
                 }
-                val active = mode == selected
+                val active = option == selected
+                val text = optionLabel(option)
                 Text(
-                    text = when (mode) {
-                        PlayerLoopMode.SINGLE_LOOP -> "单集循环"
-                        PlayerLoopMode.LIST_LOOP -> "列表循环"
-                        PlayerLoopMode.NONE -> "不循环"
-                    },
+                    text = text,
                     color = if (active) OnlinePink else SettingsSecondary,
                     fontSize = 11.5.sp,
                     fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
@@ -571,14 +588,10 @@ private fun LoopSettingRow(
                         .selectable(
                             selected = active,
                             role = Role.RadioButton,
-                            onClick = { onSelect(mode) },
+                            onClick = { onSelect(option) },
                         )
                         .semantics {
-                            contentDescription = when (mode) {
-                                PlayerLoopMode.SINGLE_LOOP -> "单集循环"
-                                PlayerLoopMode.LIST_LOOP -> "列表循环"
-                                PlayerLoopMode.NONE -> "不循环"
-                            }
+                            contentDescription = optionDescription(text)
                         }
                         .padding(horizontal = 7.dp, vertical = 7.dp),
                 )
@@ -658,104 +671,5 @@ private fun SettingsSwitch(checked: Boolean) {
                 .shadow(1.dp, CircleShape)
                 .background(Color.White, CircleShape)
         )
-    }
-}
-
-/** 竖屏播放器的画质选择弹层，和横屏抽屉共用同一组清晰度数据。 */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun PlayerQualitySheet(
-    options: List<PlayerQualityOption>,
-    selectedQuality: Int?,
-    onDismiss: () -> Unit,
-    onQualitySelected: (Int) -> Unit,
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = PlaybackSurface,
-        scrimColor = Color.Black.copy(alpha = .34f),
-        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
-        dragHandle = {
-            Box(
-                Modifier.padding(top = 10.dp, bottom = 2.dp).width(36.dp).height(4.dp)
-                    .clip(CircleShape).background(Color(0xFFDADCE0))
-            )
-        },
-        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
-    ) {
-        Column(
-            Modifier.fillMaxWidth().navigationBarsPadding()
-                .padding(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 18.dp)
-        ) {
-            Text(
-                "画质",
-                color = SettingsInk,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                "切换后保持当前播放进度",
-                color = SettingsMuted,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 3.dp, bottom = 12.dp),
-            )
-            options.forEach { option ->
-                val active = option.qn == selectedQuality
-                Row(
-                    Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (active) OnlinePink.copy(alpha = .12f) else SettingsSheetSurface)
-                        .clickable(role = Role.RadioButton) { onQualitySelected(option.qn) }
-                        .semantics(mergeDescendants = true) { contentDescription = "选择清晰度 ${option.label}" }
-                        .padding(horizontal = 14.dp, vertical = 11.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                option.label,
-                                color = if (active) OnlinePink else SettingsInk,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            option.badge?.let { badge ->
-                                Spacer(Modifier.width(6.dp))
-                                Box(
-                                    Modifier.clip(RoundedCornerShape(4.dp))
-                                        .background(OnlinePink.copy(alpha = .16f))
-                                        .padding(horizontal = 5.dp, vertical = 1.dp)
-                                ) {
-                                    Text(
-                                        badge,
-                                        color = OnlinePink,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                }
-                            }
-                        }
-                        if (option.description.isNotBlank()) {
-                            Text(
-                                option.description,
-                                color = SettingsMuted,
-                                fontSize = 10.5.sp,
-                                modifier = Modifier.padding(top = 2.dp),
-                            )
-                        }
-                    }
-                    if (active) {
-                        Box(
-                            Modifier.size(18.dp).clip(CircleShape).background(OnlinePink),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            AppGlyphIcon(AppIcon.CHECK, Color.White, Modifier.size(11.dp), 2.6f)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(7.dp))
-            }
-        }
     }
 }
