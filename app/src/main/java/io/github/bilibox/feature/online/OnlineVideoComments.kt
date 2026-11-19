@@ -97,11 +97,8 @@ internal fun onlineVideoCommentsPane(
     }
 
     return PlayerExtraDetailPane.ScrollableList(
-        header = {
-            if (canLoad) {
-                LaunchedEffect(pager) { pager.loadInitial() }
-                CommentOrderBar(order) { order = it }
-            }
+        onVisible = {
+            if (canLoad) LaunchedEffect(pager) { pager.loadInitial() }
         },
     ) {
         if (!canLoad) {
@@ -115,6 +112,7 @@ internal fun onlineVideoCommentsPane(
             return@ScrollableList
         }
 
+        item(key = "comment-order") { CommentOrderBar(order) { order = it } }
         items(pager.comments, key = { it.id }) { comment ->
             Column {
                 CommentFloor(comment, ownerId) {

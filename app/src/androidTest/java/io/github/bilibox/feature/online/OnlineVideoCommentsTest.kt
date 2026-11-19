@@ -5,11 +5,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.media3.exoplayer.ExoPlayer
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.data.bili.BiliException
@@ -36,53 +38,32 @@ class OnlineVideoCommentsTest {
             pinned = true,
             previewReply = comment(20L, "第一条回复预览").copy(authorLevel = 0),
         )
-        val newest = comment(12L, "最新评论", replyCount = 2)
-        compose.setContent {
-            val context = LocalContext.current
-            val player = remember { ExoPlayer.Builder(context).build() }
-            DisposableEffect(player) { onDispose { player.release() } }
-            BiliBoxTheme(darkTheme = false, dynamicColor = false) {
-                VideoPlayerScreen(
-                    player = player,
-                    title = "测试视频",
-                    sourceLabel = "哔哩哔哩",
-                    detailTabs = listOf("简介", "评论 24"),
-                    commentMessage = "",
-                    extraDetailPane = onlineVideoCommentsPane(
-                        videoKey = 42L,
-                        canLoad = true,
-                        awaitingVideoInfo = false,
-                        onRetryVideoInfo = {},
-                        ownerId = 1L,
-                        loadComments = { order, offset ->
-                            requests += order to offset
-                            when {
-                                order == VideoCommentOrder.NEWEST -> VideoCommentPage(listOf(newest), null)
-                                offset.isEmpty() -> VideoCommentPage(listOf(root), "next")
-                                requests.count { it.second == "next" } == 1 -> throw BiliException(-412, "受限")
-                                else -> VideoCommentPage(listOf(root, comment(11L, "下一页评论")), null)
-                            }
-                        },
-                        loadReplies = { rootId, page ->
-                            threadRequests += rootId to page
-                            if (rootId == root.id) {
-                                sheetReplies.await()
-                            } else {
-                                VideoCommentPage(listOf(comment(20L, "页内回复").copy(authorLevel = 3)), null)
-                            }
-                        },
-                    ),
-                    onBack = {},
-                    onRetry = {},
-                    details = { Text("视频简介") },
-                )
-            }
-        }
+        val newest = comment(12L, "最新的一条测试评论", replyCount = 2)
+        setPlayerContent(
+            loadComments = { order, offset ->
+                requests += order to offset
+                when {
+                    order == VideoCommentOrder.NEWEST -> VideoCommentPage(listOf(newest), null)
+                    offset.isEmpty() -> VideoCommentPage(listOf(root), "next")
+                    requests.count { it.second == "next" } == 1 -> throw BiliException(-412, "受限")
+                    else -> VideoCommentPage(listOf(root, comment(11L, "下一页评论")), null)
+                }
+            },
+            loadReplies = { rootId, page ->
+                threadRequests += rootId to page
+                if (rootId == root.id) {
+                    sheetReplies.await()
+                } else {
+                    VideoCommentPage(listOf(comment(20L, "页内回复").copy(authorLevel = 3)), null)
+                }
+            },
+        )
 
         compose.onNodeWithText("视频简介").assertIsDisplayed()
         compose.runOnIdle { assertEquals(emptyList<Pair<VideoCommentOrder, String>>(), requests) }
         compose.onNodeWithText("评论 24").performClick()
-        compose.onNodeWithText("热门").assertIsSelected()
+        compose.onNodeWithText("热门评论").assertIsDisplayed()
+        compose.onNodeWithText("按热度").assertIsDisplayed()
         compose.onNodeWithText("共 24 条评论").assertDoesNotExist()
         compose.onNodeWithText("第一条热门评论").assertIsDisplayed()
         compose.onNodeWithText("置顶").assertIsDisplayed()
@@ -102,9 +83,10 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("哔哩哔哩暂时限制了评论请求，请稍后再试").assertIsDisplayed()
         compose.onNodeWithText("重试").performClick()
         compose.onNodeWithText("下一页评论").assertIsDisplayed()
-        compose.onNodeWithText("最新").performClick()
-        compose.onNodeWithText("最新").assertIsSelected()
+        compose.onNodeWithText("按热度").performClick()
+        compose.onNodeWithText("按时间").assertIsDisplayed()
         compose.onNodeWithText("最新评论").assertIsDisplayed()
+        compose.onNodeWithText("最新的一条测试评论").assertIsDisplayed()
         compose.onNodeWithText("第一条热门评论").assertDoesNotExist()
         compose.onNodeWithContentDescription("LV0", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("查看 2 条回复").performClick()
@@ -113,12 +95,74 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("评论详情").assertDoesNotExist()
         compose.onNodeWithText("收起回复").performClick()
         compose.onNodeWithText("页内回复").assertDoesNotExist()
+        compose.onNodeWithText("按时间").performClick()
+        compose.onNodeWithText("按热度").assertIsDisplayed()
+        compose.onNodeWithText("热门评论").assertIsDisplayed()
+        compose.onNodeWithText("第一条热门评论").assertIsDisplayed()
         compose.runOnIdle {
             assertEquals(listOf(10L to 1, 12L to 1), threadRequests)
             assertEquals(
-                listOf(VideoCommentOrder.HOT to "", VideoCommentOrder.HOT to "next", VideoCommentOrder.HOT to "next", VideoCommentOrder.NEWEST to ""),
+                listOf(
+                    VideoCommentOrder.HOT to "",
+                    VideoCommentOrder.HOT to "next",
+                    VideoCommentOrder.HOT to "next",
+                    VideoCommentOrder.NEWEST to "",
+                    VideoCommentOrder.HOT to "",
+                ),
                 requests,
             )
+        }
+    }
+
+    @Test
+    fun orderBarScrollsAwayWhileDetailTabsStayVisible() {
+        val comments = List(24) { index -> comment(index + 1L, "测试评论 ${index + 1}") }
+        setPlayerContent(loadComments = { _, _ -> VideoCommentPage(comments, null) })
+
+        compose.onNodeWithText("评论 24").performClick()
+        compose.onNodeWithText("按热度").assertIsDisplayed()
+        compose.onNodeWithText("热门评论").assertIsDisplayed()
+
+        val list = compose.onNode(hasScrollToIndexAction())
+        list.performScrollToIndex(10)
+        compose.onNodeWithText("按热度").assertIsNotDisplayed()
+        compose.onNodeWithText("热门评论").assertIsNotDisplayed()
+        compose.onNodeWithText("评论 24").assertIsDisplayed()
+
+        list.performScrollToIndex(0)
+        compose.onNodeWithText("按热度").assertIsDisplayed()
+        compose.onNodeWithText("热门评论").assertIsDisplayed()
+    }
+
+    private fun setPlayerContent(
+        loadComments: suspend (VideoCommentOrder, String) -> VideoCommentPage<String>,
+        loadReplies: suspend (Long, Int) -> VideoCommentPage<Int> = { _, _ -> VideoCommentPage(emptyList(), null) },
+    ) {
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            BiliBoxTheme(darkTheme = false, dynamicColor = false) {
+                VideoPlayerScreen(
+                    player = player,
+                    title = "测试视频",
+                    sourceLabel = "哔哩哔哩",
+                    detailTabs = listOf("简介", "评论 24"),
+                    commentMessage = "",
+                    extraDetailPane = onlineVideoCommentsPane(
+                        videoKey = 42L,
+                        canLoad = true,
+                        awaitingVideoInfo = false,
+                        onRetryVideoInfo = {},
+                        ownerId = 1L,
+                        loadComments = loadComments,
+                        loadReplies = loadReplies,
+                    ),
+                    onBack = {},
+                    onRetry = {},
+                    details = { Text("视频简介") },
+                )
+            }
         }
     }
 

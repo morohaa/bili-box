@@ -35,7 +35,7 @@ import io.github.bilibox.data.player.LightsOffMode
 
 internal sealed interface PlayerExtraDetailPane {
     class Content(val render: @Composable (Long) -> Unit) : PlayerExtraDetailPane
-    class ScrollableList(val header: @Composable () -> Unit, val render: LazyListScope.() -> Unit) : PlayerExtraDetailPane
+    class ScrollableList(val onVisible: @Composable () -> Unit, val render: LazyListScope.() -> Unit) : PlayerExtraDetailPane
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -105,11 +105,11 @@ internal fun PlayerDetailsPane(
             .navigationBarsPadding().clipToBounds()
     ) {
         if (activePane != 0 && extraDetailPane is PlayerExtraDetailPane.ScrollableList) {
+            extraDetailPane.onVisible()
             LazyColumn(Modifier.fillMaxSize().then(blurModifier), userScrollEnabled = !lightsOff) {
                 stickyHeader {
                     Column(Modifier.fillMaxWidth().background(detailsBackground)) {
                         tabBar()
-                        extraDetailPane.header()
                     }
                 }
                 extraDetailPane.render(this)

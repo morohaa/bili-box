@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
@@ -49,7 +47,6 @@ import io.github.bilibox.core.ui.theme.Pink
 import io.github.bilibox.core.ui.theme.PlaybackDivider
 import io.github.bilibox.core.ui.theme.PlaybackInk
 import io.github.bilibox.core.ui.theme.PlaybackMuted
-import io.github.bilibox.core.ui.theme.PlaybackStroke
 import io.github.bilibox.core.ui.theme.playbackColor
 import io.github.bilibox.data.bili.VideoComment
 import io.github.bilibox.data.bili.VideoCommentOrder
@@ -60,28 +57,37 @@ internal val CommentInset: Color
 
 @Composable
 internal fun CommentOrderBar(order: VideoCommentOrder, onOrderChange: (VideoCommentOrder) -> Unit) {
+    val byPopularity = order == VideoCommentOrder.HOT
+    val muted = PlaybackMuted
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        CommentOrderPill("热门", order == VideoCommentOrder.HOT) { onOrderChange(VideoCommentOrder.HOT) }
-        CommentOrderPill("最新", order == VideoCommentOrder.NEWEST) { onOrderChange(VideoCommentOrder.NEWEST) }
-    }
-}
-
-@Composable
-private fun CommentOrderPill(label: String, selected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(8.dp)
-    val activeFill = playbackColor(Color(0xFFECE9FA), Color(0xFF3C345A))
-    val activeInk = playbackColor(Color(0xFF5948D4), Color(0xFFD2C8FF))
-    Box(
-        Modifier.heightIn(min = 40.dp).clip(shape)
-            .then(if (selected) Modifier.background(activeFill) else Modifier.border(1.dp, PlaybackStroke, shape))
-            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
-            .padding(horizontal = 15.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label, color = if (selected) activeInk else PlaybackMuted, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        Text(
+            if (byPopularity) "热门评论" else "最新评论",
+            color = muted,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        Row(
+            Modifier.heightIn(min = 34.dp).clickable(
+                role = Role.Button,
+                onClickLabel = if (byPopularity) "切换为按时间排序" else "切换为按热度排序",
+            ) { onOrderChange(if (byPopularity) VideoCommentOrder.NEWEST else VideoCommentOrder.HOT) },
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Canvas(Modifier.size(14.dp)) {
+                val inset = 1.dp.toPx()
+                val lineWidth = 1.dp.toPx()
+                for (line in 1..3) {
+                    val y = size.height * line / 4
+                    drawLine(muted, Offset(inset, y), Offset(size.width - inset, y), lineWidth, StrokeCap.Round)
+                }
+            }
+            Text(if (byPopularity) "按热度" else "按时间", color = muted, fontSize = 12.sp)
+        }
     }
 }
 
