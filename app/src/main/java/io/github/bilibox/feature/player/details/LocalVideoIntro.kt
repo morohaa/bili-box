@@ -44,7 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.bilibox.core.playback.LocalQueueMode
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.OnlinePink
@@ -71,7 +71,7 @@ internal fun LocalVideoIntro(
     playlist: List<LocalVideo>,
     durationMs: Long,
     resumeMs: Long,
-    queueMode: LocalQueueMode,
+    queueMode: PlaybackMode,
     playbackByKey: Map<String, LocalVideoPlayback>,
     onShare: () -> Unit,
     onSelectVideo: (LocalVideo) -> Unit,

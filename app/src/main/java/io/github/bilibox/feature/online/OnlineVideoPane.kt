@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -42,9 +41,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.model.VideoSummary
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.VideoMetaIcon
+import io.github.bilibox.core.ui.component.playback.PlaybackModeMenu
 import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.Pink
@@ -70,8 +71,8 @@ internal fun OnlineVideoDetails(
     creatorCard: UserCardData?,
     context: Context,
     selectedPage: Int,
-    autoPlayNext: Boolean,
-    onAutoPlayNextChange: (Boolean) -> Unit,
+    playbackMode: PlaybackMode,
+    onPlaybackModeChange: (PlaybackMode) -> Unit,
     onPageSelected: (Int) -> Unit,
     onOpenEpisodes: () -> Unit,
 ) {
@@ -227,8 +228,8 @@ internal fun OnlineVideoDetails(
             OnlineEpisodesSection(
                 pages = pages,
                 selectedPage = selectedPage,
-                autoPlayNext = autoPlayNext,
-                onAutoPlayNextChange = onAutoPlayNextChange,
+                playbackMode = playbackMode,
+                onPlaybackModeChange = onPlaybackModeChange,
                 onPageSelected = onPageSelected,
                 onOpenEpisodes = onOpenEpisodes,
             )
@@ -242,8 +243,8 @@ internal fun OnlineVideoDetails(
 internal fun OnlineEpisodesSection(
     pages: List<Page>,
     selectedPage: Int,
-    autoPlayNext: Boolean,
-    onAutoPlayNextChange: (Boolean) -> Unit,
+    playbackMode: PlaybackMode,
+    onPlaybackModeChange: (PlaybackMode) -> Unit,
     onPageSelected: (Int) -> Unit,
     onOpenEpisodes: () -> Unit,
 ) {
@@ -262,7 +263,7 @@ internal fun OnlineEpisodesSection(
             maxLines = 1,
         )
         Spacer(Modifier.width(8.dp))
-        OnlineAutoPlayChip(autoPlayNext, onAutoPlayNextChange)
+        OnlinePlaybackModeChip(playbackMode, onPlaybackModeChange)
         Spacer(Modifier.weight(1f))
         Row(
             Modifier.clip(RoundedCornerShape(6.dp))
@@ -303,24 +304,22 @@ internal fun OnlineEpisodesSection(
     }
 }
 
-/** Compact auto-play-next chip used in the "正片" section header. */
 @Composable
-internal fun OnlineAutoPlayChip(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        Modifier.height(24.dp)
-            .clip(CircleShape)
-            .background(PlaybackDivider)
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
-            .semantics { contentDescription = "自动连播" }
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier.size(6.dp).clip(CircleShape)
-                .background(if (checked) OnlinePink else Color(0xFFB9BEC5))
-        )
-        Spacer(Modifier.width(4.dp))
-        Text("自动连播", color = PlaybackSecondary, fontSize = 10.5.sp, maxLines = 1)
+internal fun OnlinePlaybackModeChip(mode: PlaybackMode, onModeChange: (PlaybackMode) -> Unit) {
+    PlaybackModeMenu(mode, onModeChange) { open ->
+        Row(
+            Modifier.height(28.dp)
+                .clip(CircleShape)
+                .background(PlaybackDivider)
+                .clickable(role = Role.Button, onClick = open)
+                .semantics { contentDescription = "播放模式：${mode.label}" }
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(mode.label, color = PlaybackSecondary, fontSize = 11.5.sp, maxLines = 1)
+            Spacer(Modifier.width(4.dp))
+            OnlineChevronRight(PlaybackSecondary, Modifier.size(6.dp).rotate(90f))
+        }
     }
 }
 

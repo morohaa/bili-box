@@ -94,12 +94,12 @@ class SeekPreviewSettingsTest {
             bitmap.recycle()
         }
         compose.onNodeWithContentDescription("返回播放设置").performClick()
-        compose.onNodeWithText("自动连播").assertIsDisplayed()
+        compose.onNodeWithText("播放模式").assertIsDisplayed()
         compose.onNodeWithText("更多播放设置").performScrollTo().performClick()
         toggle.assertIsOff()
         compose.runOnIdle { activity!!.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithTag("more-playback-settings").assertDoesNotExist()
-        compose.onNodeWithText("自动连播").assertIsDisplayed()
+        compose.onNodeWithText("播放模式").assertIsDisplayed()
         compose.runOnIdle { generation.intValue++ }
         openMoreSettings()
         toggle.assertIsOff().performClick().assertIsOn()

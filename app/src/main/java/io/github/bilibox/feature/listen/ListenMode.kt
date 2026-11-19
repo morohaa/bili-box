@@ -59,6 +59,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import io.github.bilibox.core.playback.ListenPlaybackBridge
 import io.github.bilibox.core.playback.ListenQueue
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.playback.PlaybackSleepTimer
 import io.github.bilibox.core.playback.SleepTimerMode
 import io.github.bilibox.core.playback.buildListenMetadata
@@ -97,15 +98,12 @@ internal data class ListenInfo(
  * Queue controls on the 听视频 page (上一个/下一个/播放模式/选集). Kept in one
  * object so VideoPlayerScreen does not grow more parameters: that composable is
  * already so large that extra parameters pushed it past ART's verifier.
- * [mode]: 0 列表循环, 1 单曲循环, 2 随机播放, 3 播完暂停.
  */
 internal class ListenControls(
-    val mode: Int = 0,
     val hasPrevious: Boolean = false,
     val hasNext: Boolean = false,
     val onPrevious: () -> Unit = {},
     val onNext: () -> Unit = {},
-    val onCycleMode: () -> Unit = {},
     val onOpenQueue: () -> Unit = {},
 )
 
@@ -386,7 +384,7 @@ internal fun ListenScreen(
     durationMs: Long,
     speed: Float,
     timer: PlaybackSleepTimer,
-    mode: Int = 0,
+    mode: PlaybackMode = PlaybackMode.STOP_AFTER,
     remainingVideos: Int = 1,
     hasPrevious: Boolean = false,
     hasNext: Boolean,
@@ -625,18 +623,14 @@ internal fun ListenScreen(
                 ToolButton(
                     icon = {
                         when (mode) {
-                            0 -> LoopListGlyph(it)
-                            1 -> LoopOneGlyph(it)
-                            2 -> ShuffleGlyph(it)
-                            else -> StopAfterGlyph(it)
+                            PlaybackMode.LIST_LOOP -> LoopListGlyph(it)
+                            PlaybackMode.SINGLE_LOOP -> LoopOneGlyph(it)
+                            PlaybackMode.SHUFFLE -> ShuffleGlyph(it)
+                            PlaybackMode.STOP_AFTER -> StopAfterGlyph(it)
+                            PlaybackMode.SEQUENTIAL -> NextGlyph(it)
                         }
                     },
-                    label = when (mode) {
-                        0 -> "列表循环"
-                        1 -> "单曲循环"
-                        2 -> "随机播放"
-                        else -> "播完暂停"
-                    },
+                    label = mode.label,
                     active = false,
                     onClick = { onCycleMode() }
                 )

@@ -28,6 +28,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import io.github.bilibox.core.model.VideoSummary
 import io.github.bilibox.core.playback.ListenPlaybackBridge
 import io.github.bilibox.core.playback.ListenQueue
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.ui.theme.PlaybackSurface
 import io.github.bilibox.data.auth.BiliSession
 import io.github.bilibox.data.auth.hasLoginCookies
@@ -97,7 +98,7 @@ internal fun OnlineVideoScreen(
     var qualityResumeMs by remember(video.bvid, cookie) { mutableLongStateOf(0L) }
     var qualityResumePlaying by remember(video.bvid, cookie) { mutableStateOf(true) }
     var episodesSheetVisible by rememberSaveable(video.bvid, cookie) { mutableStateOf(false) }
-    var autoPlayNext by rememberSaveable(video.bvid, cookie) { mutableStateOf(true) }
+    var playbackMode by rememberSaveable(video.bvid, cookie) { mutableStateOf(PlaybackMode.SEQUENTIAL) }
     var episodesInGridView by rememberSaveable(video.bvid, cookie) { mutableStateOf(false) }
     var creatorCard by remember(video.bvid, cookie) { mutableStateOf<UserCardData?>(null) }
     // Cache sheet data + queue. The controller lives for the whole video screen
@@ -523,28 +524,32 @@ internal fun OnlineVideoScreen(
         .orEmpty()
     val episodePages = videoInfo?.pages?.takeIf { it.size > 1 }
     val latestEpisodePages by rememberUpdatedState(episodePages)
-    val latestAutoPlayNext by rememberUpdatedState(autoPlayNext)
+    val latestPlaybackMode by rememberUpdatedState(playbackMode)
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
-                if (state != Player.STATE_ENDED || !latestAutoPlayNext) return
-                val parts = latestEpisodePages ?: return
+                if (state != Player.STATE_ENDED || !exoPlayer.playWhenReady) return
+                val parts = latestEpisodePages
                 // Read the live page, not a composition snapshot: in the background
                 // several parts can finish before the UI recomposes once.
-                val index = parts.indexOfFirst { it.page == selectedPage }
-                if (index in 0 until parts.lastIndex) {
-                    latestAdvance(parts[index + 1].page)
+                val index = parts?.indexOfFirst { it.page == selectedPage } ?: 0
+                val next = latestPlaybackMode.nextIndex(index, parts?.size ?: 1) ?: return
+                if (next == index) {
+                    exoPlayer.seekTo(0L)
+                } else {
+                    parts?.getOrNull(next)?.let { latestAdvance(it.page) }
                 }
             }
         }
         exoPlayer.addListener(listener)
         onDispose { exoPlayer.removeListener(listener) }
     }
-    LaunchedEffect(exoPlayer, selectedPage, autoPlayNext, episodePages, selectedQn) {
-        if (!autoPlayNext) return@LaunchedEffect
+    LaunchedEffect(exoPlayer, selectedPage, playbackMode, episodePages, selectedQn) {
         val parts = episodePages ?: return@LaunchedEffect
         val currentIndex = parts.indexOfFirst { it.page == selectedPage }
-        val nextPart = parts.getOrNull(currentIndex + 1) ?: return@LaunchedEffect
+        val nextIndex = playbackMode.nextIndex(currentIndex, parts.size) ?: return@LaunchedEffect
+        if (nextIndex == currentIndex) return@LaunchedEffect
+        val nextPart = parts[nextIndex]
         while (true) {
             delay(1_000)
             val duration = exoPlayer.duration
@@ -584,8 +589,8 @@ internal fun OnlineVideoScreen(
             OnlineEpisodesBottomSheet(
                 pages = overlayPages,
                 selectedPage = selectedPage,
-                autoPlayNext = autoPlayNext,
-                onAutoPlayNextChange = { autoPlayNext = it },
+                playbackMode = playbackMode,
+                onPlaybackModeChange = { playbackMode = it },
                 gridView = episodesInGridView,
                 onGridViewChange = { episodesInGridView = it },
                 onDismiss = { episodesSheetVisible = false },
@@ -653,8 +658,8 @@ internal fun OnlineVideoScreen(
         onNextEpisode = nextPage?.let { page -> { advanceToPart(page.page) } },
         qualityOptions = qualityOptions,
         selectedQuality = effectiveQuality,
-        autoPlayNext = autoPlayNext,
-        onAutoPlayNextChange = { autoPlayNext = it },
+        playbackMode = playbackMode,
+        onPlaybackModeChange = { playbackMode = it },
         cacheLabel = cacheLabel,
         onCache = openCacheSheet,
         cacheSheetVisible = cacheSheetVisible,
@@ -716,8 +721,8 @@ internal fun OnlineVideoScreen(
                     creatorCard = creatorCard,
                     context = context,
                     selectedPage = selectedPage,
-                    autoPlayNext = autoPlayNext,
-                    onAutoPlayNextChange = { autoPlayNext = it },
+                    playbackMode = playbackMode,
+                    onPlaybackModeChange = { playbackMode = it },
                     onPageSelected = { selectedPage = it },
                     onOpenEpisodes = { episodesSheetVisible = true },
                 )

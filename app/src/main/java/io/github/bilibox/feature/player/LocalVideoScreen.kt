@@ -13,7 +13,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import io.github.bilibox.core.playback.LocalQueueMode
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.ui.component.rememberVideoThumbnail
 import io.github.bilibox.data.localvideo.LocalPlaybackQueue
 import io.github.bilibox.data.localvideo.LocalVideo
@@ -45,7 +45,7 @@ internal fun LocalVideoScreen(
     var playbackError by remember(player) { mutableStateOf<String?>(null) }
     var playbackState by remember(player) { mutableIntStateOf(Player.STATE_IDLE) }
     // Survives a switch to the next folder item so 连播 keeps working.
-    var queueMode by rememberSaveable { mutableStateOf(LocalQueueMode.LIST_LOOP) }
+    var queueMode by rememberSaveable { mutableStateOf(PlaybackMode.LIST_LOOP) }
     var resumeDismissed by remember(video.uri) { mutableStateOf(false) }
     SideEffect {
         queue.playlist = playlist
@@ -152,24 +152,10 @@ internal fun LocalVideoScreen(
         ),
         listenQueue = queue,
         listenControls = ListenControls(
-            mode = when (queueMode) {
-                LocalQueueMode.LIST_LOOP -> 0
-                LocalQueueMode.SINGLE_LOOP -> 1
-                LocalQueueMode.SHUFFLE -> 2
-                LocalQueueMode.STOP_AFTER -> 3
-            },
             hasPrevious = previousVideo != null,
             hasNext = nextVideo != null,
             onPrevious = { previousVideo?.let { switchTo(it) } },
             onNext = { nextVideo?.let { switchTo(it) } },
-            onCycleMode = {
-                queueMode = when (queueMode) {
-                    LocalQueueMode.LIST_LOOP -> LocalQueueMode.SINGLE_LOOP
-                    LocalQueueMode.SINGLE_LOOP -> LocalQueueMode.SHUFFLE
-                    LocalQueueMode.SHUFFLE -> LocalQueueMode.STOP_AFTER
-                    LocalQueueMode.STOP_AFTER -> LocalQueueMode.LIST_LOOP
-                }
-            },
         ),
         mediaKey = video.uri,
         // Persist the exact exit position before the library recomposes its status list.
@@ -199,22 +185,8 @@ internal fun LocalVideoScreen(
                 },
             )
         },
-        autoPlayNext = queueMode != LocalQueueMode.STOP_AFTER,
-        onAutoPlayNextChange = { enabled ->
-            queueMode = if (enabled) LocalQueueMode.LIST_LOOP else LocalQueueMode.STOP_AFTER
-        },
-        loopMode = when (queueMode) {
-            LocalQueueMode.SINGLE_LOOP -> PlayerLoopMode.SINGLE_LOOP
-            LocalQueueMode.STOP_AFTER -> PlayerLoopMode.NONE
-            LocalQueueMode.LIST_LOOP, LocalQueueMode.SHUFFLE -> PlayerLoopMode.LIST_LOOP
-        },
-        onLoopModeChange = { mode ->
-            queueMode = when (mode) {
-                PlayerLoopMode.SINGLE_LOOP -> LocalQueueMode.SINGLE_LOOP
-                PlayerLoopMode.LIST_LOOP -> LocalQueueMode.LIST_LOOP
-                PlayerLoopMode.NONE -> LocalQueueMode.STOP_AFTER
-            }
-        },
+        playbackMode = queueMode,
+        onPlaybackModeChange = { queueMode = it },
         details = { duration ->
             LocalVideoIntro(
                 video = video,

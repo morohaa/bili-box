@@ -7,7 +7,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import io.github.bilibox.core.playback.ListenPlaybackBridge
 import io.github.bilibox.core.playback.ListenQueue
-import io.github.bilibox.core.playback.LocalQueueMode
+import io.github.bilibox.core.playback.PlaybackMode
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,10 +34,10 @@ internal class LocalPlaybackQueue(
 
     var playlist: List<LocalVideo> = emptyList()
     var onCurrentChanged: (LocalVideo) -> Unit = {}
-    var mode: LocalQueueMode = LocalQueueMode.LIST_LOOP
+    var mode: PlaybackMode = PlaybackMode.LIST_LOOP
         set(value) {
             field = value
-            val repeat = if (value == LocalQueueMode.SINGLE_LOOP) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+            val repeat = if (value == PlaybackMode.SINGLE_LOOP) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
             if (player.repeatMode != repeat) player.repeatMode = repeat
         }
 
@@ -106,11 +106,6 @@ internal class LocalPlaybackQueue(
         player.playWhenReady = true
     }
 
-    private fun nextInList(): LocalVideo? {
-        val index = playlist.indexOfFirst { it.uri == current.uri }
-        return (playlist.getOrNull(index + 1) ?: playlist.firstOrNull())?.takeIf { it.uri != current.uri }
-    }
-
     override val hasNext: Boolean
         get() {
             val index = playlist.indexOfFirst { it.uri == current.uri }
@@ -131,14 +126,14 @@ internal class LocalPlaybackQueue(
     }
 
     private fun onEnded() {
-        when (mode) {
-            LocalQueueMode.LIST_LOOP -> nextInList()
-            LocalQueueMode.SHUFFLE -> playlist.filter { it.uri != current.uri }.randomOrNull()
-            else -> return
-        }?.let(::moveTo) ?: run {
-            // Single-file folder: start the same file again.
+        if (!player.playWhenReady || mode == PlaybackMode.SINGLE_LOOP) return
+        val videos = playlist.ifEmpty { listOf(current) }
+        val index = videos.indexOfFirst { it.uri == current.uri }
+        val next = mode.nextIndex(index, videos.size)?.let(videos::get) ?: return
+        if (next.uri == current.uri) {
             player.seekTo(0L)
-            player.playWhenReady = true
+        } else {
+            moveTo(next)
         }
     }
 

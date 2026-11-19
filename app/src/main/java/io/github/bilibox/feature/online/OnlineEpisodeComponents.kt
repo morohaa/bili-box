@@ -3,7 +3,6 @@ package io.github.bilibox.feature.online
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,7 +32,6 @@ import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
@@ -45,7 +42,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -62,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.core.ui.theme.OnlinePink
 import io.github.bilibox.core.ui.theme.OnlinePinkSoft
@@ -117,8 +114,8 @@ internal fun OnlineEpisodeCard(
 internal fun OnlineEpisodesBottomSheet(
     pages: List<Page>,
     selectedPage: Int,
-    autoPlayNext: Boolean,
-    onAutoPlayNextChange: (Boolean) -> Unit,
+    playbackMode: PlaybackMode,
+    onPlaybackModeChange: (PlaybackMode) -> Unit,
     gridView: Boolean,
     onGridViewChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
@@ -133,8 +130,8 @@ internal fun OnlineEpisodesBottomSheet(
         EpisodesSheetHeader(
             fraction = if (selectedIndex >= 0) selectedIndex + 1 else selectedPage,
             total = pages.size,
-            autoPlayNext = autoPlayNext,
-            onAutoPlayNextChange = onAutoPlayNextChange,
+            playbackMode = playbackMode,
+            onPlaybackModeChange = onPlaybackModeChange,
             gridView = gridView,
             onGridViewChange = onGridViewChange,
             onDismiss = onDismiss,
@@ -188,8 +185,8 @@ internal fun OnlineEpisodesBottomSheet(
 private fun EpisodesSheetHeader(
     fraction: Int,
     total: Int,
-    autoPlayNext: Boolean,
-    onAutoPlayNextChange: (Boolean) -> Unit,
+    playbackMode: PlaybackMode,
+    onPlaybackModeChange: (PlaybackMode) -> Unit,
     gridView: Boolean,
     onGridViewChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
@@ -208,48 +205,11 @@ private fun EpisodesSheetHeader(
             maxLines = 1,
         )
         Spacer(Modifier.weight(1f))
-        AutoPlayNextToggle(autoPlayNext, onAutoPlayNextChange)
+        OnlinePlaybackModeChip(playbackMode, onPlaybackModeChange)
         Spacer(Modifier.width(8.dp))
         EpisodeLayoutToggle(gridView, onGridViewChange)
         Spacer(Modifier.width(8.dp))
         EpisodesSheetCloseButton(onDismiss)
-    }
-}
-
-@Composable
-private fun AutoPlayNextToggle(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    val trackColor by animateColorAsState(
-        targetValue = if (checked) OnlinePink else PlaybackStroke,
-        animationSpec = tween(180),
-        label = "自动连播开关颜色",
-    )
-    val knobOffset by animateDpAsState(
-        targetValue = if (checked) 14.dp else 2.dp,
-        animationSpec = tween(180),
-        label = "自动连播滑块位置",
-    )
-    Row(
-        Modifier.height(32.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
-            .semantics { contentDescription = "自动连播" }
-            .padding(horizontal = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("自动连播", color = PlaybackSecondary, fontSize = 11.5.sp, maxLines = 1)
-        Spacer(Modifier.width(5.dp))
-        Box(Modifier.width(28.dp).height(16.dp).clip(CircleShape).background(trackColor)) {
-            Box(
-                Modifier.align(Alignment.CenterStart)
-                    .offset(x = knobOffset)
-                    .size(12.dp)
-                    .shadow(1.dp, CircleShape)
-                    .background(Color.White, CircleShape)
-            )
-        }
     }
 }
 

@@ -20,8 +20,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertHasClickAction
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -38,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.test.platform.app.InstrumentationRegistry
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.data.bili.Page
 import io.github.bilibox.data.danmaku.DanmakuBlockType
 import io.github.bilibox.data.danmaku.DanmakuSettings
@@ -180,6 +180,7 @@ class VideoPlayerScreenTest {
 
     @Test
     fun portraitMoreOpensSettingsCardAnchoredBelowVideo() {
+        var mode by mutableStateOf(PlaybackMode.STOP_AFTER)
         compose.setContent {
             val context = LocalContext.current
             val player = remember { ExoPlayer.Builder(context).build() }
@@ -189,6 +190,8 @@ class VideoPlayerScreenTest {
                 title = "搜索视频",
                 sourceLabel = "哔哩哔哩",
                 commentMessage = "暂不支持查看在线评论",
+                playbackMode = mode,
+                onPlaybackModeChange = { mode = it },
                 onBack = {},
                 onRetry = {},
                 details = { Text("搜索视频简介") }
@@ -197,8 +200,9 @@ class VideoPlayerScreenTest {
 
         compose.onNodeWithContentDescription("更多").performClick()
         compose.waitForIdle()
-        compose.onNodeWithText("自动连播").assertExists()
-        compose.onNodeWithText("循环播放").assertExists()
+        compose.onNodeWithText("播放模式").assertExists()
+        compose.onNodeWithText("自动连播").assertDoesNotExist()
+        compose.onNodeWithText("循环播放").assertDoesNotExist()
         compose.onNodeWithText("后台听视频").assertExists()
         compose.onNodeWithText("画质").assertExists()
         compose.onNodeWithText("弹幕设置").assertExists()
@@ -217,13 +221,18 @@ class VideoPlayerScreenTest {
         assertEquals(video.bottom, sheet.top, 1f)
         assertEquals(root.bottom, sheet.bottom, 1f)
 
-        compose.onNodeWithContentDescription("单集循环").performClick()
+        for (option in listOf(PlaybackMode.SEQUENTIAL, PlaybackMode.SINGLE_LOOP, PlaybackMode.LIST_LOOP, PlaybackMode.STOP_AFTER)) {
+            val choice = compose.onNodeWithText(option.label)
+            choice.performScrollTo().performClick()
+            compose.runOnIdle { assertEquals(option, mode) }
+            choice.assertIsSelected()
+        }
         compose.onNodeWithContentDescription("镜像翻转").performClick()
         // The scrim covers the whole root; its center is underneath the card.
         // Tap its exposed video area to exercise the actual dismiss gesture.
         compose.onNodeWithTag("player-touch-surface").performTouchInput { click(center) }
         compose.waitForIdle()
-        compose.onNodeWithText("自动连播").assertDoesNotExist()
+        compose.onNodeWithText("播放模式").assertDoesNotExist()
         // 关掉卡片后视频仍可正常操作。
         compose.onNodeWithContentDescription("更多").assertExists()
     }
@@ -626,14 +635,14 @@ class VideoPlayerScreenTest {
         var selectedPage = 1
         var visible by mutableStateOf(true)
         var gridView by mutableStateOf(false)
-        var autoPlayNext by mutableStateOf(true)
+        var mode by mutableStateOf(PlaybackMode.SEQUENTIAL)
         compose.setContent {
             if (visible) {
                 OnlineEpisodesBottomSheet(
                     pages = pages,
                     selectedPage = selectedPage,
-                    autoPlayNext = autoPlayNext,
-                    onAutoPlayNextChange = { autoPlayNext = it },
+                    playbackMode = mode,
+                    onPlaybackModeChange = { mode = it },
                     gridView = gridView,
                     onGridViewChange = { gridView = it },
                     onDismiss = { visible = false },
@@ -648,8 +657,9 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("列表视图").assertExists()
         compose.onNodeWithContentDescription("切换为列表视图").performClick()
         compose.onNodeWithText("宫格视图").assertExists()
-        compose.onNodeWithContentDescription("自动连播").performClick()
-        compose.runOnIdle { assertEquals(false, autoPlayNext) }
+        compose.onNodeWithContentDescription("播放模式：顺序播放").performClick()
+        compose.onNodeWithText("列表循环").performClick()
+        compose.runOnIdle { assertEquals(PlaybackMode.LIST_LOOP, mode) }
         compose.onNodeWithText("第二集", substring = true).performClick()
         compose.runOnIdle {
             assertEquals(2, selectedPage)
@@ -662,22 +672,22 @@ class VideoPlayerScreenTest {
     }
 
     @Test
-    fun onlineEpisodesSectionShowsFractionAndTogglesAutoPlay() {
+    fun onlineEpisodesSectionShowsFractionAndChangesPlaybackMode() {
         val pages = listOf(
             Page(cid = 501, page = 1, part = "第一集", duration = 60),
             Page(cid = 502, page = 2, part = "第二集", duration = 90),
             Page(cid = 503, page = 3, part = "第三集", duration = 120),
         )
         var selectedPage = 1
-        var autoPlayNext by mutableStateOf(true)
+        var mode by mutableStateOf(PlaybackMode.SEQUENTIAL)
         var opened = 0
         compose.setContent {
             Column(Modifier.fillMaxSize().padding(top = 80.dp)) {
                 OnlineEpisodesSection(
                     pages = pages,
                     selectedPage = selectedPage,
-                    autoPlayNext = autoPlayNext,
-                    onAutoPlayNextChange = { autoPlayNext = it },
+                    playbackMode = mode,
+                    onPlaybackModeChange = { mode = it },
                     onPageSelected = { selectedPage = it },
                     onOpenEpisodes = { opened++ },
                 )
@@ -688,9 +698,10 @@ class VideoPlayerScreenTest {
         compose.onNodeWithText("(1/3)").assertExists()
         compose.onNodeWithText("共3P · 查看全部").assertExists()
         compose.onNodeWithText("第一集").assertExists()
-        compose.onNodeWithContentDescription("自动连播").assertIsOn().assertHasClickAction().performClick()
-        compose.onNodeWithContentDescription("自动连播").assertIsOff()
-        compose.runOnIdle { assertEquals(false, autoPlayNext) }
+        compose.onNodeWithContentDescription("播放模式：顺序播放").performClick()
+        compose.onNodeWithText("播完停止").performClick()
+        compose.onNodeWithContentDescription("播放模式：播完停止").assertExists()
+        compose.runOnIdle { assertEquals(PlaybackMode.STOP_AFTER, mode) }
         compose.onNodeWithText("第二集").performClick()
         compose.runOnIdle { assertEquals(2, selectedPage) }
         compose.onNodeWithContentDescription("查看全部选集").performClick()

@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.Composable
@@ -43,11 +44,13 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.playback.PlayerSidePanelWidth
@@ -64,16 +67,9 @@ import kotlinx.coroutines.launch
  * 播放偏好列表。卡片本身可以下拉收起，也可以通过遮罩、返回键关闭。
  */
 
-internal enum class PlayerLoopMode {
-    SINGLE_LOOP,
-    LIST_LOOP,
-    NONE,
-}
-
 internal data class PlayerSettingsState(
     val speed: Float,
-    val autoPlayNext: Boolean,
-    val loopMode: PlayerLoopMode,
+    val playbackMode: PlaybackMode,
     val backgroundAudio: Boolean,
     val qualityOptions: List<PlayerQualityOption>,
     val selectedQuality: Int?,
@@ -91,8 +87,7 @@ internal class PlayerSettingsActions(
     val onCache: () -> Unit,
     val onPictureInPicture: () -> Unit,
     val onSleepTimer: () -> Unit,
-    val onAutoPlayNextChange: (Boolean) -> Unit,
-    val onLoopModeChange: (PlayerLoopMode) -> Unit,
+    val onPlaybackModeChange: (PlaybackMode) -> Unit,
     val onBackgroundAudioChange: (Boolean) -> Unit,
     val onQualitySelected: (Int) -> Unit,
     val onDanmakuSettings: () -> Unit,
@@ -143,8 +138,7 @@ internal fun PlayerPlaybackSettingsHost(
     onDanmakuSettings: () -> Unit,
     onMoreSettings: () -> Unit,
     onBackgroundAudioChange: (Boolean) -> Unit,
-    onAutoPlayNextChange: (Boolean) -> Unit,
-    onLoopModeChange: (PlayerLoopMode) -> Unit,
+    onPlaybackModeChange: (PlaybackMode) -> Unit,
     onSubtitleChange: (Boolean) -> Unit,
     onMirrorChange: (Boolean) -> Unit,
     onSeekPreviewChange: (Boolean) -> Unit,
@@ -198,8 +192,7 @@ internal fun PlayerPlaybackSettingsHost(
             },
             onPictureInPicture = { dismissThen { onUnavailable("小窗播放暂未支持") } },
             onSleepTimer = { dismissThen(onSleepTimer) },
-            onAutoPlayNextChange = onAutoPlayNextChange,
-            onLoopModeChange = onLoopModeChange,
+            onPlaybackModeChange = onPlaybackModeChange,
             onBackgroundAudioChange = { enabled -> dismissThen { onBackgroundAudioChange(enabled) } },
             onQualitySelected = onQualitySelected,
             onDanmakuSettings = {
@@ -446,26 +439,14 @@ private fun SettingsList(state: PlayerSettingsState, actions: PlayerSettingsActi
             .clip(RoundedCornerShape(14.dp))
             .background(SettingsCardSurface)
     ) {
-        ToggleSettingRow(
-            label = "自动连播",
-            checked = state.autoPlayNext,
-            icon = PlayerSettingsIcon.AUTOPLAY,
-            onCheckedChange = actions.onAutoPlayNextChange,
-        )
-        SettingsDivider()
         ChoiceSettingRow(
-            label = "循环播放",
+            label = "播放模式",
             icon = PlayerSettingsIcon.LOOP,
-            options = PlayerLoopMode.entries,
-            selected = state.loopMode,
-            optionLabel = { mode ->
-                when (mode) {
-                    PlayerLoopMode.SINGLE_LOOP -> "单集循环"
-                    PlayerLoopMode.LIST_LOOP -> "列表循环"
-                    PlayerLoopMode.NONE -> "不循环"
-                }
-            },
-            onSelect = actions.onLoopModeChange,
+            options = PlaybackMode.standard,
+            selected = state.playbackMode,
+            optionLabel = { it.label },
+            visibleOptionCount = 3,
+            onSelect = actions.onPlaybackModeChange,
         )
         SettingsDivider()
         ToggleSettingRow(
@@ -550,8 +531,12 @@ private fun <Option> ChoiceSettingRow(
     optionLabel: (Option) -> String,
     optionDescription: (String) -> String = { it },
     emptyLabel: String = "",
+    visibleOptionCount: Int? = null,
     onSelect: (Option) -> Unit,
 ) {
+    val fontSize = 11.5.sp
+    val optionPadding = 7.dp
+    val dividerWidth = 1.dp
     Row(
         Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -564,14 +549,29 @@ private fun <Option> ChoiceSettingRow(
             Text(emptyLabel, color = SettingsMuted, fontSize = 12.sp, maxLines = 1)
             return@Row
         }
+        val viewport = if (visibleOptionCount != null && options.size > visibleOptionCount) {
+            val measurer = rememberTextMeasurer()
+            val style = LocalTextStyle.current.copy(fontSize = fontSize)
+            val width = with(LocalDensity.current) {
+                val choices = options.take(visibleOptionCount).sumOf { option ->
+                    val weight = if (option == selected) FontWeight.Medium else FontWeight.Normal
+                    measurer.measure(optionLabel(option), style.copy(fontWeight = weight), maxLines = 1).size.width +
+                        2 * optionPadding.roundToPx()
+                }
+                (choices + (visibleOptionCount - 1) * dividerWidth.roundToPx()).toDp()
+            }
+            Modifier.widthIn(max = width)
+        } else {
+            Modifier
+        }
         Row(
-            Modifier.horizontalScroll(rememberScrollState()).selectableGroup(),
+            viewport.horizontalScroll(rememberScrollState()).selectableGroup(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             options.forEachIndexed { index, option ->
                 if (index > 0) {
                     Box(
-                        Modifier.width(1.dp).height(12.dp)
+                        Modifier.width(dividerWidth).height(12.dp)
                             .background(SettingsLine)
                     )
                 }
@@ -580,7 +580,7 @@ private fun <Option> ChoiceSettingRow(
                 Text(
                     text = text,
                     color = if (active) OnlinePink else SettingsSecondary,
-                    fontSize = 11.5.sp,
+                    fontSize = fontSize,
                     fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
                     maxLines = 1,
                     modifier = Modifier
@@ -593,7 +593,7 @@ private fun <Option> ChoiceSettingRow(
                         .semantics {
                             contentDescription = optionDescription(text)
                         }
-                        .padding(horizontal = 7.dp, vertical = 7.dp),
+                        .padding(optionPadding),
                 )
             }
         }

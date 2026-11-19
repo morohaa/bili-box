@@ -14,7 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
-import io.github.bilibox.core.playback.LocalQueueMode
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.playback.PlaybackSleepTimer
 import io.github.bilibox.core.playback.SleepTimerMode
 import io.github.bilibox.core.ui.component.playback.SleepTimerSheet
@@ -69,7 +69,7 @@ class LocalVideoDetailsTest {
                     playlist = listOf(first, second),
                     durationMs = 6_000L,
                     resumeMs = 0L,
-                    queueMode = LocalQueueMode.STOP_AFTER,
+                    queueMode = PlaybackMode.STOP_AFTER,
                     playbackByKey = emptyMap(),
                     onShare = {},
                     onSelectVideo = { selected = it },
@@ -80,7 +80,7 @@ class LocalVideoDetailsTest {
 
         compose.onNodeWithText("本机文件").assertExists()
         compose.onNodeWithText("1.5x").assertExists()
-        compose.onNodeWithText("播完暂停").assertExists()
+        compose.onNodeWithText("播完停止").assertExists()
         compose.onNodeWithText("同文件夹").assertExists()
         compose.onNodeWithText("播放中").assertExists()
         compose.onNodeWithText("第二堂课").performClick()
@@ -89,7 +89,7 @@ class LocalVideoDetailsTest {
         compose.runOnIdle { assertEquals(1, speedOpened) }
         compose.onNodeWithText("定时关闭").performClick()
         compose.runOnIdle { assertEquals(1, timerOpened) }
-        compose.onNodeWithText("播完暂停").performClick()
+        compose.onNodeWithText("播完停止").performClick()
         compose.runOnIdle { assertEquals(1, playbackSheetOpened) }
     }
 
@@ -103,7 +103,7 @@ class LocalVideoDetailsTest {
                     playlist = emptyList(),
                     durationMs = item.durationMs,
                     resumeMs = 0L,
-                    queueMode = LocalQueueMode.LIST_LOOP,
+                    queueMode = PlaybackMode.LIST_LOOP,
                     playbackByKey = emptyMap(),
                     onShare = {},
                     onSelectVideo = {},
@@ -162,20 +162,21 @@ class LocalVideoDetailsTest {
     }
 
     @Test
-    fun playbackSheetShowsFourModesAndSelects() {
-        var picked: LocalQueueMode? = null
+    fun playbackSheetShowsStandardModesAndKeepsLocalShuffle() {
+        var picked: PlaybackMode? = null
         compose.setContent {
             PlaybackModeSheet(
-                selected = LocalQueueMode.LIST_LOOP,
+                selected = PlaybackMode.LIST_LOOP,
                 onDismiss = {},
                 onSelect = { picked = it },
             )
         }
         compose.onNodeWithText("播放顺序").assertExists()
         compose.onNodeWithText("列表循环").assertExists()
-        compose.onNodeWithText("单个循环").assertExists()
-        compose.onNodeWithText("播完暂停").assertExists()
+        compose.onNodeWithText("单集循环").assertExists()
+        compose.onNodeWithText("播完停止").assertExists()
+        compose.onNodeWithText("顺序播放").assertExists()
         compose.onNodeWithText("随机播放").performClick()
-        compose.runOnIdle { assertEquals(LocalQueueMode.SHUFFLE, picked) }
+        compose.runOnIdle { assertEquals(PlaybackMode.SHUFFLE, picked) }
     }
 }

@@ -3,6 +3,7 @@ package io.github.bilibox.feature.player
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -14,10 +15,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -26,8 +32,11 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.espresso.Espresso.pressBack
+import io.github.bilibox.core.playback.PlaybackMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -37,6 +46,7 @@ class PlayerPortraitSettingsTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var player: ExoPlayer
     private var selectedQuality by mutableStateOf(80)
+    private var playbackMode by mutableStateOf(PlaybackMode.SEQUENTIAL)
 
     @Test
     fun moreAndDismissMoveVideoAboveSettingsAndRestoreFullscreenPosition() {
@@ -132,6 +142,35 @@ class PlayerPortraitSettingsTest {
     }
 
     @Test
+    fun playbackModesShowThreeChoicesAndScrollToTheFourthInPortraitFullscreen() {
+        showPlayer(Modifier.width(400.dp))
+        compose.onNodeWithContentDescription("竖屏").performClick()
+        val expanded = surfaceBounds()
+        openSettings()
+
+        val label = compose.onNodeWithText("播放模式").performScrollTo().assertIsDisplayed()
+        val labelBounds = label.fetchSemanticsNode().boundsInRoot
+        for (mode in PlaybackMode.standard.take(3)) {
+            val bounds = compose.onNodeWithText(mode.label).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertEquals(labelBounds.center.y, bounds.center.y, 1f)
+        }
+        val last = compose.onNodeWithText("列表循环").assertIsNotDisplayed()
+
+        compose.onNode(
+            SemanticsMatcher.keyIsDefined(SemanticsProperties.HorizontalScrollAxisRange) and
+                hasAnyDescendant(hasText("列表循环")),
+        ).performTouchInput { swipeLeft() }
+
+        last.assertIsDisplayed()
+        assertEquals(labelBounds, label.fetchSemanticsNode().boundsInRoot)
+        assertEquals(labelBounds.center.y, last.fetchSemanticsNode().boundsInRoot.center.y, 1f)
+        last.performTouchInput { click(center) }
+        compose.runOnIdle { assertEquals(PlaybackMode.LIST_LOOP, playbackMode) }
+        last.assertIsSelected()
+        assertFullscreen(expanded)
+    }
+
+    @Test
     fun cacheAndPlaybackOrderRemainReachableInsideFullscreen() {
         showPlayer()
         compose.onNodeWithContentDescription("竖屏").performClick()
@@ -155,35 +194,39 @@ class PlayerPortraitSettingsTest {
         assertFullscreen(expanded)
     }
 
-    private fun showPlayer() {
+    private fun showPlayer(modifier: Modifier = Modifier) {
         compose.setContent {
             val context = LocalContext.current
             player = remember { ExoPlayer.Builder(context).build() }
             DisposableEffect(player) { onDispose { player.release() } }
             var cacheVisible by remember { mutableStateOf(false) }
-            VideoPlayerScreen(
-                player = player,
-                title = "竖屏设置测试",
-                sourceLabel = "哔哩哔哩",
-                commentMessage = "测试",
-                onBack = {},
-                onRetry = {},
-                qualityOptions = listOf(PlayerQualityOption(80, "1080P"), PlayerQualityOption(64, "720P")),
-                selectedQuality = selectedQuality,
-                onQualitySelected = { selectedQuality = it },
-                playbackModeSheet = { Text("队列设置") },
-                onCache = { cacheVisible = true },
-                cacheSheetVisible = cacheVisible,
-                onCacheSheetVisibleChange = { cacheVisible = it },
-                cacheSheet = { visible, topInset, _ ->
-                    if (visible) {
-                        Box(Modifier.fillMaxSize().padding(top = topInset).testTag("test-cache-panel")) {
-                            Text("缓存面板")
+            Box(modifier) {
+                VideoPlayerScreen(
+                    player = player,
+                    title = "竖屏设置测试",
+                    sourceLabel = "哔哩哔哩",
+                    commentMessage = "测试",
+                    onBack = {},
+                    onRetry = {},
+                    qualityOptions = listOf(PlayerQualityOption(80, "1080P"), PlayerQualityOption(64, "720P")),
+                    selectedQuality = selectedQuality,
+                    onQualitySelected = { selectedQuality = it },
+                    playbackMode = playbackMode,
+                    onPlaybackModeChange = { playbackMode = it },
+                    playbackModeSheet = { Text("队列设置") },
+                    onCache = { cacheVisible = true },
+                    cacheSheetVisible = cacheVisible,
+                    onCacheSheetVisibleChange = { cacheVisible = it },
+                    cacheSheet = { visible, topInset, _ ->
+                        if (visible) {
+                            Box(Modifier.fillMaxSize().padding(top = topInset).testTag("test-cache-panel")) {
+                                Text("缓存面板")
+                            }
                         }
-                    }
-                },
-                details = { Text("视频详情") },
-            )
+                    },
+                    details = { Text("视频详情") },
+                )
+            }
         }
     }
 

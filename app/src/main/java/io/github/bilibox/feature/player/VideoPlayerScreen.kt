@@ -36,6 +36,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import io.github.bilibox.core.playback.ListenQueue
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.playback.PlaybackSleepTimer
 import io.github.bilibox.core.playback.SleepTimerMode
 import io.github.bilibox.core.ui.component.playback.SleepTimerSheet
@@ -98,11 +99,8 @@ internal fun VideoPlayerScreen(
     sourcePill: Boolean = false,
     extraDetailPane: PlayerExtraDetailPane? = null,
     playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
-    // 播放设置卡片的偏好：在线视频由外层持有自动连播，本地队列持有循环模式。
-    autoPlayNext: Boolean? = null,
-    onAutoPlayNextChange: ((Boolean) -> Unit)? = null,
-    loopMode: PlayerLoopMode? = null,
-    onLoopModeChange: ((PlayerLoopMode) -> Unit)? = null,
+    playbackMode: PlaybackMode = PlaybackMode.STOP_AFTER,
+    onPlaybackModeChange: (PlaybackMode) -> Unit = {},
     cacheLabel: String? = null,
     onCache: (() -> Unit)? = null,
     // 缓存面板与播放设置卡片共用视频下沿作为顶边；可见状态由在线视频页持有，
@@ -138,8 +136,6 @@ internal fun VideoPlayerScreen(
     var speed by remember(player) { mutableFloatStateOf(1f) }
     var speedMenuExpanded by remember(player) { mutableStateOf(false) }
     var settingsSheetOpen by remember(player) { mutableStateOf(false) }
-    var localAutoPlayNext by rememberSaveable(player) { mutableStateOf(false) }
-    var localLoopMode by rememberSaveable(player) { mutableStateOf(PlayerLoopMode.NONE) }
     var subtitleEnabled by rememberSaveable(player) { mutableStateOf(true) }
     var mirrorEnabled by rememberSaveable(player) { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -425,8 +421,6 @@ internal fun VideoPlayerScreen(
 
         SleepTimerMode.OFF -> 0L
     }
-    val settingsAutoPlayNext = autoPlayNext ?: localAutoPlayNext
-    val settingsLoopMode = loopMode ?: localLoopMode
     Box(Modifier.fillMaxSize().onGloballyPositioned { screenRootOffset = it.positionInRoot() }) {
         PlayerScreenLayout(
             fullScreen = fullScreen,
@@ -837,8 +831,7 @@ internal fun VideoPlayerScreen(
             fullScreen = fullScreen,
             state = PlayerSettingsState(
                 speed = speed,
-                autoPlayNext = settingsAutoPlayNext,
-                loopMode = settingsLoopMode,
+                playbackMode = playbackMode,
                 backgroundAudio = listening,
                 qualityOptions = qualityOptions,
                 selectedQuality = selectedQuality,
@@ -857,8 +850,7 @@ internal fun VideoPlayerScreen(
             onDanmakuSettings = { danmakuSettingsOpen = true },
             onMoreSettings = { playbackModeExpanded = true },
             onBackgroundAudioChange = { if (it) enterListen() else restoreVideo() },
-            onAutoPlayNextChange = { onAutoPlayNextChange?.invoke(it) ?: run { localAutoPlayNext = it } },
-            onLoopModeChange = { onLoopModeChange?.invoke(it) ?: run { localLoopMode = it } },
+            onPlaybackModeChange = onPlaybackModeChange,
             onSubtitleChange = { subtitleEnabled = it },
             onMirrorChange = { mirrorEnabled = it },
             onSeekPreviewChange = previewPreference::update,
@@ -952,7 +944,7 @@ internal fun VideoPlayerScreen(
                 durationMs = duration,
                 speed = speed,
                 timer = sleepTimer,
-                mode = listenControls?.mode ?: 0,
+                mode = playbackMode,
                 remainingVideos = remainingVideos,
                 hasPrevious = listenControls?.hasPrevious ?: false,
                 // Online videos pass no controls; their 下一个 is the next P as before.
@@ -975,7 +967,10 @@ internal fun VideoPlayerScreen(
                     player.setPlaybackSpeed(it)
                     speed = it
                 },
-                onCycleMode = listenControls?.onCycleMode ?: {},
+                onCycleMode = {
+                    val modes = if (listenInfo?.online == false) PlaybackMode.entries else PlaybackMode.standard
+                    onPlaybackModeChange(modes[(modes.indexOf(playbackMode) + 1) % modes.size])
+                },
                 onOpenQueue = listenControls?.onOpenQueue ?: {},
                 onCollapse = { listenPageOpen = false },
                 onRestoreVideo = { restoreVideo() },

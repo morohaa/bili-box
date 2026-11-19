@@ -21,7 +21,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.media3.exoplayer.ExoPlayer
 import io.github.bilibox.core.model.VideoSummary
-import io.github.bilibox.core.playback.LocalQueueMode
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.feature.online.OnlineVideoDetails
@@ -72,8 +72,8 @@ class PlayerThemeTest {
                                     creatorCard = null,
                                     context = context,
                                     selectedPage = 1,
-                                    autoPlayNext = true,
-                                    onAutoPlayNextChange = {},
+                                    playbackMode = PlaybackMode.SEQUENTIAL,
+                                    onPlaybackModeChange = {},
                                     onPageSelected = {},
                                     onOpenEpisodes = {},
                                 )
@@ -83,7 +83,7 @@ class PlayerThemeTest {
                                     playlist = emptyList(),
                                     durationMs = duration,
                                     resumeMs = 0,
-                                    queueMode = LocalQueueMode.LIST_LOOP,
+                                    queueMode = PlaybackMode.LIST_LOOP,
                                     playbackByKey = emptyMap(),
                                     onShare = {},
                                     onSelectVideo = {},

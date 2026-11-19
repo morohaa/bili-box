@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import io.github.bilibox.core.model.VideoSummary
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.data.bili.Stat
 import io.github.bilibox.data.bili.VideoInfo
@@ -28,8 +29,8 @@ class OnlineUnavailableActionsTest {
                     creatorCard = null,
                     context = LocalContext.current,
                     selectedPage = 1,
-                    autoPlayNext = false,
-                    onAutoPlayNextChange = {},
+                    playbackMode = PlaybackMode.STOP_AFTER,
+                    onPlaybackModeChange = {},
                     onPageSelected = {},
                     onOpenEpisodes = {},
                 )

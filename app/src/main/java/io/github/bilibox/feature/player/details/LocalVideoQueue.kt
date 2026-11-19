@@ -39,7 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.bilibox.core.playback.LocalQueueMode
+import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.ui.component.AppGlyphIcon
 import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.component.EqualizerBars
@@ -62,9 +62,9 @@ import io.github.bilibox.data.localvideo.loadVideoThumbnail
 /** Bottom sheet matching the reference "播放顺序 / 同文件夹" card. */
 @Composable
 internal fun PlaybackModeSheet(
-    selected: LocalQueueMode,
+    selected: PlaybackMode,
     onDismiss: () -> Unit,
-    onSelect: (LocalQueueMode) -> Unit,
+    onSelect: (PlaybackMode) -> Unit,
 ) {
     val scrimInteraction = remember { MutableInteractionSource() }
     Box(Modifier.fillMaxSize()) {
@@ -96,7 +96,7 @@ internal fun PlaybackModeSheet(
                 Spacer(Modifier.width(8.dp))
                 Text("同文件夹", color = PlaybackMuted, fontSize = 12.sp)
             }
-            LocalQueueMode.entries.forEach { mode ->
+            PlaybackMode.entries.forEach { mode ->
                 val active = mode == selected
                 Row(
                     Modifier.fillMaxWidth().height(50.dp)
