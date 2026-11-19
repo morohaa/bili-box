@@ -242,6 +242,7 @@ internal fun AppNavigation(
                             onOrderChange = { appState.runSearch(order = it) },
                             duration = appState.searchDuration,
                             timeRange = appState.searchTimeRange,
+                            anonymousSearch = appState.anonymousSearch,
                             onFiltersChange = appState::updateSearchFilters,
                             gridLayout = appState.searchGrid,
                             onToggleLayout = { appState.searchGrid = !appState.searchGrid },

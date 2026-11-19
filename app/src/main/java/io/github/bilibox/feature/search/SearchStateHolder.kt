@@ -29,6 +29,7 @@ internal class SearchStateHolder(
         order: SearchOrder,
         duration: SearchDuration?,
         timeRange: SearchTimeRange?,
+        anonymous: Boolean,
     ) {
         val keyword = query.trim()
         if (keyword.isEmpty()) return
@@ -43,6 +44,7 @@ internal class SearchStateHolder(
                     order = order,
                     duration = duration,
                     timeRange = timeRange,
+                    forceAnonymous = anonymous,
                 )
                 SearchUiState.Success(
                     items = result.items.map(::toVideoSummary),

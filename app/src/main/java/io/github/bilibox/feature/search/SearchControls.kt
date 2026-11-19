@@ -21,14 +21,19 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -74,7 +79,8 @@ internal fun SearchControlsBar(
     onOrderChange: (SearchOrder) -> Unit,
     duration: SearchDuration?,
     timeRange: SearchTimeRange?,
-    onFiltersChange: (SearchDuration?, SearchTimeRange?) -> Unit,
+    anonymousSearch: Boolean,
+    onFiltersChange: (SearchDuration?, SearchTimeRange?, Boolean) -> Unit,
     gridLayout: Boolean,
     onToggleLayout: () -> Unit,
     colors: DynamicColors,
@@ -89,6 +95,18 @@ internal fun SearchControlsBar(
         ) {
             SortChip(order, colors, onOrderChange)
             Spacer(Modifier.weight(1f))
+            if (anonymousSearch) {
+                Text(
+                    "匿名",
+                    modifier = Modifier.clip(CircleShape).background(colors.pinkSoft)
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .semantics { contentDescription = "匿名搜索已开启" },
+                    color = colors.pink,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                Spacer(Modifier.width(8.dp))
+            }
             FilterChip(colors, activeCount = activeFilters) { filterSheetOpen = true }
             Spacer(Modifier.width(8.dp))
             LayoutButton(gridLayout, colors, onToggleLayout)
@@ -100,12 +118,13 @@ internal fun SearchControlsBar(
         SearchFilterSheet(
             duration = duration,
             timeRange = timeRange,
+            anonymousSearch = anonymousSearch,
             colors = colors,
             onDismiss = { filterSheetOpen = false },
-            onApply = { selectedDuration, selectedRange ->
+            onApply = { selectedDuration, selectedRange, selectedAnonymous ->
                 filterSheetOpen = false
-                if (selectedDuration != duration || selectedRange != timeRange) {
-                    onFiltersChange(selectedDuration, selectedRange)
+                if (selectedDuration != duration || selectedRange != timeRange || selectedAnonymous != anonymousSearch) {
+                    onFiltersChange(selectedDuration, selectedRange, selectedAnonymous)
                 }
             },
         )
@@ -276,12 +295,14 @@ private fun LayoutButton(
 private fun SearchFilterSheet(
     duration: SearchDuration?,
     timeRange: SearchTimeRange?,
+    anonymousSearch: Boolean,
     colors: DynamicColors,
     onDismiss: () -> Unit,
-    onApply: (SearchDuration?, SearchTimeRange?) -> Unit,
+    onApply: (SearchDuration?, SearchTimeRange?, Boolean) -> Unit,
 ) {
     var draftDuration by remember { mutableStateOf(duration) }
     var draftTimeRange by remember { mutableStateOf(timeRange) }
+    var draftAnonymous by rememberSaveable { mutableStateOf(anonymousSearch) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -326,7 +347,10 @@ private fun SearchFilterSheet(
                     }
                 }
             }
-            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            Column(
+                Modifier.fillMaxWidth().weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            ) {
                 Spacer(Modifier.height(10.dp))
                 Text("时长", color = colors.ink2, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(10.dp))
@@ -358,6 +382,34 @@ private fun SearchFilterSheet(
                     }
                 }
                 Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = colors.line, thickness = 1.dp)
+                Row(
+                    Modifier.fillMaxWidth()
+                        .toggleable(value = draftAnonymous, role = Role.Switch) { draftAnonymous = it }
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("匿名搜索", color = colors.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "搜索不携带 B 站登录信息，不影响播放和收藏。",
+                            color = colors.ink2,
+                            fontSize = 12.sp,
+                        )
+                    }
+                    Switch(
+                        checked = draftAnonymous,
+                        onCheckedChange = null,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = colors.onPink,
+                            checkedTrackColor = colors.pink,
+                            uncheckedThumbColor = colors.ink2,
+                            uncheckedTrackColor = colors.background,
+                            uncheckedBorderColor = colors.line,
+                        ),
+                    )
+                }
             }
             HorizontalDivider(color = colors.line, thickness = 1.dp)
             Row(
@@ -370,7 +422,7 @@ private fun SearchFilterSheet(
                     draftDuration = null
                     draftTimeRange = null
                 }
-                SheetButton("应用筛选", colors, primary = true) { onApply(draftDuration, draftTimeRange) }
+                SheetButton("应用筛选", colors, primary = true) { onApply(draftDuration, draftTimeRange, draftAnonymous) }
             }
         }
     }

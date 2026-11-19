@@ -16,6 +16,7 @@ import io.github.bilibox.data.auth.BiliSessionStore
 import io.github.bilibox.data.bili.BiliClient
 import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.data.localvideo.LocalVideoQuickFilter
+import io.github.bilibox.data.search.SearchPreferences
 import io.github.bilibox.feature.search.SearchStateHolder
 import io.github.bilibox.feature.search.SearchUiState
 import kotlinx.coroutines.CoroutineScope
@@ -25,14 +26,15 @@ import kotlinx.coroutines.launch
 internal fun rememberBiliBoxAppState(): BiliBoxAppState {
     val context = LocalContext.current
     val initialSession = remember(context) { BiliSessionStore.load(context) }
+    val searchPreferences = remember(context) { SearchPreferences(context) }
     val scope = rememberCoroutineScope()
     val homeScroll = rememberScrollState()
     val profileScroll = rememberScrollState()
-    val saver = remember(initialSession, scope, homeScroll, profileScroll) {
-        BiliBoxAppState.saver(initialSession, scope, homeScroll, profileScroll)
+    val saver = remember(initialSession, scope, homeScroll, profileScroll, searchPreferences) {
+        BiliBoxAppState.saver(initialSession, scope, homeScroll, profileScroll, searchPreferences)
     }
     val appState = rememberSaveable(saver = saver) {
-        BiliBoxAppState(initialSession, scope, homeScroll, profileScroll)
+        BiliBoxAppState(initialSession, scope, homeScroll, profileScroll, searchPreferences)
     }
     DisposableEffect(appState) { onDispose { appState.dispose() } }
     return appState
@@ -44,6 +46,7 @@ internal class BiliBoxAppState(
     private val scope: CoroutineScope,
     val homeScroll: ScrollState,
     val profileScroll: ScrollState,
+    private val searchPreferences: SearchPreferences? = null,
 ) {
     private var selectedIndex by mutableIntStateOf(0)
 
@@ -62,6 +65,8 @@ internal class BiliBoxAppState(
     var searchDuration by mutableStateOf<SearchDuration?>(null)
         private set
     var searchTimeRange by mutableStateOf<SearchTimeRange?>(null)
+        private set
+    var anonymousSearch by mutableStateOf(searchPreferences?.anonymousSearch ?: false)
         private set
     var searchGrid by mutableStateOf(false)
     var homeExpanded by mutableStateOf(false)
@@ -158,13 +163,17 @@ internal class BiliBoxAppState(
         if (keyword.isNotEmpty()) {
             searchOrder = order
             scope.launch { homeScroll.scrollTo(0) }
-            searchHolder.search(keyword, page, order, searchDuration, searchTimeRange)
+            searchHolder.search(keyword, page, order, searchDuration, searchTimeRange, anonymousSearch)
         }
     }
 
-    fun updateSearchFilters(duration: SearchDuration?, timeRange: SearchTimeRange?) {
+    fun updateSearchFilters(duration: SearchDuration?, timeRange: SearchTimeRange?, anonymous: Boolean = anonymousSearch) {
         searchDuration = duration
         searchTimeRange = timeRange
+        if (anonymous != anonymousSearch) {
+            anonymousSearch = anonymous
+            searchPreferences?.anonymousSearch = anonymous
+        }
         runSearch()
     }
 
@@ -212,6 +221,7 @@ internal class BiliBoxAppState(
             scope: CoroutineScope,
             homeScroll: ScrollState,
             profileScroll: ScrollState,
+            searchPreferences: SearchPreferences? = null,
         ): Saver<BiliBoxAppState, Any> = mapSaver(
             save = {
                 mapOf(
@@ -229,7 +239,7 @@ internal class BiliBoxAppState(
                 )
             },
             restore = {
-                BiliBoxAppState(initialSession, scope, homeScroll, profileScroll).apply {
+                BiliBoxAppState(initialSession, scope, homeScroll, profileScroll, searchPreferences).apply {
                     selectedIndex = it["selectedIndex"] as Int
                     searchQuery = it["searchQuery"] as String
                     searchOrder = SearchOrder.valueOf(it["searchOrder"] as String)
