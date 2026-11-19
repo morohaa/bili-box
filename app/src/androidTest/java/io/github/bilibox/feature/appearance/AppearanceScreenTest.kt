@@ -58,7 +58,8 @@ class AppearanceScreenTest {
         }
 
         compose.onNodeWithText("小电视").performScrollTo().assertIsSelected()
-        listOf(SeekThumbStyle.DOT, SeekThumbStyle.DIAMOND, SeekThumbStyle.STAR, SeekThumbStyle.TELEVISION).forEach { style ->
+        (SeekThumbStyle.entries.drop(1) + SeekThumbStyle.TELEVISION).forEach { style ->
+            compose.onNodeWithText(style.label).performScrollTo()
             compose.onNodeWithText(style.label).performSemanticsAction(SemanticsActions.OnClick) { it() }
             compose.onNodeWithText(style.label).assertIsSelected()
             compose.runOnIdle { assertEquals(initial.copy(seekThumbStyle = style), settings) }

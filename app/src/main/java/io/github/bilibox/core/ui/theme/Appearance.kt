@@ -15,6 +15,7 @@ internal enum class SeekThumbStyle(val label: String) {
     DOT("圆点"),
     DIAMOND("菱形"),
     STAR("星星"),
+    XIAOHEI("罗小黑"),
 }
 
 internal val LocalSeekThumbStyle = compositionLocalOf { SeekThumbStyle.TELEVISION }
