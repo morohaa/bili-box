@@ -85,6 +85,7 @@ class SeekPreviewSettingsTest {
             }
         }
         openMoreSettings()
+        compose.onNodeWithText("进度条滑块样式").assertDoesNotExist()
         val toggle = compose.onNodeWithContentDescription("进度条画面预览")
         toggle.assertIsOn().performClick().assertIsOff()
         compose.runOnIdle { assertFalse(preferences.load()) }

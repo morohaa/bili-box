@@ -26,6 +26,7 @@ import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.core.ui.theme.HomeBackground
 import io.github.bilibox.core.ui.theme.LocalAppFontFamily
 import io.github.bilibox.core.ui.theme.PageBackgroundSettings
+import io.github.bilibox.core.ui.theme.SeekThumbStyle
 import io.github.bilibox.core.ui.theme.fontFamily
 import io.github.bilibox.data.appearance.BackgroundImageStore
 import java.io.File
@@ -35,6 +36,34 @@ import org.junit.Test
 
 class AppearanceScreenTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test
+    fun selectingSeekThumbStyleChangesOnlyThatAppearanceSetting() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val stores = BackgroundPage.entries.associateWith { BackgroundImageStore(context, it) }
+        val initial = AppearanceSettings(themeId = "blue", font = AppFont.WENKAI)
+        var settings by mutableStateOf(initial)
+        compose.setContent {
+            BiliBoxTheme {
+                AppearanceScreen(
+                    appearance = settings,
+                    darkMode = false,
+                    backgroundImages = emptyMap(),
+                    backgroundStores = stores,
+                    onBackgroundImageChange = { _, _ -> },
+                    onBack = {},
+                    onChange = { settings = it },
+                )
+            }
+        }
+
+        compose.onNodeWithText("小电视").performScrollTo().assertIsSelected()
+        listOf(SeekThumbStyle.DOT, SeekThumbStyle.DIAMOND, SeekThumbStyle.STAR, SeekThumbStyle.TELEVISION).forEach { style ->
+            compose.onNodeWithText(style.label).performSemanticsAction(SemanticsActions.OnClick) { it() }
+            compose.onNodeWithText(style.label).assertIsSelected()
+            compose.runOnIdle { assertEquals(initial.copy(seekThumbStyle = style), settings) }
+        }
+    }
 
     @Test
     fun selectingFontsUpdatesThemeImmediatelyWithoutChangingOtherSettings() {

@@ -274,6 +274,12 @@ internal fun AppearanceScreen(
                         }
                     }
                 }
+                SeekThumbSettingsCard(
+                    selected = appearance.seekThumbStyle,
+                    accent = accent,
+                    palette = palette,
+                    onSelect = { style -> onChange(appearance.copy(seekThumbStyle = style)) },
+                )
                 NavigationSettingsCard(
                     fixed = appearance.fixedBottomNavigation,
                     accent = accent,

@@ -1,5 +1,6 @@
 package io.github.bilibox.core.ui.theme
 
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 /** 外观模式。跟随系统时由调用方用 [resolveDark] 解析成实际明暗。 */
@@ -8,6 +9,15 @@ internal enum class AppearanceMode(val label: String) {
     DARK("深色"),
     AUTO("自动"),
 }
+
+internal enum class SeekThumbStyle(val label: String) {
+    TELEVISION("小电视"),
+    DOT("圆点"),
+    DIAMOND("菱形"),
+    STAR("星星"),
+}
+
+internal val LocalSeekThumbStyle = compositionLocalOf { SeekThumbStyle.TELEVISION }
 
 /**
  * 页面背景样式，「主题外观」页的底部弹层直接映射到这个枚举，顺序即展示顺序。
@@ -83,6 +93,7 @@ internal data class AppearanceSettings(
     val profileBackground: PageBackgroundSettings = PageBackgroundSettings(),
     val font: AppFont = AppFont.DEFAULT,
     val fixedBottomNavigation: Boolean = false,
+    val seekThumbStyle: SeekThumbStyle = SeekThumbStyle.TELEVISION,
 ) {
     val theme: ThemeOption get() = themeById(themeId)
 

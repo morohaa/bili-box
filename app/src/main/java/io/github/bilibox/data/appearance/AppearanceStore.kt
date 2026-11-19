@@ -9,13 +9,20 @@ import io.github.bilibox.core.ui.theme.BackgroundPage
 import io.github.bilibox.core.ui.theme.DefaultThemeId
 import io.github.bilibox.core.ui.theme.HomeBackground
 import io.github.bilibox.core.ui.theme.PageBackgroundSettings
+import io.github.bilibox.core.ui.theme.SeekThumbStyle
 import io.github.bilibox.core.ui.theme.ThemeCatalog
 import io.github.bilibox.core.ui.theme.WallpaperBlurMax
 import io.github.bilibox.core.ui.theme.WallpaperDarknessMax
 
 /** 「主题外观」偏好；沿用旧版的 `appearance` SharedPreferences，并兼容 `dark_mode`。 */
-internal class AppearanceStore(private val preferences: SharedPreferences) {
-    constructor(context: Context) : this(context.applicationContext.getSharedPreferences("appearance", Context.MODE_PRIVATE))
+internal class AppearanceStore(
+    private val preferences: SharedPreferences,
+    private val legacySeekThumbPreferences: SharedPreferences? = null,
+) {
+    constructor(context: Context) : this(
+        context.applicationContext.getSharedPreferences("appearance", Context.MODE_PRIVATE),
+        context.applicationContext.getSharedPreferences("player_seek_thumb", Context.MODE_PRIVATE),
+    )
 
     fun load(): AppearanceSettings {
         val themeId = preferences.getString("theme_id", null)
@@ -24,11 +31,14 @@ internal class AppearanceStore(private val preferences: SharedPreferences) {
         val mode = preferences.getString("appearance_mode", null)
             ?.let { raw -> AppearanceMode.entries.firstOrNull { it.name == raw } }
             ?: if (preferences.getBoolean("dark_mode", false)) AppearanceMode.DARK else AppearanceMode.LIGHT
+        val seekThumbStyle = preferences.getString("seek_thumb_style", null)
+            ?: legacySeekThumbPreferences?.getString("style", null)
         return AppearanceSettings(
             themeId = themeId,
             mode = mode,
             font = AppFont.fromStorageId(preferences.getString("font_id", null)),
             fixedBottomNavigation = preferences.getBoolean("fixed_bottom_navigation", false),
+            seekThumbStyle = SeekThumbStyle.entries.firstOrNull { it.name == seekThumbStyle } ?: SeekThumbStyle.TELEVISION,
         ).let { settings ->
             BackgroundPage.entries.fold(settings) { result, page ->
                 result.withBackground(page, loadBackground(page))
@@ -55,6 +65,7 @@ internal class AppearanceStore(private val preferences: SharedPreferences) {
             .putString("appearance_mode", settings.mode.name)
             .putString("font_id", settings.font.storageId)
             .putBoolean("fixed_bottom_navigation", settings.fixedBottomNavigation)
+            .putString("seek_thumb_style", settings.seekThumbStyle.name)
             .remove("dark_mode")
         BackgroundPage.entries.forEach { page ->
             val background = settings.backgroundFor(page)

@@ -13,6 +13,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import io.github.bilibox.core.ui.component.playback.SeekThumb
+import io.github.bilibox.core.ui.theme.LocalSeekThumbStyle
 import io.github.bilibox.core.ui.theme.OnlinePink
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +33,7 @@ internal fun VideoSeekBar(
 ) {
     // Keep the visual layout compact; Compose still expands the touch target.
     val accent = OnlinePink
+    val thumbStyle = LocalSeekThumbStyle.current
     val interactionSource = remember { MutableInteractionSource() }
     val cancel by rememberUpdatedState(onSeekCanceled)
     LaunchedEffect(interactionSource) {
@@ -50,7 +53,7 @@ internal fun VideoSeekBar(
                 enabled = duration > 0,
                 modifier = Modifier.fillMaxWidth().height(24.dp).semantics { contentDescription = "播放进度" },
                 interactionSource = interactionSource,
-                thumb = { TelevisionSeekThumb() },
+                thumb = { SeekThumb(thumbStyle, accent, Modifier.testTag("player-seek-thumb-${thumbStyle.name}")) },
                 track = { sliderState ->
                     Canvas(Modifier.fillMaxWidth().height(2.5.dp).testTag("player-seek-track")) {
                         val played = (sliderState.value / duration.coerceAtLeast(1L)).coerceIn(0f, 1f)

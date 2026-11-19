@@ -8,12 +8,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import io.github.bilibox.R
-import io.github.bilibox.core.ui.theme.OnlinePink
-import io.github.bilibox.core.ui.theme.OnlineText
 
 @Composable
 internal fun PlaybackIcon(playing: Boolean, modifier: Modifier = Modifier.size(26.dp)) {
@@ -41,33 +38,6 @@ internal fun PlaybackIcon(playing: Boolean, modifier: Modifier = Modifier.size(2
                 },
                 Color.White
             )
-        }
-    }
-}
-
-@Composable
-internal fun TelevisionSeekThumb() {
-    val accent = OnlinePink
-    Canvas(Modifier.size(width = 18.dp, height = 16.dp)) {
-        val u = size.width / 24f
-        val stroke = Stroke(1.8f * u, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        drawLine(accent, Offset(7.5f * u, 1.5f * u), Offset(10.5f * u, 4.5f * u), 2f * u, StrokeCap.Round)
-        drawLine(accent, Offset(16.5f * u, 1.5f * u), Offset(13.5f * u, 4.5f * u), 2f * u, StrokeCap.Round)
-        drawRoundRect(
-            Color.White,
-            Offset(2.5f * u, 4f * u),
-            androidx.compose.ui.geometry.Size(19f * u, 14f * u),
-            androidx.compose.ui.geometry.CornerRadius(4.5f * u)
-        )
-        drawRoundRect(
-            accent,
-            Offset(2.5f * u, 4f * u),
-            androidx.compose.ui.geometry.Size(19f * u, 14f * u),
-            androidx.compose.ui.geometry.CornerRadius(4.5f * u),
-            style = stroke
-        )
-        listOf(8.5f, 15.5f).forEach { x ->
-            drawLine(OnlineText, Offset(x * u, 10f * u), Offset(x * u, 11.8f * u), 2f * u, StrokeCap.Round)
         }
     }
 }

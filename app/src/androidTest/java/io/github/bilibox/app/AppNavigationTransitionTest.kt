@@ -64,6 +64,7 @@ class AppNavigationTransitionTest {
         finishTransition()
         compose.runOnIdle { assertTrue(state.appearanceOpen) }
         compose.onNodeWithTag("app-bottom-navigation").assertDoesNotExist()
+        compose.onNodeWithText("进度条滑块样式").assertExists()
         compose.onNodeWithContentDescription("返回").performClick()
         finishTransition()
         compose.runOnIdle {

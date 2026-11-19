@@ -7,6 +7,7 @@ import io.github.bilibox.core.ui.theme.AppearanceSettings
 import io.github.bilibox.core.ui.theme.BackgroundPage
 import io.github.bilibox.core.ui.theme.HomeBackground
 import io.github.bilibox.core.ui.theme.PageBackgroundSettings
+import io.github.bilibox.core.ui.theme.SeekThumbStyle
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -103,5 +104,28 @@ class AppearanceStoreTest {
         AppearanceStore(preferences).save(AppearanceSettings(fixedBottomNavigation = true))
         AppearanceStore(preferences).save(AppearanceSettings())
         assertFalse(AppearanceStore(preferences).load().fixedBottomNavigation)
+    }
+
+    @Test
+    fun seekThumbKeepsLegacySelectionUntilSavedInAppearance() {
+        val legacy = context.getSharedPreferences("appearance_legacy_seek_thumb_test", Context.MODE_PRIVATE)
+        legacy.edit().clear().commit()
+        try {
+            val store = AppearanceStore(preferences, legacy)
+            assertEquals(SeekThumbStyle.TELEVISION, store.load().seekThumbStyle)
+            legacy.edit().putString("style", "STAR").commit()
+            assertEquals(SeekThumbStyle.STAR, store.load().seekThumbStyle)
+            SeekThumbStyle.entries.forEach { style ->
+                val settings = AppearanceSettings(themeId = "blue", seekThumbStyle = style)
+                store.save(settings)
+                assertEquals(settings, AppearanceStore(preferences, legacy).load())
+            }
+            store.save(AppearanceSettings())
+            assertEquals(SeekThumbStyle.TELEVISION, store.load().seekThumbStyle)
+            preferences.edit().putString("seek_thumb_style", "unknown").commit()
+            assertEquals(SeekThumbStyle.TELEVISION, store.load().seekThumbStyle)
+        } finally {
+            legacy.edit().clear().commit()
+        }
     }
 }

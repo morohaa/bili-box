@@ -32,6 +32,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import io.github.bilibox.core.ui.component.playback.SeekThumbWidth
 import io.github.bilibox.core.util.formatPlaybackTime
 
 /** 以滑块为锚点，预览保持在进度条上方并夹在可见窗口内。 */
@@ -49,7 +50,11 @@ internal class SeekPreviewPositionProvider(private val fraction: Float, private 
 @Composable
 internal fun PlayerSeekPreviewPopup(preview: PlayerSeekPreviewController?, positionMs: Long, durationMs: Long) {
     val provider = with(LocalDensity.current) {
-        SeekPreviewPositionProvider((positionMs.toFloat() / durationMs.coerceAtLeast(1L)).coerceIn(0f, 1f), 8.dp.roundToPx(), 9.dp.roundToPx())
+        SeekPreviewPositionProvider(
+            (positionMs.toFloat() / durationMs.coerceAtLeast(1L)).coerceIn(0f, 1f),
+            8.dp.roundToPx(),
+            (SeekThumbWidth / 2).roundToPx(),
+        )
     }
     Popup(
         popupPositionProvider = provider,

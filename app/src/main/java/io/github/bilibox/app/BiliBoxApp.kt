@@ -12,6 +12,7 @@ import io.github.bilibox.core.ui.theme.AppearanceMode
 import io.github.bilibox.core.ui.theme.AppearanceSettings
 import io.github.bilibox.core.ui.theme.BackgroundPage
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
+import io.github.bilibox.core.ui.theme.LocalSeekThumbStyle
 import io.github.bilibox.core.ui.theme.fontFamily
 import io.github.bilibox.core.ui.theme.resolveDark
 import io.github.bilibox.data.appearance.AppearanceStore
@@ -54,18 +55,20 @@ internal fun BiliBoxApp() {
     ) { toggleTheme ->
         BiliBoxTheme(darkTheme = darkMode, accent = appearance.theme.base, dynamicColor = false, fontFamily = appearance.font.fontFamily) {
             AppSystemBars(appState, darkMode)
-            AppNavigation(
-                appState = appState,
-                darkMode = darkMode,
-                appearance = appearance,
-                backgroundImages = backgroundImages,
-                backgroundStores = backgroundStores,
-                onBackgroundImageChange = { page, image ->
-                    backgroundImages = if (image == null) backgroundImages - page else backgroundImages + (page to image)
-                },
-                onAppearanceChange = ::updateAppearance,
-                onToggleDarkMode = toggleTheme,
-            )
+            CompositionLocalProvider(LocalSeekThumbStyle provides appearance.seekThumbStyle) {
+                AppNavigation(
+                    appState = appState,
+                    darkMode = darkMode,
+                    appearance = appearance,
+                    backgroundImages = backgroundImages,
+                    backgroundStores = backgroundStores,
+                    onBackgroundImageChange = { page, image ->
+                        backgroundImages = if (image == null) backgroundImages - page else backgroundImages + (page to image)
+                    },
+                    onAppearanceChange = ::updateAppearance,
+                    onToggleDarkMode = toggleTheme,
+                )
+            }
         }
     }
 }
