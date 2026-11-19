@@ -32,8 +32,9 @@ class OnlineVideoCommentsTest {
         val sheetReplies = CompletableDeferred<VideoCommentPage<Int>>()
         val root = comment(10L, "第一条热门评论", replyCount = 12).copy(
             authorId = 1L,
+            authorLevel = 6,
             pinned = true,
-            previewReply = comment(20L, "第一条回复预览"),
+            previewReply = comment(20L, "第一条回复预览").copy(authorLevel = 0),
         )
         val newest = comment(12L, "最新评论", replyCount = 2)
         compose.setContent {
@@ -45,6 +46,7 @@ class OnlineVideoCommentsTest {
                     player = player,
                     title = "测试视频",
                     sourceLabel = "哔哩哔哩",
+                    detailTabs = listOf("简介", "评论 24"),
                     commentMessage = "",
                     extraDetailPane = onlineVideoCommentsPane(
                         videoKey = 42L,
@@ -52,7 +54,6 @@ class OnlineVideoCommentsTest {
                         awaitingVideoInfo = false,
                         onRetryVideoInfo = {},
                         ownerId = 1L,
-                        totalCount = 24L,
                         loadComments = { order, offset ->
                             requests += order to offset
                             when {
@@ -67,7 +68,7 @@ class OnlineVideoCommentsTest {
                             if (rootId == root.id) {
                                 sheetReplies.await()
                             } else {
-                                VideoCommentPage(listOf(comment(20L, "页内回复")), null)
+                                VideoCommentPage(listOf(comment(20L, "页内回复").copy(authorLevel = 3)), null)
                             }
                         },
                     ),
@@ -80,19 +81,22 @@ class OnlineVideoCommentsTest {
 
         compose.onNodeWithText("视频简介").assertIsDisplayed()
         compose.runOnIdle { assertEquals(emptyList<Pair<VideoCommentOrder, String>>(), requests) }
-        compose.onNodeWithText("评论").performClick()
+        compose.onNodeWithText("评论 24").performClick()
         compose.onNodeWithText("热门").assertIsSelected()
-        compose.onNodeWithText("共 24 条评论").assertIsDisplayed()
+        compose.onNodeWithText("共 24 条评论").assertDoesNotExist()
         compose.onNodeWithText("第一条热门评论").assertIsDisplayed()
         compose.onNodeWithText("置顶").assertIsDisplayed()
         compose.onNodeWithText("UP").assertIsDisplayed()
+        compose.onNodeWithContentDescription("LV6").assertIsDisplayed()
+        compose.onNodeWithContentDescription("LV0", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithText("第一条回复预览", substring = true).assertIsDisplayed()
         compose.onNodeWithText("查看 12 条回复").performClick()
         compose.onNodeWithText("评论详情").assertIsDisplayed()
         compose.onNodeWithText("全部回复（12）").assertIsDisplayed()
-        val replies = List(12) { index -> comment(20L + index, "抽屉回复 ${index + 1}") }
+        val replies = List(12) { index -> comment(20L + index, "抽屉回复 ${index + 1}").copy(authorLevel = if (index == 0) 4 else null) }
         compose.runOnIdle { sheetReplies.complete(VideoCommentPage(replies, null)) }
         compose.onNodeWithText("抽屉回复 1").assertIsDisplayed()
+        compose.onNodeWithContentDescription("LV4").assertIsDisplayed()
         compose.onNodeWithContentDescription("关闭评论详情").performClick()
         compose.onNodeWithText("加载更多").performClick()
         compose.onNodeWithText("哔哩哔哩暂时限制了评论请求，请稍后再试").assertIsDisplayed()
@@ -102,8 +106,10 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("最新").assertIsSelected()
         compose.onNodeWithText("最新评论").assertIsDisplayed()
         compose.onNodeWithText("第一条热门评论").assertDoesNotExist()
+        compose.onNodeWithContentDescription("LV0", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("查看 2 条回复").performClick()
         compose.onNodeWithText("页内回复").assertIsDisplayed()
+        compose.onNodeWithContentDescription("LV3").assertIsDisplayed()
         compose.onNodeWithText("评论详情").assertDoesNotExist()
         compose.onNodeWithText("收起回复").performClick()
         compose.onNodeWithText("页内回复").assertDoesNotExist()

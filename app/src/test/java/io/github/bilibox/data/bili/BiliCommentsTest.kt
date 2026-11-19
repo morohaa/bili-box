@@ -24,13 +24,13 @@ class BiliCommentsTest {
                 "/x/v2/reply/wbi/main" -> """
                     {"code":0,"data":{
                       "cursor":{"is_end":false,"pagination_reply":{"next_offset":"{\"page\":2}"}},
-                      "top_replies":[{"rpid_str":"9007199254740995","like":12,"rcount":3,"member":{"uname":"作者","mid":"42"},"content":{"message":"置顶内容"},
-                        "replies":[{"rpid":0},{"rpid":7,"member":{"uname":"回复者","mid":11},"content":{"message":"真实回复预览"}}]}],
-                      "replies":[{"rpid":9007199254740995},{"rpid":2,"content":{"message":"普通评论"}}]
+                      "top_replies":[{"rpid_str":"9007199254740995","like":12,"rcount":3,"member":{"uname":"作者","mid":"42","level_info":{"current_level":6}},"content":{"message":"置顶内容"},
+                        "replies":[{"rpid":0},{"rpid":7,"member":{"uname":"回复者","mid":11,"level_info":{"current_level":0}},"content":{"message":"真实回复预览"}}]}],
+                      "replies":[{"rpid":9007199254740995},{"rpid":2,"member":{"level_info":{}},"content":{"message":"普通评论"}}]
                     }}
                 """.trimIndent()
 
-                "/x/v2/reply/reply" -> """{"code":0,"data":{"page":{"size":20,"count":42},"replies":[{"rpid":3,"content":{"message":"楼中楼回复"}}]}}"""
+                "/x/v2/reply/reply" -> """{"code":0,"data":{"page":{"size":20,"count":42},"replies":[{"rpid":3,"member":{"level_info":{"current_level":4}},"content":{"message":"楼中楼回复"}}]}}"""
 
                 else -> error("Unexpected request: ${request.url.encodedPath}")
             }
@@ -43,17 +43,21 @@ class BiliCommentsTest {
         assertEquals(3, page.comments.first().replyCount)
         assertEquals(12L, page.comments.first().likes)
         assertEquals(42L, page.comments.first().authorId)
+        assertEquals(6, page.comments.first().authorLevel)
         val preview = checkNotNull(page.comments.first().previewReply)
         assertEquals(7L, preview.id)
         assertEquals(11L, preview.authorId)
+        assertEquals(0, preview.authorLevel)
         assertEquals("真实回复预览", preview.message)
         assertNull(page.comments[1].previewReply)
+        assertNull(page.comments[1].authorLevel)
         assertEquals("{\"page\":2}", nextOffset)
 
         val next = client.videoComments(42L, nextOffset, VideoCommentOrder.NEWEST)
         assertTrue(next.comments.none(VideoComment::pinned))
         val thread = client.videoCommentReplies(42L, page.comments.first().id, 2)
         assertEquals("楼中楼回复", thread.comments.single().message)
+        assertEquals(4, thread.comments.single().authorLevel)
         assertEquals(3, thread.nextKey)
 
         assertEquals(4, requests.size)

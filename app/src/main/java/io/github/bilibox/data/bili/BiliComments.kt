@@ -20,6 +20,7 @@ internal data class VideoComment(
     val replyCount: Int,
     val pinned: Boolean = false,
     val authorId: Long = 0L,
+    val authorLevel: Int? = null,
     val previewReply: VideoComment? = null,
 )
 
@@ -106,13 +107,22 @@ internal data class VideoCommentPayload(
             replyCount = replyCount.coerceAtLeast(0),
             pinned = pinned,
             authorId = member?.mid ?: 0L,
+            authorLevel = member?.levelInfo?.currentLevel,
             previewReply = if (includePreview) replies.orEmpty().firstNotNullOfOrNull { it.toComment() } else null,
         )
     }
 }
 
 @Serializable
-internal data class VideoCommentMember(@SerialName("uname") val name: String = "", val avatar: String = "", val mid: Long = 0L)
+internal data class VideoCommentMember(
+    @SerialName("uname") val name: String = "",
+    val avatar: String = "",
+    val mid: Long = 0L,
+    @SerialName("level_info") val levelInfo: VideoCommentLevelInfo? = null,
+)
+
+@Serializable
+internal data class VideoCommentLevelInfo(@SerialName("current_level") val currentLevel: Int? = null)
 
 @Serializable
 internal data class VideoCommentContent(val message: String = "")

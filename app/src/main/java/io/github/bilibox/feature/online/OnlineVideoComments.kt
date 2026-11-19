@@ -60,7 +60,6 @@ internal fun rememberOnlineVideoComments(
     client: BiliClient,
     aid: Long?,
     ownerId: Long,
-    totalCount: Long?,
     awaitingVideoInfo: Boolean,
     onRetryVideoInfo: () -> Unit,
 ): PlayerExtraDetailPane = onlineVideoCommentsPane(
@@ -69,7 +68,6 @@ internal fun rememberOnlineVideoComments(
     awaitingVideoInfo = awaitingVideoInfo,
     onRetryVideoInfo = onRetryVideoInfo,
     ownerId = ownerId,
-    totalCount = totalCount,
     loadComments = { order, offset -> client.videoComments(requireNotNull(aid), offset, order) },
     loadReplies = { root, page -> client.videoCommentReplies(requireNotNull(aid), root, page) },
 )
@@ -83,7 +81,6 @@ internal fun onlineVideoCommentsPane(
     loadComments: suspend (VideoCommentOrder, String) -> VideoCommentPage<String>,
     loadReplies: suspend (Long, Int) -> VideoCommentPage<Int>,
     ownerId: Long = 0L,
-    totalCount: Long? = null,
 ): PlayerExtraDetailPane {
     val scope = rememberCoroutineScope()
     var order by remember(videoKey) { mutableStateOf(VideoCommentOrder.HOT) }
@@ -103,7 +100,7 @@ internal fun onlineVideoCommentsPane(
         header = {
             if (canLoad) {
                 LaunchedEffect(pager) { pager.loadInitial() }
-                CommentOrderBar(order, totalCount) { order = it }
+                CommentOrderBar(order) { order = it }
             }
         },
     ) {

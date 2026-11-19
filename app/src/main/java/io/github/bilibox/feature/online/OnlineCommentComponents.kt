@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -18,7 +19,8 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,10 +35,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -50,29 +53,20 @@ import io.github.bilibox.core.ui.theme.PlaybackStroke
 import io.github.bilibox.core.ui.theme.playbackColor
 import io.github.bilibox.data.bili.VideoComment
 import io.github.bilibox.data.bili.VideoCommentOrder
-import java.text.NumberFormat
 
 internal val CommentInset: Color
     @Composable @ReadOnlyComposable
     get() = playbackColor(Color(0xFFF7F8FA), Color(0xFF2A2D33))
 
 @Composable
-internal fun CommentOrderBar(order: VideoCommentOrder, totalCount: Long?, onOrderChange: (VideoCommentOrder) -> Unit) {
+internal fun CommentOrderBar(order: VideoCommentOrder, onOrderChange: (VideoCommentOrder) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CommentOrderPill("热门", order == VideoCommentOrder.HOT) { onOrderChange(VideoCommentOrder.HOT) }
-            CommentOrderPill("最新", order == VideoCommentOrder.NEWEST) { onOrderChange(VideoCommentOrder.NEWEST) }
-        }
-        if (totalCount != null) {
-            val count = remember(totalCount) { NumberFormat.getIntegerInstance().format(totalCount) }
-            Text("共 $count 条评论", Modifier.weight(1f), color = PlaybackMuted, fontSize = 12.sp, textAlign = TextAlign.End, maxLines = 2)
-        }
+        CommentOrderPill("热门", order == VideoCommentOrder.HOT) { onOrderChange(VideoCommentOrder.HOT) }
+        CommentOrderPill("最新", order == VideoCommentOrder.NEWEST) { onOrderChange(VideoCommentOrder.NEWEST) }
     }
-    HorizontalDivider(color = PlaybackDivider)
 }
 
 @Composable
@@ -130,6 +124,7 @@ private fun CommentIdentity(comment: VideoComment, ownerId: Long) {
             CommentBadge("置顶", playbackColor(Color(0xFF9E4C00), Color(0xFFFFBC73)), playbackColor(Color(0xFFFFF3E5), Color(0xFF533823)))
         }
         Text(comment.author, Modifier.weight(1f, fill = false), color = PlaybackMuted, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        comment.authorLevel?.let { OnlineUserLevelBadge(it) }
         if (ownerId > 0L && comment.authorId == ownerId) {
             CommentBadge("UP", playbackColor(Color(0xFFB52E61), Color(0xFFFFA3C1)), Pink.copy(alpha = .15f))
         }
@@ -182,10 +177,23 @@ internal fun CommentReplyPreview(comment: VideoComment, onClick: () -> Unit) {
     ) {
         comment.previewReply?.let { preview ->
             val teaser = buildAnnotatedString {
-                withStyle(SpanStyle(color = authorInk, fontWeight = FontWeight.Medium)) { append("${preview.author}：") }
+                withStyle(SpanStyle(color = authorInk, fontWeight = FontWeight.Medium)) {
+                    append(preview.author)
+                    preview.authorLevel?.let { level ->
+                        append(" ")
+                        appendInlineContent("level", "LV$level")
+                    }
+                    append("：")
+                }
                 append(preview.message.ifBlank { "（无文字内容）" })
             }
-            Text(teaser, color = PlaybackInk, fontSize = 13.sp, lineHeight = 19.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val inlineContent = preview.authorLevel?.let { level ->
+                val badge = InlineTextContent(Placeholder(20.sp, 10.sp, PlaceholderVerticalAlign.TextCenter)) {
+                    OnlineUserLevelBadge(level, Modifier.fillMaxSize())
+                }
+                mapOf("level" to badge)
+            }.orEmpty()
+            Text(teaser, color = PlaybackInk, fontSize = 13.sp, lineHeight = 19.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, inlineContent = inlineContent)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("查看 ${formatCompactCount(comment.replyCount.toLong())} 条回复", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Medium)

@@ -87,11 +87,7 @@ internal fun OnlineCreatorCard(
                 )
                 level?.let { current ->
                     Spacer(Modifier.width(5.dp))
-                    Image(
-                        painterResource(levelBadgeResource(current)),
-                        contentDescription = "LV$current",
-                        modifier = Modifier.width(20.dp).height(10.dp),
-                    )
+                    OnlineUserLevelBadge(current)
                 }
             }
             CreatorStats(fans, archiveCount)
@@ -194,4 +190,11 @@ private val LevelBadgeDrawables = intArrayOf(
     R.drawable.ic_bili_level_7,
 )
 
-private fun levelBadgeResource(level: Int): Int = LevelBadgeDrawables[level.coerceIn(0, LevelBadgeDrawables.lastIndex)]
+@Composable
+internal fun OnlineUserLevelBadge(level: Int, modifier: Modifier = Modifier.width(20.dp).height(10.dp)) {
+    Image(
+        painterResource(LevelBadgeDrawables[level.coerceIn(0, LevelBadgeDrawables.lastIndex)]),
+        contentDescription = "LV$level",
+        modifier = modifier,
+    )
+}

@@ -628,7 +628,6 @@ internal fun OnlineVideoScreen(
         client = client,
         aid = videoInfo?.aid,
         ownerId = videoInfo?.owner?.mid ?: 0L,
-        totalCount = videoInfo?.stat?.reply,
         awaitingVideoInfo = videoInfo == null && playbackState !is OnlinePlaybackState.Error,
         onRetryVideoInfo = { retryToken++ },
     )
