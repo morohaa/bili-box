@@ -31,6 +31,10 @@ internal fun SeekThumb(style: SeekThumbStyle, accent: Color, modifier: Modifier 
 
         SeekThumbStyle.CORGI -> CorgiSeekThumb(thumbModifier, animate)
 
+        SeekThumbStyle.PINK_PUFF -> PinkPuffSeekThumb(thumbModifier, animate)
+
+        SeekThumbStyle.HAMSTER -> HamsterSeekThumb(thumbModifier, animate)
+
         SeekThumbStyle.DOT -> Canvas(thumbModifier) {
             val radius = 5.dp.toPx()
             drawCircle(Color.White, radius)

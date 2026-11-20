@@ -36,7 +36,8 @@ internal fun SeekThumbSettingsCard(
     val shape = RoundedCornerShape(10.dp)
     val gap = 8.dp
     val styles = SeekThumbStyle.entries
-    val minOptionWidth = with(LocalDensity.current) { maxOf(48.dp, 36.sp.toDp() + gap) }
+    val labelSize = 12.sp
+    val minOptionWidth = with(LocalDensity.current) { maxOf(48.dp, labelSize.toDp() * styles.maxOf { it.label.length } + gap) }
     AppearanceCard(palette) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("进度条滑块样式", color = palette.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
@@ -64,7 +65,7 @@ internal fun SeekThumbSettingsCard(
                             Text(
                                 style.label,
                                 color = if (active) palette.ink else palette.ink2,
-                                fontSize = 12.sp,
+                                fontSize = labelSize,
                                 fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                             )
                         }

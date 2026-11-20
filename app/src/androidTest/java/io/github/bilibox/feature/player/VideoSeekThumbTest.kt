@@ -4,6 +4,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PixelMap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -121,5 +123,65 @@ class VideoSeekThumbTest {
         }
         compose.mainClock.advanceTimeBy(64)
         assertTrue(matchesResting(0 until resting.width))
+    }
+
+    @Test
+    fun pinkPuffAnimatesItsFeetWithoutMovingItsFace() {
+        assertSteppingThumb(SeekThumbStyle.PINK_PUFF, Color(0xFFFF85A8), halfCycleMillis = 170)
+    }
+
+    @Test
+    fun hamsterAnimatesItsPawsWithoutMovingItsFace() {
+        assertSteppingThumb(SeekThumbStyle.HAMSTER, Color(0xFFFFFBEB), halfCycleMillis = 100)
+    }
+
+    private fun assertSteppingThumb(style: SeekThumbStyle, faceColor: Color, halfCycleMillis: Long) {
+        var playing by mutableStateOf(false)
+        var scrubbing by mutableStateOf(false)
+        compose.setContent {
+            CompositionLocalProvider(LocalSeekThumbStyle provides style) {
+                VideoSeekBar(
+                    position = 500f,
+                    duration = 1_000L,
+                    bufferedPosition = 750L,
+                    onSeek = {},
+                    onSeekFinished = {},
+                    scrubbing = scrubbing,
+                    isPlaying = playing,
+                )
+            }
+        }
+        val thumb = compose.onNodeWithTag("player-seek-thumb-${style.name}", useUnmergedTree = true)
+        val resting = thumb.captureToImage().toPixelMap()
+        assertEquals(faceColor, resting[resting.width / 2, (resting.height * .47f).toInt()])
+
+        fun PixelMap.matches(other: PixelMap, columns: IntRange, rows: IntRange): Boolean = rows.all { row ->
+            columns.all { column -> this[column, row] == other[column, row] }
+        }
+
+        val allColumns = 0 until resting.width
+        val faceRows = 0 until resting.height / 2
+        val stepRows = resting.height / 2 until resting.height
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { playing = true }
+        compose.mainClock.advanceTimeBy(48)
+        val firstStep = thumb.captureToImage().toPixelMap()
+        compose.mainClock.advanceTimeBy(halfCycleMillis)
+        val nextStep = thumb.captureToImage().toPixelMap()
+        assertTrue(firstStep.matches(resting, allColumns, faceRows))
+        assertTrue(nextStep.matches(resting, allColumns, faceRows))
+        assertTrue(!nextStep.matches(firstStep, 0 until resting.width / 2, stepRows))
+        assertTrue(!nextStep.matches(firstStep, resting.width / 2 until resting.width, stepRows))
+
+        compose.runOnIdle { scrubbing = true }
+        compose.mainClock.advanceTimeBy(48)
+        assertTrue(thumb.captureToImage().toPixelMap().matches(resting, allColumns, 0 until resting.height))
+
+        compose.runOnIdle {
+            playing = false
+            scrubbing = false
+        }
+        compose.mainClock.advanceTimeBy(48)
+        assertTrue(thumb.captureToImage().toPixelMap().matches(resting, allColumns, 0 until resting.height))
     }
 }
