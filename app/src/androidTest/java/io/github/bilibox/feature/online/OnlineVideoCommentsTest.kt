@@ -163,7 +163,11 @@ class OnlineVideoCommentsTest {
         val originalTop = reply.getUnclippedBoundsInRoot().top.value
         compose.onAllNodesWithText("查看对话")[0].performClick()
 
-        compose.onNodeWithText("对话").assertIsDisplayed()
+        val title = compose.onNodeWithText("对话列表").assertIsDisplayed()
+        val close = compose.onNodeWithContentDescription("关闭对话列表").assertIsDisplayed()
+        val header = compose.onNodeWithTag("comment-dialog-header").getUnclippedBoundsInRoot()
+        assertEquals(header.left.value + 12f, title.getUnclippedBoundsInRoot().left.value, 0.5f)
+        assertTrue(header.right.value - close.getUnclippedBoundsInRoot().right.value in 0f..12f)
         compose.onNodeWithText(root.message).assertDoesNotExist()
         compose.onNodeWithText("无对话的回复", substring = true).assertDoesNotExist()
         compose.onNode(hasText(selected.message) and hasAnyAncestor(isSelected())).assertIsDisplayed()
@@ -176,7 +180,7 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("评论详情").assertIsDisplayed()
         assertEquals(originalTop, reply.getUnclippedBoundsInRoot().top.value, 0.5f)
         compose.onAllNodesWithText("查看对话")[0].performClick()
-        compose.onNodeWithContentDescription("返回评论详情").performClick()
+        close.performClick()
         assertEquals(originalTop, reply.getUnclippedBoundsInRoot().top.value, 0.5f)
         compose.onNode(hasScrollToIndexAction()).performScrollToIndex(1)
         compose.onNodeWithText("按时间").assertIsDisplayed()
@@ -212,7 +216,7 @@ class OnlineVideoCommentsTest {
             compose.mainClock.advanceTimeBy(384)
             assertEquals(panelTop, dialog.getUnclippedBoundsInRoot().top.value, 0.5f)
 
-            compose.onNodeWithContentDescription("返回评论详情").performClick()
+            compose.onNodeWithContentDescription("关闭对话列表").performClick()
             compose.mainClock.advanceTimeBy(96)
             assertTrue(dialog.getUnclippedBoundsInRoot().top.value > panelTop)
             compose.mainClock.advanceTimeBy(384)

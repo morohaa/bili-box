@@ -235,25 +235,18 @@ private fun CommentRepliesPanel(
 
 @Composable
 private fun CommentPanelHeader(inDialog: Boolean, onDismiss: () -> Unit) {
-    if (inDialog) {
-        Row(Modifier.fillMaxWidth().height(PlayerDetailBarHeight), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = "返回评论详情" }) {
-                AppGlyphIcon(AppIcon.BACK, PlaybackMuted, Modifier.size(22.dp))
-            }
-            Text("对话", color = PlaybackInk, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        }
-    } else {
-        Row(
-            Modifier.fillMaxWidth().height(PlayerDetailBarHeight).testTag("comment-replies-header").padding(start = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    val title = if (inDialog) "对话列表" else "评论详情"
+    val headerTag = if (inDialog) "comment-dialog-header" else "comment-replies-header"
+    Row(
+        Modifier.fillMaxWidth().height(PlayerDetailBarHeight).testTag(headerTag).padding(start = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, Modifier.weight(1f), color = PlaybackInk, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        IconButton(
+            onClick = onDismiss,
+            modifier = Modifier.semantics { contentDescription = "关闭$title" },
         ) {
-            Text("评论详情", Modifier.weight(1f), color = PlaybackInk, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.semantics { contentDescription = "关闭评论详情" },
-            ) {
-                AppGlyphIcon(AppIcon.CLOSE, PlaybackMuted, Modifier.size(22.dp))
-            }
+            AppGlyphIcon(AppIcon.CLOSE, PlaybackMuted, Modifier.size(22.dp))
         }
     }
     HorizontalDivider(color = PlaybackDivider, thickness = 1.dp)
