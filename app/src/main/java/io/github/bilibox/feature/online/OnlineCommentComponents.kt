@@ -122,11 +122,9 @@ internal fun CommentFloor(
             var expanded by rememberSaveable(comment.id, comment.message) { mutableStateOf(false) }
             var overflows by remember(comment.id, comment.message) { mutableStateOf(false) }
             val collapsed = collapseLongMessage && !expanded
-            Text(
-                comment.message.ifBlank { "（无文字内容）" },
-                color = PlaybackInk,
-                fontSize = if (inThread) 14.sp else 15.sp,
-                lineHeight = if (inThread) 22.sp else 23.sp,
+            CommentMessage(
+                comment,
+                inThread = inThread,
                 maxLines = if (collapsed) CollapsedCommentLines else Int.MAX_VALUE,
                 overflow = if (collapsed) TextOverflow.Ellipsis else TextOverflow.Clip,
                 onTextLayout = { if (collapsed) overflows = it.hasVisualOverflow },

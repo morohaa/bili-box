@@ -119,6 +119,21 @@ class BiliCommentsTest {
         assertNull(dialog.nextKey)
     }
 
+    @Test
+    fun keepsCommentEmoteImageMetadataAndHandlesNullMaps() {
+        val page = Json.decodeFromString<VideoCommentRepliesPayload>(
+            """
+                {"page":{"size":20,"count":2},"replies":[
+                    {"rpid":10,"content":{"message":"你好[滑稽]","emote":{"[滑稽]":{"url":"//i0.hdslb.com/emote.png","meta":{"size":2}}}}},
+                    {"rpid":11,"content":{"message":"[普通文字]","emote":null}}
+                ]}
+            """.trimIndent(),
+        ).toPage(requestedPage = 1)
+        assertEquals("你好[滑稽]", page.comments[0].message)
+        assertEquals(VideoCommentEmote("//i0.hdslb.com/emote.png", VideoCommentEmoteMeta(2)), page.comments[0].emotes["[滑稽]"])
+        assertTrue(page.comments[1].emotes.isEmpty())
+    }
+
     private fun client(requests: MutableList<Request>, respond: (Request) -> String): BiliClient = BiliClient(
         OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()

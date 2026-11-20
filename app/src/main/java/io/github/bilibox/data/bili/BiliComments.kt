@@ -23,6 +23,7 @@ internal data class VideoComment(
     val authorLevel: Int? = null,
     val previewReply: VideoComment? = null,
     val dialogId: Long = 0L,
+    val emotes: Map<String, VideoCommentEmote> = emptyMap(),
 )
 
 internal data class VideoCommentPage<Key : Any>(
@@ -137,6 +138,7 @@ internal data class VideoCommentPayload(
             authorLevel = member?.levelInfo?.currentLevel,
             previewReply = if (includePreview) replies.orEmpty().firstNotNullOfOrNull { it.toComment() } else null,
             dialogId = dialogId?.toLongOrNull() ?: dialog,
+            emotes = content?.emotes.orEmpty(),
         )
     }
 }
@@ -153,4 +155,13 @@ internal data class VideoCommentMember(
 internal data class VideoCommentLevelInfo(@SerialName("current_level") val currentLevel: Int? = null)
 
 @Serializable
-internal data class VideoCommentContent(val message: String = "")
+internal data class VideoCommentContent(
+    val message: String = "",
+    @SerialName("emote") val emotes: Map<String, VideoCommentEmote>? = null,
+)
+
+@Serializable
+internal data class VideoCommentEmote(val url: String = "", val meta: VideoCommentEmoteMeta? = null)
+
+@Serializable
+internal data class VideoCommentEmoteMeta(val size: Int = 1)
