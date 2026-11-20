@@ -163,9 +163,10 @@ private fun CommentIdentity(comment: VideoComment, ownerId: Long, inThread: Bool
 private fun CommentBadge(label: String, ink: Color, fill: Color) {
     Text(
         label,
-        Modifier.background(fill, RoundedCornerShape(4.dp)).padding(horizontal = 5.dp, vertical = 1.dp),
+        Modifier.background(fill, RoundedCornerShape(3.dp)).padding(horizontal = 3.dp, vertical = 1.dp),
         color = ink,
         fontSize = 10.sp,
+        lineHeight = 12.sp,
         fontWeight = FontWeight.SemiBold,
     )
 }

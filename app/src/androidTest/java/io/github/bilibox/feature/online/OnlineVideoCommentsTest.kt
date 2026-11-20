@@ -79,8 +79,11 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("共 24 条评论").assertDoesNotExist()
         compose.onNodeWithText("第一条热门评论").assertIsDisplayed()
         compose.onNodeWithText("展开全文").assertDoesNotExist()
-        compose.onNodeWithText("置顶").assertIsDisplayed()
-        compose.onNodeWithText("UP").assertIsDisplayed()
+        for (label in listOf("置顶", "UP")) {
+            val badge = compose.onNodeWithText(label).assertIsDisplayed().getUnclippedBoundsInRoot()
+            assertTrue((badge.bottom - badge.top).value < 18f)
+            assertTrue((badge.right - badge.left).value < 29f)
+        }
         compose.onNodeWithContentDescription("LV6").assertIsDisplayed()
         compose.onNodeWithContentDescription("LV0", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("第一条回复预览", substring = true).assertDoesNotExist()
