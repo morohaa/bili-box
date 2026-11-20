@@ -113,19 +113,19 @@ internal fun PlayerPlaybackStateObserver(
     }
 }
 
+internal val PlayerDetailsOverlayEnter = slideInVertically(
+    initialOffsetY = { it },
+    animationSpec = tween(300, easing = CubicBezierEasing(.22f, 1f, .36f, 1f)),
+) + fadeIn(animationSpec = tween(180))
+
+internal val PlayerDetailsOverlayExit = slideOutVertically(
+    targetOffsetY = { it },
+    animationSpec = tween(240, easing = FastOutSlowInEasing),
+) + fadeOut(animationSpec = tween(140))
+
 @Composable
 internal fun PlayerDetailsOverlay(visible: Boolean, overlay: @Composable () -> Unit) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically(
-            initialOffsetY = { it },
-            animationSpec = tween(300, easing = CubicBezierEasing(.22f, 1f, .36f, 1f))
-        ) + fadeIn(animationSpec = tween(180)),
-        exit = slideOutVertically(
-            targetOffsetY = { it },
-            animationSpec = tween(240, easing = FastOutSlowInEasing)
-        ) + fadeOut(animationSpec = tween(140)),
-    ) {
+    AnimatedVisibility(visible = visible, enter = PlayerDetailsOverlayEnter, exit = PlayerDetailsOverlayExit) {
         overlay()
     }
 }

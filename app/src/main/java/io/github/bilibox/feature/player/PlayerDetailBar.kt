@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -78,6 +79,7 @@ private val BarSourceStroke: Color
 private val DanmakuPillExpandedWidth = 116.dp
 private val DanmakuPillCollapsedWidth = 30.dp
 private val DanmakuPillEasing = CubicBezierEasing(.25f, .46f, .45f, .94f)
+internal val PlayerDetailBarHeight = 44.dp
 
 @Composable
 internal fun PlayerDetailBar(
@@ -94,7 +96,7 @@ internal fun PlayerDetailBar(
     onSelectLightsOffMode: ((LightsOffMode) -> Unit)?,
 ) {
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp).height(44.dp),
+        Modifier.fillMaxWidth().height(PlayerDetailBarHeight).testTag("player-detail-bar").padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(

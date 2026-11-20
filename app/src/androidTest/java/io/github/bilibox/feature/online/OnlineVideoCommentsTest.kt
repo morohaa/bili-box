@@ -7,15 +7,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.test.espresso.Espresso.pressBack
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.data.bili.BiliException
 import io.github.bilibox.data.bili.VideoComment
@@ -59,7 +62,7 @@ class OnlineVideoCommentsTest {
                 if (rootId == root.id) {
                     sheetReplies.await()
                 } else {
-                    VideoCommentPage(listOf(comment(20L, "页内回复").copy(authorLevel = 3)), null)
+                    VideoCommentPage(listOf(comment(20L, "详情回复").copy(authorLevel = 3)), null)
                 }
             },
         )
@@ -79,8 +82,11 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("第一条回复预览", substring = true).assertDoesNotExist()
         compose.onNodeWithText("查看 12 条回复").performClick()
         compose.onNodeWithText("评论详情").assertIsDisplayed()
-        compose.onNodeWithText("全部回复（12）").assertIsDisplayed()
-        val replies = List(12) { index -> comment(20L + index, "抽屉回复 ${index + 1}").copy(authorLevel = if (index == 0) 4 else null) }
+        compose.onNodeWithText("相关回复共12条").assertIsDisplayed()
+        val replies = List(12) { index ->
+            val reply = comment(20L + index, "抽屉回复 ${index + 1}")
+            if (index == 0) reply.copy(authorLevel = 4, likes = 20L) else reply
+        }
         compose.runOnIdle { sheetReplies.complete(VideoCommentPage(replies, null)) }
         compose.onNodeWithText("抽屉回复 1").assertIsDisplayed()
         compose.onNodeWithContentDescription("LV4").assertIsDisplayed()
@@ -94,13 +100,15 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("最新评论").assertIsDisplayed()
         compose.onNodeWithText("最新的一条测试评论").assertIsDisplayed()
         compose.onNodeWithText("第一条热门评论").assertDoesNotExist()
-        compose.onNodeWithText("页内回复").assertDoesNotExist()
+        compose.onNodeWithText("详情回复").assertDoesNotExist()
         compose.onNodeWithText("查看 2 条回复").performClick()
-        compose.onNodeWithText("页内回复").assertIsDisplayed()
+        compose.onNodeWithText("评论详情").assertIsDisplayed()
+        compose.onNodeWithText("相关回复共2条").assertIsDisplayed()
+        compose.onNodeWithText("详情回复").assertIsDisplayed()
         compose.onNodeWithContentDescription("LV3").assertIsDisplayed()
-        compose.onNodeWithText("评论详情").assertDoesNotExist()
-        compose.onNodeWithText("收起回复").performClick()
-        compose.onNodeWithText("页内回复").assertDoesNotExist()
+        compose.onNodeWithContentDescription("关闭评论详情").performClick()
+        compose.onNodeWithTag("comment-replies-panel").assertDoesNotExist()
+        compose.onNodeWithText("详情回复").assertDoesNotExist()
         compose.onNodeWithText("查看 2 条回复").assertIsDisplayed()
         compose.onNodeWithText("按时间").performClick()
         compose.onNodeWithText("按热度").assertIsDisplayed()
@@ -119,6 +127,110 @@ class OnlineVideoCommentsTest {
                 requests,
             )
         }
+    }
+
+    @Test
+    fun repliesPanelStartsBelowVideoAndSortsAcrossPages() {
+        val root = comment(10L, "有多页回复的评论", replyCount = 80)
+        val newest = comment(20L, "时间最新的回复").copy(timestampSeconds = 1_800_000_000L)
+        val hottest = comment(30L, "点赞最多的回复").copy(timestampSeconds = 1_700_000_000L, likes = 100L)
+        val pages = mutableListOf<Int>()
+        setPlayerContent(
+            loadComments = { _, _ -> VideoCommentPage(listOf(root), null) },
+            loadReplies = { _, page ->
+                pages += page
+                when {
+                    page == 1 -> VideoCommentPage(listOf(newest), 2)
+                    pages.count { it == 2 } == 1 -> throw BiliException(-412, "受限")
+                    else -> VideoCommentPage(listOf(hottest), null)
+                }
+            },
+        )
+        compose.onNodeWithText("评论 24").performClick()
+        compose.onNodeWithText("查看 80 条回复").performClick()
+
+        val panel = compose.onNodeWithTag("comment-replies-panel")
+        val video = compose.onNodeWithTag("player-touch-surface")
+        assertEquals(video.getUnclippedBoundsInRoot().bottom.value, panel.getUnclippedBoundsInRoot().top.value, 0.5f)
+        compose.onNodeWithText("相关回复共80条").assertIsDisplayed()
+        compose.onNodeWithText(newest.message).assertDoesNotExist()
+        compose.onNodeWithText("重试").performClick()
+
+        fun replyTop(reply: VideoComment): Float = compose.onNodeWithText(reply.message).getUnclippedBoundsInRoot().top.value
+
+        assertTrue(replyTop(hottest) < replyTop(newest))
+        compose.onNodeWithText("按热度").performClick()
+        compose.onNodeWithText("按时间").assertIsDisplayed()
+        assertTrue(replyTop(newest) < replyTop(hottest))
+        compose.onNodeWithText("按时间").performClick()
+        assertTrue(replyTop(hottest) < replyTop(newest))
+        compose.runOnIdle { assertEquals(listOf(1, 2, 2), pages) }
+
+        pressBack()
+        panel.assertDoesNotExist()
+        compose.onNodeWithText("查看 80 条回复").assertIsDisplayed()
+    }
+
+    @Test
+    fun repliesPanelMatchesDetailBarHeightAndSlidesInAndOut() {
+        val root = comment(10L, "有回复的评论", replyCount = 1)
+        setPlayerContent(
+            loadComments = { _, _ -> VideoCommentPage(listOf(root), null) },
+            loadReplies = { _, _ -> VideoCommentPage(listOf(comment(11L, "相关回复")), null) },
+        )
+        compose.onNodeWithText("评论 24").performClick()
+        val detailBar = compose.onNodeWithTag("player-detail-bar").getUnclippedBoundsInRoot()
+        val detailBarHeight = (detailBar.bottom - detailBar.top).value
+        val videoBottom = compose.onNodeWithTag("player-touch-surface").getUnclippedBoundsInRoot().bottom.value
+        val panel = compose.onNodeWithTag("comment-replies-panel")
+        val panelHeader = compose.onNodeWithTag("comment-replies-header")
+
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onNodeWithText("查看 1 条回复").performClick()
+            compose.mainClock.advanceTimeBy(96)
+            assertTrue(panel.getUnclippedBoundsInRoot().top.value > videoBottom)
+            compose.mainClock.advanceTimeBy(384)
+            assertEquals(videoBottom, panel.getUnclippedBoundsInRoot().top.value, 0.5f)
+            val headerBounds = panelHeader.getUnclippedBoundsInRoot()
+            assertEquals(detailBarHeight, (headerBounds.bottom - headerBounds.top).value, 0.5f)
+
+            compose.onNodeWithContentDescription("关闭评论详情").performClick()
+            compose.mainClock.advanceTimeBy(96)
+            assertTrue(panel.getUnclippedBoundsInRoot().top.value > videoBottom)
+            compose.mainClock.advanceTimeBy(384)
+            panel.assertDoesNotExist()
+            compose.onNodeWithText("查看 1 条回复").assertIsDisplayed()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
+    fun longOriginalCommentAndRepliesShareOneScrollUnderFixedTitle() {
+        val message = (1..35).joinToString("\n") { "原评论第 $it 行" }
+        val root = comment(1L, message, replyCount = 8)
+        val replies = List(8) { index -> comment(index + 2L, "相关回复 ${index + 1}") }
+        setPlayerContent(
+            loadComments = { _, _ -> VideoCommentPage(listOf(root), null) },
+            loadReplies = { _, _ -> VideoCommentPage(replies, null) },
+        )
+        compose.onNodeWithText("评论 24").performClick()
+        compose.onNodeWithText("查看 8 条回复").performClick()
+
+        val title = compose.onNodeWithText("评论详情")
+        val initialTitleTop = title.getUnclippedBoundsInRoot().top.value
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(message).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(35, layouts.single().lineCount)
+        assertFalse(layouts.single().hasVisualOverflow)
+        compose.onNodeWithText("相关回复共8条").assertIsNotDisplayed()
+
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(1)
+        compose.onNodeWithText(message).assertIsNotDisplayed()
+        compose.onNodeWithText("相关回复共8条").assertIsDisplayed()
+        compose.onNodeWithText("按热度").assertIsDisplayed()
+        assertEquals(initialTitleTop, title.getUnclippedBoundsInRoot().top.value, 0.5f)
     }
 
     @Test

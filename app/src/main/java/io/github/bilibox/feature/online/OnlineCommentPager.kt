@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 internal class OnlineCommentPager<Key : Any>(
     firstKey: Key,
     private val scope: CoroutineScope,
+    private val loadAllPages: Boolean = false,
     private val fetch: suspend (Key) -> VideoCommentPage<Key>,
 ) {
     var comments by mutableStateOf(emptyList<VideoComment>())
@@ -35,17 +36,19 @@ internal class OnlineCommentPager<Key : Any>(
     }
 
     fun loadMore() {
-        val pageKey = nextKey ?: return
-        if (isLoading) return
+        if (!hasMore || isLoading) return
         started = true
         isLoading = true
         error = null
         request = scope.launch {
             try {
-                val page = fetch(pageKey)
-                completedKeys += pageKey
-                comments = (comments + page.comments).distinctBy(VideoComment::id)
-                nextKey = page.nextKey?.takeUnless(completedKeys::contains)
+                do {
+                    val pageKey = nextKey ?: break
+                    val page = fetch(pageKey)
+                    completedKeys += pageKey
+                    comments = (comments + page.comments).distinctBy(VideoComment::id)
+                    nextKey = page.nextKey?.takeUnless(completedKeys::contains)
+                } while (loadAllPages && hasMore)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {

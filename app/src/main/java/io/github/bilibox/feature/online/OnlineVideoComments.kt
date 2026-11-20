@@ -4,28 +4,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -36,12 +26,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.bilibox.core.ui.component.AppGlyphIcon
+import io.github.bilibox.core.ui.component.AppIcon
 import io.github.bilibox.core.ui.theme.Pink
 import io.github.bilibox.core.ui.theme.PlaybackDivider
 import io.github.bilibox.core.ui.theme.PlaybackInk
@@ -51,9 +44,8 @@ import io.github.bilibox.data.bili.BiliClient
 import io.github.bilibox.data.bili.VideoComment
 import io.github.bilibox.data.bili.VideoCommentOrder
 import io.github.bilibox.data.bili.VideoCommentPage
+import io.github.bilibox.feature.player.PlayerDetailBarHeight
 import io.github.bilibox.feature.player.PlayerExtraDetailPane
-
-private const val InlineReplyLimit = 10
 
 @Composable
 internal fun rememberOnlineVideoComments(
@@ -84,22 +76,25 @@ internal fun onlineVideoCommentsPane(
 ): PlayerExtraDetailPane {
     val scope = rememberCoroutineScope()
     var order by remember(videoKey) { mutableStateOf(VideoCommentOrder.HOT) }
-    var inlineRoot by remember(videoKey, order) { mutableStateOf<Long?>(null) }
-    var sheetRoot by remember(videoKey, order) { mutableStateOf<VideoComment?>(null) }
+    var panelRoot by remember(videoKey, order) { mutableStateOf<VideoComment?>(null) }
     val pager = remember(videoKey, order, scope) {
         val selectedOrder = order
         OnlineCommentPager("", scope) { offset -> loadComments(selectedOrder, offset) }
     }
     DisposableEffect(pager) { onDispose { pager.cancel() } }
-    val inlineReplies = inlineRoot?.let { rememberCommentReplies(videoKey, it, loadReplies) }
-    sheetRoot?.let { root ->
-        CommentRepliesSheet(root, ownerId, rememberCommentReplies(videoKey, root.id, loadReplies)) { sheetRoot = null }
+    val repliesOverlay = panelRoot?.let { root ->
+        val dismiss = { panelRoot = null }
+        PlayerExtraDetailPane.Overlay(onDismiss = dismiss) { modifier ->
+            val replies = rememberCommentReplies(videoKey, root.id, loadReplies)
+            CommentRepliesPanel(modifier, root, ownerId, replies, dismiss)
+        }
     }
 
     return PlayerExtraDetailPane.ScrollableList(
         onVisible = {
             if (canLoad) LaunchedEffect(pager) { pager.loadInitial() }
         },
+        overlay = repliesOverlay,
     ) {
         if (!canLoad) {
             item {
@@ -116,12 +111,8 @@ internal fun onlineVideoCommentsPane(
         items(pager.comments, key = { it.id }) { comment ->
             Column {
                 CommentFloor(comment, ownerId, collapseLongMessage = true) {
-                    if (comment.id == inlineRoot && inlineReplies != null) {
-                        InlineCommentReplies(inlineReplies, ownerId, onCollapse = { inlineRoot = null })
-                    } else if (comment.replyCount > 0) {
-                        CommentReplyEntry(comment.replyCount) {
-                            if (comment.replyCount <= InlineReplyLimit) inlineRoot = comment.id else sheetRoot = comment
-                        }
+                    if (comment.replyCount > 0) {
+                        CommentReplyEntry(comment.replyCount) { panelRoot = comment }
                     }
                 }
                 HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = PlaybackDivider)
@@ -138,91 +129,86 @@ private fun rememberCommentReplies(
     loadReplies: suspend (Long, Int) -> VideoCommentPage<Int>,
 ): OnlineCommentPager<Int> {
     val scope = rememberCoroutineScope()
-    val pager = remember(videoKey, rootId, scope) { OnlineCommentPager(1, scope) { page -> loadReplies(rootId, page) } }
+    val pager = remember(videoKey, rootId, scope) {
+        OnlineCommentPager(1, scope, loadAllPages = true) { page -> loadReplies(rootId, page) }
+    }
     DisposableEffect(pager) { onDispose { pager.cancel() } }
     return pager
 }
 
 @Composable
-private fun InlineCommentReplies(pager: OnlineCommentPager<Int>, ownerId: Long, onCollapse: () -> Unit) {
-    LaunchedEffect(pager) { pager.loadInitial() }
-    Column(
-        Modifier.fillMaxWidth()
-            .background(CommentInset, RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-    ) {
-        pager.comments.forEach { reply ->
-            CommentFloor(reply, ownerId, compact = true, inset = true)
-            HorizontalDivider(color = PlaybackDivider)
-        }
-        CommentLoadState(pager, "暂无回复", showEnd = false)
-        CommentTextAction("收起回复", onCollapse)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CommentRepliesSheet(
+private fun CommentRepliesPanel(
+    modifier: Modifier,
     root: VideoComment,
     ownerId: Long,
     pager: OnlineCommentPager<Int>,
     onDismiss: () -> Unit,
 ) {
     LaunchedEffect(pager) { pager.loadInitial() }
-    val rootMaxHeight = (LocalConfiguration.current.screenHeightDp * .25f).dp
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = PlaybackSurface,
-        scrimColor = Color.Black.copy(alpha = .36f),
-        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
-        dragHandle = {
-            Box(Modifier.padding(top = 10.dp, bottom = 2.dp).width(36.dp).height(4.dp).background(PlaybackDivider, CircleShape))
-        },
-        contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
-    ) {
-        Column(Modifier.fillMaxWidth().fillMaxHeight(.8f).navigationBarsPadding()) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+    var order by remember(root.id) { mutableStateOf(VideoCommentOrder.HOT) }
+    val replies = if (pager.hasMore) emptyList() else remember(pager.comments, order) {
+        val newestFirst = compareByDescending<VideoComment> { it.timestampSeconds }.thenByDescending { it.id }
+        val ordering = if (order == VideoCommentOrder.HOT) {
+            compareByDescending<VideoComment> { it.likes }.then(newestFirst)
+        } else {
+            newestFirst
+        }
+        pager.comments.sortedWith(ordering)
+    }
+    Column(modifier.background(PlaybackSurface).testTag("comment-replies-panel")) {
+        Row(
+            Modifier.fillMaxWidth().height(PlayerDetailBarHeight).testTag("comment-replies-header").padding(start = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("评论详情", Modifier.weight(1f), color = PlaybackInk, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.semantics { contentDescription = "关闭评论详情" },
             ) {
-                Text("评论详情", Modifier.weight(1f), color = PlaybackInk, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                CommentSheetClose(onDismiss)
+                AppGlyphIcon(AppIcon.CLOSE, PlaybackMuted, Modifier.size(22.dp))
             }
-            HorizontalDivider(color = PlaybackDivider)
-            Box(Modifier.fillMaxWidth().background(CommentInset).heightIn(max = rootMaxHeight).verticalScroll(rememberScrollState())) {
-                CommentFloor(root, ownerId, compact = true)
-            }
-            HorizontalDivider(color = PlaybackDivider)
-            Text(
-                "全部回复（${formatCompactCount(root.replyCount.toLong())}）",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                color = PlaybackMuted,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            LazyColumn(Modifier.weight(1f)) {
-                items(pager.comments, key = { it.id }) { reply ->
-                    Column {
-                        CommentFloor(reply, ownerId, compact = true)
-                        HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = PlaybackDivider)
+        }
+        HorizontalDivider(color = PlaybackDivider, thickness = 1.dp)
+        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+            item(key = "thread-root") { CommentFloor(root, ownerId, inThread = true) }
+            item(key = "thread-order") {
+                Column {
+                    HorizontalDivider(thickness = 8.dp, color = CommentInset)
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "相关回复共${root.replyCount}条",
+                            Modifier.weight(1f).padding(end = 8.dp),
+                            color = PlaybackMuted,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        CommentOrderToggle(order) { order = it }
                     }
                 }
-                item(key = "reply-status-${pager.comments.size}") { CommentLoadState(pager, "暂无回复") }
             }
+            items(replies, key = { it.id }) { reply ->
+                Column {
+                    CommentFloor(reply, ownerId, inThread = true)
+                    HorizontalDivider(Modifier.padding(start = 54.dp, end = 12.dp), color = PlaybackDivider)
+                }
+            }
+            item(key = "reply-status-${replies.size}") { CommentLoadState(pager, "暂无回复") }
         }
     }
 }
 
 @Composable
-private fun CommentLoadState(pager: OnlineCommentPager<*>, emptyMessage: String, showEnd: Boolean = true) {
+private fun CommentLoadState(pager: OnlineCommentPager<*>, emptyMessage: String) {
     val error = pager.error
     when {
         error != null -> CommentNotice(error, "重试", pager::loadMore)
         pager.isLoading || pager.awaitingInitialLoad -> CommentLoading()
         pager.hasMore -> CommentNotice(action = "加载更多", onClick = pager::loadMore)
         pager.comments.isEmpty() -> CommentNotice(emptyMessage)
-        showEnd -> CommentNotice("没有更多了")
+        else -> CommentNotice("没有更多了")
     }
 }
 

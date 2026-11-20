@@ -1,6 +1,8 @@
 package io.github.bilibox.feature.player
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -17,11 +19,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,7 +40,13 @@ import io.github.bilibox.data.player.LightsOffMode
 
 internal sealed interface PlayerExtraDetailPane {
     class Content(val render: @Composable (Long) -> Unit) : PlayerExtraDetailPane
-    class ScrollableList(val onVisible: @Composable () -> Unit, val render: LazyListScope.() -> Unit) : PlayerExtraDetailPane
+    class ScrollableList(
+        val onVisible: @Composable () -> Unit,
+        val overlay: Overlay? = null,
+        val render: LazyListScope.() -> Unit,
+    ) : PlayerExtraDetailPane
+
+    class Overlay(val onDismiss: () -> Unit, val render: @Composable (Modifier) -> Unit)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,6 +88,7 @@ internal fun PlayerDetailsPane(
     val overlayVisible = episodeOverlayVisible && episodeOverlay != null
     val activePane = if (showDetailTabs) detailsTab else 0
     val detailScroll = rememberScrollState()
+    val detailListStateHolder = rememberSaveableStateHolder()
     LaunchedEffect(activePane) { detailScroll.scrollTo(0) }
     val blurRadius by animateDpAsState(
         targetValue = if (lightsOff) lightsOffMode.contentBlurRadius() else 0.dp,
@@ -106,13 +118,41 @@ internal fun PlayerDetailsPane(
     ) {
         if (activePane != 0 && extraDetailPane is PlayerExtraDetailPane.ScrollableList) {
             extraDetailPane.onVisible()
-            LazyColumn(Modifier.fillMaxSize().then(blurModifier), userScrollEnabled = !lightsOff) {
-                stickyHeader {
-                    Column(Modifier.fillMaxWidth().background(detailsBackground)) {
-                        tabBar()
+            val detailOverlay = extraDetailPane.overlay
+            AnimatedContent(
+                targetState = detailOverlay,
+                contentKey = { it != null },
+                transitionSpec = {
+                    if (targetState != null) {
+                        (PlayerDetailsOverlayEnter togetherWith ExitTransition.KeepUntilTransitionsFinished)
+                            .apply { targetContentZIndex = 1f }
+                    } else {
+                        EnterTransition.None togetherWith PlayerDetailsOverlayExit
+                    }
+                },
+                label = "播放详情面板切换",
+            ) { visibleOverlay ->
+                val contentModifier = Modifier.fillMaxSize().then(blurModifier)
+                if (visibleOverlay != null) {
+                    visibleOverlay.render(contentModifier)
+                } else {
+                    val obscured = detailOverlay != null
+                    val listModifier = if (obscured) {
+                        contentModifier.clearAndSetSemantics { hideFromAccessibility() }
+                    } else {
+                        contentModifier
+                    }
+                    detailListStateHolder.SaveableStateProvider("extra-detail-list") {
+                        LazyColumn(listModifier, userScrollEnabled = !lightsOff && !obscured) {
+                            stickyHeader {
+                                Column(Modifier.fillMaxWidth().background(detailsBackground)) {
+                                    tabBar()
+                                }
+                            }
+                            extraDetailPane.render(this)
+                        }
                     }
                 }
-                extraDetailPane.render(this)
             }
         } else {
             Column(

@@ -395,6 +395,11 @@ internal fun VideoPlayerScreen(
             gestures.clearFeedback()
         }
     }
+    val dismissDetailOverlay = if (!fullScreen && showDetailTabs && detailsTab != 0) {
+        (extraDetailPane as? PlayerExtraDetailPane.ScrollableList)?.overlay?.onDismiss
+    } else {
+        null
+    }
     BackHandler(enabled = !listenPageOpen) {
         when {
             screenLocked -> controlsVisible = true
@@ -409,6 +414,7 @@ internal fun VideoPlayerScreen(
             settingsSheetOpen -> settingsSheetOpen = false
             speedMenuExpanded -> speedMenuExpanded = false
             verticalFullScreen -> verticalFullScreen = false
+            dismissDetailOverlay != null -> dismissDetailOverlay()
             else -> navigateBack()
         }
     }
