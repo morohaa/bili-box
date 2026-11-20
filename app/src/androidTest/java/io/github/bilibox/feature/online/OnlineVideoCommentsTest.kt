@@ -8,6 +8,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -21,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
@@ -35,6 +38,7 @@ import io.github.bilibox.data.bili.BiliException
 import io.github.bilibox.data.bili.VideoComment
 import io.github.bilibox.data.bili.VideoCommentOrder
 import io.github.bilibox.data.bili.VideoCommentPage
+import io.github.bilibox.data.online.OnlineCommentsPreferences
 import io.github.bilibox.feature.player.VideoPlayerScreen
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
@@ -531,15 +535,91 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("热门评论").assertIsDisplayed()
     }
 
+    @Test
+    fun commentsSettingKeepsTheTabAndStopsLoadingWhileDisabled() {
+        val preferences = OnlineCommentsPreferences(InstrumentationRegistry.getInstrumentation().targetContext)
+        val original = preferences.load()
+        preferences.save(true)
+        try {
+            val pendingReplies = CompletableDeferred<VideoCommentPage<Int>>()
+            var commentRequests = 0
+            var repliesStarted = false
+            var repliesCancelled = false
+            setPlayerContent(
+                loadComments = { _, _ ->
+                    commentRequests++
+                    VideoCommentPage(listOf(comment(1L, "测试评论", replyCount = 1)), null)
+                },
+                loadReplies = { _, _ ->
+                    repliesStarted = true
+                    try {
+                        pendingReplies.await()
+                    } finally {
+                        repliesCancelled = true
+                    }
+                },
+                withCommentsSettings = true,
+            )
+
+            val toggle = compose.onNodeWithContentDescription("显示在线评论")
+            val tab = compose.onNodeWithText("评论 24")
+            val unavailable = compose.onNodeWithText("暂不支持查看在线评论")
+            openMorePlaybackSettings()
+            toggle.assertIsOn().performClick().assertIsOff()
+            closeMorePlaybackSettings()
+            tab.performClick().assertIsSelected()
+            unavailable.assertIsDisplayed()
+            compose.runOnIdle {
+                assertEquals(0, commentRequests)
+                assertFalse(OnlineCommentsPreferenceState(preferences).enabled)
+            }
+
+            openMorePlaybackSettings()
+            toggle.assertIsOff().performClick().assertIsOn()
+            closeMorePlaybackSettings()
+            tab.assertIsSelected()
+            unavailable.assertDoesNotExist()
+            compose.onNodeWithText("测试评论").assertIsDisplayed()
+            compose.onNodeWithText("查看 1 条回复").performClick()
+            compose.onNodeWithText("评论详情").assertIsDisplayed()
+            compose.runOnIdle {
+                assertEquals(1, commentRequests)
+                assertTrue(repliesStarted)
+            }
+
+            openMorePlaybackSettings()
+            toggle.performClick().assertIsOff()
+            closeMorePlaybackSettings()
+            tab.assertIsSelected()
+            unavailable.assertIsDisplayed()
+            compose.onNodeWithText("评论详情").assertDoesNotExist()
+            compose.runOnIdle { assertTrue(repliesCancelled) }
+        } finally {
+            preferences.save(original)
+        }
+    }
+
+    private fun openMorePlaybackSettings() {
+        compose.onNodeWithContentDescription("更多").performClick()
+        compose.onNodeWithText("更多播放设置").performScrollTo().performClick()
+    }
+
+    private fun closeMorePlaybackSettings() {
+        compose.onNodeWithContentDescription("返回播放设置").performClick()
+        pressBack()
+    }
+
     private fun setPlayerContent(
         loadComments: suspend (VideoCommentOrder, String) -> VideoCommentPage<String>,
         loadReplies: suspend (Long, Int) -> VideoCommentPage<Int> = { _, _ -> VideoCommentPage(emptyList(), null) },
         loadDialog: suspend (Long, Long, Long) -> VideoCommentPage<Long> = { _, _, _ -> VideoCommentPage(emptyList(), null) },
+        withCommentsSettings: Boolean = false,
     ) {
         compose.setContent {
             val context = LocalContext.current
             val player = remember { ExoPlayer.Builder(context).build() }
             DisposableEffect(player) { onDispose { player.release() } }
+            val commentsPreference = if (withCommentsSettings) rememberOnlineCommentsPreference() else null
             BiliBoxTheme(darkTheme = false, dynamicColor = false) {
                 VideoPlayerScreen(
                     player = player,
@@ -547,8 +627,11 @@ class OnlineVideoCommentsTest {
                     sourceLabel = "哔哩哔哩",
                     detailTabs = listOf("简介", "评论 24"),
                     commentMessage = "",
+                    onlineCommentsEnabled = commentsPreference?.enabled,
+                    onOnlineCommentsChange = { commentsPreference?.update(it) },
                     extraDetailPane = onlineVideoCommentsPane(
                         videoKey = 42L,
+                        enabled = commentsPreference?.enabled ?: true,
                         canLoad = true,
                         awaitingVideoInfo = false,
                         onRetryVideoInfo = {},

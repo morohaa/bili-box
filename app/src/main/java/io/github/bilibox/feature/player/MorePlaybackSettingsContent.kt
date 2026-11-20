@@ -33,6 +33,8 @@ internal fun MorePlaybackSettingsContent(
     onVideoPosition: () -> Unit,
     bookmarkDotsEnabled: Boolean = true,
     onBookmarkDotsChange: (Boolean) -> Unit = {},
+    onlineCommentsEnabled: Boolean? = null,
+    onOnlineCommentsChange: (Boolean) -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth().testTag("more-playback-settings")) {
         Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -42,10 +44,25 @@ internal fun MorePlaybackSettingsContent(
             Text("更多播放设置", color = SettingsInk, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(SettingsCardSurface)) {
+            if (onlineCommentsEnabled != null) {
+                ToggleSettingRow(
+                    label = "显示在线评论",
+                    checked = onlineCommentsEnabled,
+                    icon = PlayerSettingsIcon.ONLINE_COMMENTS,
+                    onCheckedChange = onOnlineCommentsChange,
+                )
+                Text(
+                    "关闭后保留评论标签，但不加载评论",
+                    color = SettingsSecondary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
+                )
+                SettingsDivider()
+            }
             ToggleSettingRow(
                 label = "进度条画面预览",
                 checked = previewEnabled,
-                icon = PlayerSettingsIcon.PLAYBACK_SETTINGS,
+                icon = PlayerSettingsIcon.SEEK_PREVIEW,
                 onCheckedChange = onPreviewChange,
             )
             Text(
@@ -58,7 +75,7 @@ internal fun MorePlaybackSettingsContent(
             ToggleSettingRow(
                 label = "显示标记点",
                 checked = bookmarkDotsEnabled,
-                icon = PlayerSettingsIcon.PLAYBACK_SETTINGS,
+                icon = PlayerSettingsIcon.BOOKMARK_DOTS,
                 onCheckedChange = onBookmarkDotsChange,
             )
             Text(
@@ -71,7 +88,7 @@ internal fun MorePlaybackSettingsContent(
             ActionSettingRow(
                 label = "竖屏全屏画面位置",
                 value = videoPositionLabel,
-                icon = PlayerSettingsIcon.PLAYBACK_SETTINGS,
+                icon = PlayerSettingsIcon.VIDEO_POSITION,
                 onClick = onVideoPosition,
             )
             if (onQueueSettings != null) {

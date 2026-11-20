@@ -60,12 +60,14 @@ import io.github.bilibox.feature.player.PlayerExtraDetailPane
 @Composable
 internal fun rememberOnlineVideoComments(
     client: BiliClient,
+    enabled: Boolean,
     aid: Long?,
     ownerId: Long,
     awaitingVideoInfo: Boolean,
     onRetryVideoInfo: () -> Unit,
 ): PlayerExtraDetailPane = onlineVideoCommentsPane(
     videoKey = client to aid,
+    enabled = enabled,
     canLoad = aid != null && aid > 0,
     awaitingVideoInfo = awaitingVideoInfo,
     onRetryVideoInfo = onRetryVideoInfo,
@@ -85,7 +87,10 @@ internal fun onlineVideoCommentsPane(
     loadReplies: suspend (Long, Int) -> VideoCommentPage<Int>,
     loadDialog: suspend (Long, Long, Long) -> VideoCommentPage<Long>,
     ownerId: Long = 0L,
+    enabled: Boolean = true,
 ): PlayerExtraDetailPane {
+    if (!enabled) return PlayerExtraDetailPane.Content { CommentNotice("暂不支持查看在线评论") }
+
     val scope = rememberCoroutineScope()
     var order by remember(videoKey) { mutableStateOf(VideoCommentOrder.HOT) }
     var panelRoot by remember(videoKey, order) { mutableStateOf<VideoComment?>(null) }

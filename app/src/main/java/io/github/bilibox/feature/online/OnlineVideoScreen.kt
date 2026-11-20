@@ -623,8 +623,10 @@ internal fun OnlineVideoScreen(
     }
     val replyCount = videoInfo?.stat?.reply ?: 0L
     val commentTabLabel = if (replyCount > 0) "评论 ${formatCompactCount(replyCount)}" else "评论"
+    val commentsPreference = rememberOnlineCommentsPreference()
     val commentsPane = rememberOnlineVideoComments(
         client = client,
+        enabled = commentsPreference.enabled,
         aid = videoInfo?.aid,
         ownerId = videoInfo?.owner?.mid ?: 0L,
         awaitingVideoInfo = videoInfo == null && playbackState !is OnlinePlaybackState.Error,
@@ -647,6 +649,8 @@ internal fun OnlineVideoScreen(
         commentMessage = "暂无评论",
         detailTabs = listOf("简介", commentTabLabel),
         extraDetailPane = commentsPane,
+        onlineCommentsEnabled = commentsPreference.enabled,
+        onOnlineCommentsChange = commentsPreference::update,
         onBack = onBack,
         onRetry = { retryToken++ },
         onNextEpisode = nextPage?.let { page -> { advanceToPart(page.page) } },

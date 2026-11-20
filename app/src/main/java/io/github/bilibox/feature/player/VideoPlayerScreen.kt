@@ -99,6 +99,8 @@ internal fun VideoPlayerScreen(
     bookmarkPositions: List<Long> = emptyList(),
     sourcePill: Boolean = false,
     extraDetailPane: PlayerExtraDetailPane? = null,
+    onlineCommentsEnabled: Boolean? = null,
+    onOnlineCommentsChange: (Boolean) -> Unit = {},
     playbackModeSheet: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     playbackMode: PlaybackMode = PlaybackMode.STOP_AFTER,
     onPlaybackModeChange: (PlaybackMode) -> Unit = {},
@@ -848,6 +850,7 @@ internal fun VideoPlayerScreen(
                 cacheLabel = cacheLabel.orEmpty(),
                 seekPreviewEnabled = previewPreference.enabled,
                 bookmarkDotsEnabled = bookmarkDisplay.enabled,
+                onlineCommentsEnabled = onlineCommentsEnabled,
             ),
             danmakuAvailable = danmakuSupported,
             moreSettingsAvailable = playbackModeSheet != null,
@@ -864,6 +867,7 @@ internal fun VideoPlayerScreen(
             onMirrorChange = { mirrorEnabled = it },
             onSeekPreviewChange = previewPreference::update,
             onBookmarkDotsChange = bookmarkDisplay::update,
+            onOnlineCommentsChange = onOnlineCommentsChange,
             videoPosition = videoPosition,
             onAdjustVideoPosition = {
                 if (fullScreen) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT

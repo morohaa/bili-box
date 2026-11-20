@@ -113,7 +113,7 @@ internal fun PlayerDetailsPane(
         ) { visibleOverlay ->
             val contentModifier = Modifier.fillMaxSize().then(blurModifier)
             if (visibleOverlay != null) {
-                visibleOverlay.render(contentModifier)
+                if (listPane != null) visibleOverlay.render(contentModifier)
             } else {
                 val obscured = detailOverlay != null
                 val scrollEnabled = !lightsOff && !obscured && !overlayVisible

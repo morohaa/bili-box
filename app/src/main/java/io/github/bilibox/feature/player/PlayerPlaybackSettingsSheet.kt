@@ -78,6 +78,7 @@ internal data class PlayerSettingsState(
     val cacheLabel: String = "",
     val seekPreviewEnabled: Boolean = true,
     val bookmarkDotsEnabled: Boolean = true,
+    val onlineCommentsEnabled: Boolean? = null,
 )
 
 internal class PlayerSettingsActions(
@@ -150,6 +151,7 @@ internal fun PlayerPlaybackSettingsHost(
     onUnavailable: (String) -> Unit,
     fullScreen: Boolean = false,
     onBookmarkDotsChange: (Boolean) -> Unit = {},
+    onOnlineCommentsChange: (Boolean) -> Unit = {},
 ) {
     var moreSettingsOpen by remember(visible) { mutableStateOf(false) }
     BackHandler(enabled = visible && moreSettingsOpen) { moreSettingsOpen = false }
@@ -170,6 +172,8 @@ internal fun PlayerPlaybackSettingsHost(
                     onPreviewChange = onSeekPreviewChange,
                     bookmarkDotsEnabled = state.bookmarkDotsEnabled,
                     onBookmarkDotsChange = onBookmarkDotsChange,
+                    onlineCommentsEnabled = state.onlineCommentsEnabled,
+                    onOnlineCommentsChange = onOnlineCommentsChange,
                     onBack = { moreSettingsOpen = false },
                     videoPositionLabel = videoPosition.label,
                     onVideoPosition = { dismissThen(onAdjustVideoPosition) },
