@@ -159,6 +159,7 @@ class OnlineVideoCommentsTest {
         )
         compose.onNodeWithText("评论 24").performClick()
         compose.onNodeWithText("查看 14 条回复").performClick()
+        compose.onNodeWithText("默认排序").performClick()
         compose.onNodeWithText("按热度").performClick()
         compose.onNodeWithText("查看对话").assertDoesNotExist()
         compose.onNode(hasScrollToIndexAction()).performScrollToIndex(8)
@@ -248,13 +249,19 @@ class OnlineVideoCommentsTest {
         val newest = comment(20L, "时间最新的回复").copy(timestampSeconds = 1_800_000_000L)
         val hottest = comment(30L, "点赞最多的回复").copy(timestampSeconds = 1_700_000_000L, likes = 100L)
         val pages = mutableListOf<Int>()
+        val failSecondPage = CompletableDeferred<Unit>()
         setPlayerContent(
             loadComments = { _, _ -> VideoCommentPage(listOf(root), null) },
             loadReplies = { _, page ->
                 pages += page
                 when {
                     page == 1 -> VideoCommentPage(listOf(newest), 2)
-                    pages.count { it == 2 } == 1 -> throw BiliException(-412, "受限")
+
+                    pages.count { it == 2 } == 1 -> {
+                        failSecondPage.await()
+                        throw BiliException(-412, "受限")
+                    }
+
                     else -> VideoCommentPage(listOf(hottest), null)
                 }
             },
@@ -266,11 +273,16 @@ class OnlineVideoCommentsTest {
         val video = compose.onNodeWithTag("player-touch-surface")
         assertEquals(video.getUnclippedBoundsInRoot().bottom.value, panel.getUnclippedBoundsInRoot().top.value, 0.5f)
         compose.onNodeWithText("相关回复共80条").assertIsDisplayed()
-        compose.onNodeWithText(newest.message).assertDoesNotExist()
+        compose.onNodeWithText(newest.message).assertIsDisplayed()
+        compose.onNodeWithText("正在加载更多回复").assertIsDisplayed()
+        compose.runOnIdle { failSecondPage.complete(Unit) }
+        compose.onNodeWithText(newest.message).assertIsDisplayed()
         compose.onNodeWithText("重试").performClick()
 
         fun replyTop(reply: VideoComment): Float = compose.onNodeWithText(reply.message).getUnclippedBoundsInRoot().top.value
 
+        assertTrue(replyTop(newest) < replyTop(hottest))
+        compose.onNodeWithText("默认排序").performClick()
         assertTrue(replyTop(hottest) < replyTop(newest))
         compose.onNodeWithText("按热度").performClick()
         compose.onNodeWithText("按时间").assertIsDisplayed()
@@ -282,6 +294,64 @@ class OnlineVideoCommentsTest {
         pressBack()
         panel.assertDoesNotExist()
         compose.onNodeWithText("查看 80 条回复").assertIsDisplayed()
+    }
+
+    @Test
+    fun laterPagesAppendWithoutChangingTheOrderUntilTheNextSortClick() {
+        val root = comment(1L, "有多页回复的评论", replyCount = 22)
+        val firstPage = List(20) { index -> comment(index + 2L, "回复 ${index + 1}").copy(likes = 20L - index) }
+        val secondPage = comment(22L, "第二页回复").copy(likes = 50L)
+        val hottest = comment(23L, "最后一页的热门回复").copy(likes = 100L)
+        val pendingSecondPage = CompletableDeferred<Unit>()
+        val pendingLastPage = CompletableDeferred<Unit>()
+        setPlayerContent(
+            loadComments = { _, _ -> VideoCommentPage(listOf(root), null) },
+            loadReplies = { _, page ->
+                when (page) {
+                    1 -> VideoCommentPage(firstPage, 2)
+
+                    2 -> {
+                        pendingSecondPage.await()
+                        VideoCommentPage(listOf(secondPage), 3)
+                    }
+
+                    else -> {
+                        pendingLastPage.await()
+                        VideoCommentPage(listOf(hottest), null)
+                    }
+                }
+            },
+        )
+        compose.onNodeWithText("评论 24").performClick()
+        compose.onNodeWithText("查看 22 条回复").performClick()
+        val list = compose.onNode(hasScrollToIndexAction())
+        val anchor = compose.onNodeWithText(firstPage[8].message)
+        list.performScrollToIndex(10)
+        val anchorTop = anchor.assertIsDisplayed().getUnclippedBoundsInRoot().top.value
+
+        compose.runOnIdle { pendingSecondPage.complete(Unit) }
+        assertEquals(anchorTop, anchor.getUnclippedBoundsInRoot().top.value, 0.5f)
+        list.performScrollToIndex(22)
+        compose.onNodeWithText(secondPage.message).assertIsDisplayed()
+        list.performScrollToIndex(1)
+        compose.onNodeWithText("默认排序").performClick()
+        val second = compose.onNodeWithText(secondPage.message).assertIsDisplayed()
+        val first = compose.onNodeWithText(firstPage.first().message).assertIsDisplayed()
+        assertTrue(second.getUnclippedBoundsInRoot().top < first.getUnclippedBoundsInRoot().top)
+        list.performScrollToIndex(11)
+        assertEquals(anchorTop, anchor.getUnclippedBoundsInRoot().top.value, 0.5f)
+
+        compose.runOnIdle { pendingLastPage.complete(Unit) }
+        assertEquals(anchorTop, anchor.getUnclippedBoundsInRoot().top.value, 0.5f)
+        list.performScrollToIndex(23)
+        compose.onNodeWithText(hottest.message).assertIsDisplayed()
+        list.performScrollToIndex(1)
+        assertTrue(second.getUnclippedBoundsInRoot().top < first.getUnclippedBoundsInRoot().top)
+        compose.onNodeWithText(hottest.message).assertIsNotDisplayed()
+        compose.onNodeWithText("按热度").performClick()
+        val hottestTop = compose.onNodeWithText(hottest.message).getUnclippedBoundsInRoot().top.value
+        val secondPageTop = compose.onNodeWithText(secondPage.message).getUnclippedBoundsInRoot().top.value
+        assertTrue(hottestTop < secondPageTop)
     }
 
     @Test
@@ -342,7 +412,7 @@ class OnlineVideoCommentsTest {
         compose.onNode(hasScrollToIndexAction()).performScrollToIndex(1)
         compose.onNodeWithText(message).assertIsNotDisplayed()
         compose.onNodeWithText("相关回复共8条").assertIsDisplayed()
-        compose.onNodeWithText("按热度").assertIsDisplayed()
+        compose.onNodeWithText("默认排序").assertIsDisplayed()
         assertEquals(initialTitleTop, title.getUnclippedBoundsInRoot().top.value, 0.5f)
     }
 

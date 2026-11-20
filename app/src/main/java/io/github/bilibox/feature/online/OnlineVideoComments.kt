@@ -5,7 +5,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -161,23 +161,14 @@ private fun CommentRepliesPanel(
     onDismiss: () -> Unit,
 ) {
     LaunchedEffect(pager) { pager.loadInitial() }
-    var order by remember(root.id) { mutableStateOf(VideoCommentOrder.HOT) }
+    var appliedSort by remember(pager) { mutableStateOf<ReplySort?>(null) }
     val listState = rememberLazyListState()
     val sharedDialogs = remember(pager.comments) {
         pager.comments.groupingBy(VideoComment::dialogId).eachCount()
     }
-    val replies = if (pager.hasMore) {
-        emptyList()
-    } else {
-        remember(pager.comments, order) {
-            val newestFirst = compareByDescending<VideoComment> { it.timestampSeconds }.thenByDescending { it.id }
-            val ordering = if (order == VideoCommentOrder.HOT) {
-                compareByDescending<VideoComment> { it.likes }.then(newestFirst)
-            } else {
-                newestFirst
-            }
-            pager.comments.sortedWith(ordering)
-        }
+    val replies = remember(pager.comments, appliedSort) {
+        val sorted = appliedSort?.replies.orEmpty()
+        if (sorted.isEmpty()) pager.comments else sorted + pager.comments.drop(sorted.size)
     }
     AnimatedContent(
         targetState = selectedReply,
@@ -218,7 +209,9 @@ private fun CommentRepliesPanel(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                             )
-                            CommentOrderToggle(order) { order = it }
+                            CommentOrderToggle(appliedSort?.order) { order ->
+                                appliedSort = ReplySort(order, sortedReplies(pager.comments, order))
+                            }
                         }
                     }
                 }
@@ -227,10 +220,24 @@ private fun CommentRepliesPanel(
                     val onViewDialog: (() -> Unit)? = if (hasDialog) ({ onOpenDialog(reply) }) else null
                     CommentThreadReply(reply, ownerId, onViewDialog = onViewDialog)
                 }
-                item(key = "reply-status-${replies.size}") { CommentLoadState(pager, "暂无回复") }
+                item(key = "reply-status") {
+                    CommentLoadState(pager, "暂无回复", loadingMoreMessage = "正在加载更多回复")
+                }
             }
         }
     }
+}
+
+private data class ReplySort(val order: VideoCommentOrder, val replies: List<VideoComment>)
+
+private fun sortedReplies(replies: List<VideoComment>, order: VideoCommentOrder): List<VideoComment> {
+    val newestFirst = compareByDescending<VideoComment> { it.timestampSeconds }.thenByDescending { it.id }
+    val ordering = if (order == VideoCommentOrder.HOT) {
+        compareByDescending<VideoComment> { it.likes }.then(newestFirst)
+    } else {
+        newestFirst
+    }
+    return replies.sortedWith(ordering)
 }
 
 @Composable
@@ -300,11 +307,11 @@ private fun CommentThreadReply(
 }
 
 @Composable
-private fun CommentLoadState(pager: OnlineCommentPager<*>, emptyMessage: String) {
+private fun CommentLoadState(pager: OnlineCommentPager<*>, emptyMessage: String, loadingMoreMessage: String? = null) {
     val error = pager.error
     when {
         error != null -> CommentNotice(error, "重试", pager::loadMore)
-        pager.isLoading || pager.awaitingInitialLoad -> CommentLoading()
+        pager.isLoading || pager.awaitingInitialLoad -> CommentLoading(loadingMoreMessage?.takeIf { pager.comments.isNotEmpty() })
         pager.hasMore -> CommentNotice(action = "加载更多", onClick = pager::loadMore)
         pager.comments.isEmpty() -> CommentNotice(emptyMessage)
         else -> CommentNotice("没有更多了")
@@ -328,8 +335,13 @@ private fun CommentTextAction(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun CommentLoading() {
-    Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+private fun CommentLoading(message: String? = null) {
+    Row(
+        Modifier.fillMaxWidth().padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         CircularProgressIndicator(Modifier.size(20.dp), color = Pink, strokeWidth = 2.dp)
+        if (message != null) Text(message, color = PlaybackMuted, fontSize = 12.sp)
     }
 }

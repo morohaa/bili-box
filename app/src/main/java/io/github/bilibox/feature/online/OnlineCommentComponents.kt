@@ -75,8 +75,13 @@ internal fun CommentOrderBar(order: VideoCommentOrder, onOrderChange: (VideoComm
 }
 
 @Composable
-internal fun CommentOrderToggle(order: VideoCommentOrder, onOrderChange: (VideoCommentOrder) -> Unit) {
+internal fun CommentOrderToggle(order: VideoCommentOrder?, onOrderChange: (VideoCommentOrder) -> Unit) {
     val byPopularity = order == VideoCommentOrder.HOT
+    val label = when (order) {
+        VideoCommentOrder.HOT -> "按热度"
+        VideoCommentOrder.NEWEST -> "按时间"
+        null -> "默认排序"
+    }
     val muted = PlaybackMuted
     Row(
         Modifier.heightIn(min = 34.dp).clickable(
@@ -94,7 +99,7 @@ internal fun CommentOrderToggle(order: VideoCommentOrder, onOrderChange: (VideoC
                 drawLine(muted, Offset(inset, y), Offset(size.width - inset, y), lineWidth, StrokeCap.Round)
             }
         }
-        Text(if (byPopularity) "按热度" else "按时间", color = muted, fontSize = 12.sp)
+        Text(label, color = muted, fontSize = 12.sp)
     }
 }
 
