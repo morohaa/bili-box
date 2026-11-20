@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,6 +83,7 @@ internal class PlayerBottomBarActions(
 
 @Composable
 internal fun PlayerBottomBar(
+    player: Player,
     state: PlayerBottomBarState,
     actions: PlayerBottomBarActions,
     modifier: Modifier = Modifier,
@@ -89,8 +91,9 @@ internal fun PlayerBottomBar(
 ) {
     val showPause = state.playWhenReady && state.playbackState != Player.STATE_ENDED
     val seekBar: @Composable (Modifier) -> Unit = { seekModifier ->
+        val livePosition by rememberSeekBarPosition(player, state.scrubbing)
         VideoSeekBar(
-            position = if (state.scrubbing) state.scrubPosition else state.position.toFloat(),
+            position = if (state.scrubbing) state.scrubPosition else livePosition.toFloat(),
             duration = state.duration,
             bufferedPosition = state.bufferedPosition,
             onSeek = actions.onSeekStart,

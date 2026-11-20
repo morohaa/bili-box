@@ -547,6 +547,7 @@ internal fun VideoPlayerScreen(
                             )
                     )
                     PlayerBottomBar(
+                        player = player,
                         preview = seekPreview,
                         state = PlayerBottomBarState(
                             fullScreen = fullScreen,

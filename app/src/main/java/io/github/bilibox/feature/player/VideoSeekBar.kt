@@ -1,5 +1,6 @@
 package io.github.bilibox.feature.player
 
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -13,9 +14,35 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.Player
 import io.github.bilibox.core.ui.component.playback.SeekThumb
 import io.github.bilibox.core.ui.theme.LocalSeekThumbStyle
 import io.github.bilibox.core.ui.theme.OnlinePink
+
+@Composable
+internal fun rememberSeekBarPosition(player: Player, scrubbing: Boolean): LongState {
+    val position = remember(player) { mutableLongStateOf(player.currentPosition) }
+    var playing by remember(player) { mutableStateOf(player.isPlaying) }
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onEvents(player: Player, events: Player.Events) {
+                position.longValue = player.currentPosition
+                playing = player.isPlaying
+            }
+        }
+        player.addListener(listener)
+        playing = player.isPlaying
+        onDispose { player.removeListener(listener) }
+    }
+    val advancing = playing && !scrubbing
+    LaunchedEffect(player, playing, scrubbing) {
+        position.longValue = player.currentPosition
+        while (advancing) {
+            withInfiniteAnimationFrameNanos { position.longValue = player.currentPosition }
+        }
+    }
+    return position
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,8 +68,9 @@ internal fun VideoSeekBar(
         interactionSource.interactions.collect { if (it is DragInteraction.Cancel) cancel() }
     }
     DisposableEffect(preview) { onDispose { cancel() } }
-    LaunchedEffect(preview, scrubbing, position) {
-        if (scrubbing) preview?.request(position.toLong().coerceIn(0L, (duration - 1L).coerceAtLeast(0L)))
+    val previewPosition = if (scrubbing) position.toLong().coerceIn(0L, (duration - 1L).coerceAtLeast(0L)) else null
+    LaunchedEffect(preview, previewPosition) {
+        if (previewPosition != null) preview?.request(previewPosition)
     }
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
         Box(modifier.height(24.dp)) {
