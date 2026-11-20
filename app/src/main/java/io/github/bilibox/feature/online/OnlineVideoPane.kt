@@ -6,11 +6,21 @@ import android.content.Context
 import android.content.Intent
 import android.util.Size
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -64,6 +74,8 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
 
+private const val DescriptionTransitionMs = 240
+
 @Composable
 internal fun OnlineVideoDetails(
     video: VideoSummary,
@@ -77,6 +89,11 @@ internal fun OnlineVideoDetails(
     onOpenEpisodes: () -> Unit,
 ) {
     var expanded by rememberSaveable(video.bvid) { mutableStateOf(false) }
+    val descriptionTransition = updateTransition(expanded, label = "视频简介展开")
+    val chevronRotation by descriptionTransition.animateFloat(
+        transitionSpec = { tween(DescriptionTransitionMs) },
+        label = "简介箭头旋转",
+    ) { isExpanded -> if (isExpanded) 180f else 0f }
     val playerActions = LocalPlayerDetailActions.current
     val unsupportedAction: (String) -> Unit = { action ->
         Toast.makeText(context, "当前版本暂不支持$action，请前往哔哩哔哩操作", Toast.LENGTH_SHORT).show()
@@ -113,19 +130,31 @@ internal fun OnlineVideoDetails(
                     .padding(top = 4.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    title, color = PlaybackText, fontSize = 15.5.sp, lineHeight = 22.sp, letterSpacing = (-0.15).sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = if (expanded) Int.MAX_VALUE else 1,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
-                )
+                descriptionTransition.AnimatedContent(
+                    modifier = Modifier.weight(1f),
+                    transitionSpec = {
+                        (fadeIn(tween(160)) togetherWith fadeOut(tween(120))) using
+                            SizeTransform { _, _ -> tween(DescriptionTransitionMs) }
+                    },
+                ) { isExpanded ->
+                    Text(
+                        title,
+                        color = PlaybackText,
+                        fontSize = 15.5.sp,
+                        lineHeight = 22.sp,
+                        letterSpacing = (-0.15).sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = if (isExpanded) Int.MAX_VALUE else 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Spacer(Modifier.width(8.dp))
                 Box(
                     Modifier.padding(top = 2.dp).size(24.dp)
                         .semantics { contentDescription = if (expanded) "收起简介" else "展开简介" },
                     contentAlignment = Alignment.Center
                 ) {
-                    ChevronDownIcon(Modifier.size(18.dp).rotate(if (expanded) 180f else 0f), PlaybackMuted)
+                    ChevronDownIcon(Modifier.size(18.dp).graphicsLayer { rotationZ = chevronRotation }, PlaybackMuted)
                 }
             }
             Row(
@@ -146,40 +175,46 @@ internal fun OnlineVideoDetails(
                 )
                 Text(duration, color = PlaybackMuted, fontSize = 11.5.sp, lineHeight = 16.sp, maxLines = 1)
             }
-            if (expanded) {
-                HorizontalDivider(Modifier.padding(top = 10.dp), color = PlaybackDivider)
-                Row(
-                    Modifier.padding(top = 2.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable(role = Role.Button) {
-                            val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                            if (manager != null) {
-                                manager.setPrimaryClip(ClipData.newPlainText("BV 号", bvId))
-                                Toast.makeText(context, "BV 号已复制", Toast.LENGTH_SHORT).show()
+            descriptionTransition.AnimatedVisibility(
+                visible = { it },
+                enter = expandVertically(tween(DescriptionTransitionMs), expandFrom = Alignment.Top) + fadeIn(tween(180)),
+                exit = shrinkVertically(tween(DescriptionTransitionMs), shrinkTowards = Alignment.Top) + fadeOut(tween(160)),
+            ) {
+                Column {
+                    HorizontalDivider(Modifier.padding(top = 10.dp), color = PlaybackDivider)
+                    Row(
+                        Modifier.padding(top = 2.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable(role = Role.Button) {
+                                val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                if (manager != null) {
+                                    manager.setPrimaryClip(ClipData.newPlainText("BV 号", bvId))
+                                    Toast.makeText(context, "BV 号已复制", Toast.LENGTH_SHORT).show()
+                                }
                             }
-                        }
-                        .semantics { contentDescription = "复制 BV 号 $bvId" }
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        bvId,
-                        color = PlaybackMuted,
-                        fontSize = 11.5.sp,
-                        lineHeight = 16.sp,
-                        maxLines = 1,
-                    )
-                    Spacer(Modifier.width(5.dp))
-                    AppGlyphIcon(AppIcon.COPY, PlaybackMuted, Modifier.size(12.dp))
-                }
-                info?.desc?.takeIf { it.isNotBlank() }?.let { description ->
-                    Text(
-                        description,
-                        color = PlaybackSecondary,
-                        fontSize = 12.sp,
-                        lineHeight = 19.sp,
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
+                            .semantics { contentDescription = "复制 BV 号 $bvId" }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            bvId,
+                            color = PlaybackMuted,
+                            fontSize = 11.5.sp,
+                            lineHeight = 16.sp,
+                            maxLines = 1,
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        AppGlyphIcon(AppIcon.COPY, PlaybackMuted, Modifier.size(12.dp))
+                    }
+                    info?.desc?.takeIf { it.isNotBlank() }?.let { description ->
+                        Text(
+                            description,
+                            color = PlaybackSecondary,
+                            fontSize = 12.sp,
+                            lineHeight = 19.sp,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
                 }
             }
         }
