@@ -4,13 +4,15 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -98,6 +100,28 @@ class SeekPreviewSessionTest {
     }
 
     @Test
+    fun localPreviewFillsFrameAtSourceAspectRatioWithTimeBelow() {
+        val preview = PlayerSeekPreviewController(PlayerPreviewSource(MediaItem.fromUri("file:///preview.mp4")))
+        val landscape = Bitmap.createBitmap(160, 120, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.GREEN) }
+        val portrait = Bitmap.createBitmap(90, 160, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.GREEN) }
+        preview.accept(0L, landscape)
+        compose.setContent { PlayerSeekPreview(preview, 80_000L) }
+
+        val image = compose.onNodeWithTag("seek-preview-image")
+        fun assertFrameFills(expectedAspectRatio: Float) {
+            assertPreviewFrameWithTimeBelow(expectedAspectRatio, "01:20")
+            val pixels = image.captureToImage().toPixelMap()
+            listOf(pixels.width / 10, pixels.width * 9 / 10).forEach { column ->
+                val pixel = pixels[column, pixels.height / 2]
+                assertTrue("预览两侧应显示视频画面，不应补黑边", pixel.green > .9f && pixel.red < .1f)
+            }
+        }
+        assertFrameFills(4f / 3f)
+        compose.runOnIdle { preview.accept(0L, portrait) }
+        assertFrameFills(9f / 16f)
+    }
+
+    @Test
     fun networkSessionWarmsBeforeDragAndSurvivesPopupReopen() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val fixture = createSeekPreviewFixture(context)
@@ -117,7 +141,7 @@ class SeekPreviewSessionTest {
             val session = rememberPlayerSeekPreview(main, source)!!
             preview = session
             Box(Modifier.padding(top = 120.dp)) {
-                if (visible) PlayerSeekPreview(session, 20_000L, Modifier.size(136.dp, 98.5.dp))
+                if (visible) PlayerSeekPreview(session, 20_000L)
             }
         }
         compose.waitUntil(5_000) {
@@ -137,6 +161,7 @@ class SeekPreviewSessionTest {
             rendered
         }
         compose.onNodeWithText("加载中…").assertDoesNotExist()
+        assertPreviewFrameWithTimeBelow(160f / 96f, "00:20")
         compose.runOnIdle {
             preview!!.request(10_000L)
             assertTrue("切换目标时保持已有帧可见", preview!!.networkRendered)
@@ -150,5 +175,13 @@ class SeekPreviewSessionTest {
         }
         compose.onNodeWithTag("seek-preview").assertExists()
         compose.onNodeWithText("加载中…").assertDoesNotExist()
+    }
+
+    private fun assertPreviewFrameWithTimeBelow(expectedAspectRatio: Float, expectedTime: String) {
+        val frame = compose.onNodeWithTag("seek-preview-frame").fetchSemanticsNode().boundsInRoot
+        val time = compose.onNodeWithTag("seek-preview-time").assertTextEquals(expectedTime).fetchSemanticsNode().boundsInRoot
+        assertEquals(expectedAspectRatio, frame.width / frame.height, .02f)
+        assertTrue("时间应位于预览框外下方", time.top > frame.bottom)
+        assertEquals(frame.center.x, time.center.x, 1f)
     }
 }

@@ -1,13 +1,13 @@
 package io.github.bilibox.feature.player
 
+import android.view.TextureView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -16,12 +16,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -32,6 +34,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import androidx.media3.ui.AspectRatioFrameLayout
 import io.github.bilibox.core.ui.component.playback.SeekThumbWidth
 import io.github.bilibox.core.util.formatPlaybackTime
 
@@ -60,7 +63,7 @@ internal fun PlayerSeekPreviewPopup(preview: PlayerSeekPreviewController?, posit
         popupPositionProvider = provider,
         properties = PopupProperties(focusable = false, dismissOnBackPress = false, dismissOnClickOutside = false),
     ) {
-        PlayerSeekPreview(preview, positionMs, Modifier.size(136.dp, 98.5.dp))
+        PlayerSeekPreview(preview, positionMs)
     }
 }
 
@@ -68,26 +71,38 @@ internal fun PlayerSeekPreviewPopup(preview: PlayerSeekPreviewController?, posit
 @Composable
 internal fun PlayerSeekPreview(preview: PlayerSeekPreviewController?, positionMs: Long, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(6.dp)
+    val aspectRatio = preview?.networkAspectRatio ?: preview?.frame?.let { it.width.toFloat() / it.height } ?: (16f / 9f)
+    val frameWidth = minOf(136.dp, 76.5.dp * aspectRatio)
+    val frameHeight = minOf(76.5.dp, 136.dp / aspectRatio)
     Column(
-        modifier.clip(shape).background(Color(0xFF151515))
-            .border(1.dp, Color.White.copy(alpha = .7f), shape)
-            .testTag("seek-preview"),
+        modifier.testTag("seek-preview"),
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.size(frameWidth, frameHeight).clip(shape).background(Color(0xFF151515))
+                .border(1.dp, Color.White.copy(alpha = .7f), shape)
+                .testTag("seek-preview-frame"),
+            contentAlignment = Alignment.Center,
+        ) {
             if (preview == null) {
                 Text("暂无预览", color = Color.White.copy(alpha = .75f), fontSize = 11.sp)
             } else {
                 SeekPreviewContent(preview)
             }
         }
-        Box(Modifier.fillMaxWidth().height(22.dp), contentAlignment = Alignment.Center) {
-            Text(formatPlaybackTime(positionMs), color = Color.White, fontSize = 11.sp)
-        }
+        Text(
+            formatPlaybackTime(positionMs),
+            modifier = Modifier.testTag("seek-preview-time"),
+            color = Color.White,
+            fontSize = 11.sp,
+            style = TextStyle(shadow = Shadow(color = Color.Black, blurRadius = 4f)),
+        )
     }
 }
 
 @Composable
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 private fun SeekPreviewContent(preview: PlayerSeekPreviewController) {
     val player = preview.networkPlayer
     if (player != null) {
@@ -96,12 +111,13 @@ private fun SeekPreviewContent(preview: PlayerSeekPreviewController) {
                 createTexturePlayerView(it, player).apply {
                     useController = false
                     keepScreenOn = false
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                 }
             },
             update = { it.player = player },
             onRelease = { view ->
-                val surface = view.videoSurfaceView as? android.view.TextureView
-                preview.retainNetworkFrame(surface?.takeIf { it.isAvailable }?.getBitmap(320, 180))
+                val surface = view.videoSurfaceView as? TextureView
+                preview.retainNetworkFrame(surface?.takeIf { it.isAvailable }?.bitmap)
                 view.player = null
             },
             modifier = Modifier.fillMaxSize().testTag("seek-preview-video"),
@@ -112,7 +128,7 @@ private fun SeekPreviewContent(preview: PlayerSeekPreviewController) {
         Image(
             bitmap = frame.asImageBitmap(),
             contentDescription = "进度预览画面",
-            contentScale = ContentScale.Fit,
+            contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize().testTag("seek-preview-image")
                 .semantics { stateDescription = "预览位置：${preview.framePositionMs}" },
         )

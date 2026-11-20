@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -44,6 +45,7 @@ internal class PlayerSeekPreviewController(val source: PlayerPreviewSource) {
     var failed by mutableStateOf(false)
     var networkRendered by mutableStateOf(false)
     var networkPlayer by mutableStateOf<ExoPlayer?>(null)
+    var networkAspectRatio by mutableStateOf<Float?>(null)
     val requests = Channel<Long>(Channel.CONFLATED)
     private val cache = object : LruCache<Long, Bitmap>(6 * 1024 * 1024) {
         override fun sizeOf(key: Long, value: Bitmap): Int = value.byteCount
@@ -137,6 +139,11 @@ private fun NetworkSeekPreviewSession(controller: PlayerSeekPreviewController, s
     }
     DisposableEffect(player) {
         val listener = object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                controller.networkAspectRatio = (videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height)
+                    .takeIf { it.isFinite() && it > 0f }
+            }
+
             override fun onRenderedFirstFrame() {
                 controller.networkRendered = true
             }
