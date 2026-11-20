@@ -143,7 +143,7 @@ internal fun CommentFloor(
                     fontWeight = FontWeight.Medium,
                 )
             }
-            CommentMetadata(comment, inThread, onViewDialog)
+            CommentMetadata(comment, onViewDialog)
             if (footer != null) Box(Modifier.padding(top = 4.dp)) { footer() }
         }
     }
@@ -178,18 +178,13 @@ private fun CommentBadge(label: String, ink: Color, fill: Color) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CommentMetadata(comment: VideoComment, inThread: Boolean, onViewDialog: (() -> Unit)?) {
+private fun CommentMetadata(comment: VideoComment, onViewDialog: (() -> Unit)?) {
     val muted = PlaybackMuted
     val likes = formatCompactCount(comment.likes)
     val hasMetadata = comment.timestampSeconds > 0 || comment.ipLocation != null || onViewDialog != null
-    val arrangement = when {
-        !inThread -> Arrangement.spacedBy(14.dp)
-        hasMetadata -> Arrangement.SpaceBetween
-        else -> Arrangement.End
-    }
     FlowRow(
-        (if (inThread) Modifier.fillMaxWidth() else Modifier).padding(top = 2.dp),
-        horizontalArrangement = arrangement,
+        Modifier.fillMaxWidth().padding(top = 2.dp),
+        horizontalArrangement = if (hasMetadata) Arrangement.SpaceBetween else Arrangement.End,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (hasMetadata) {

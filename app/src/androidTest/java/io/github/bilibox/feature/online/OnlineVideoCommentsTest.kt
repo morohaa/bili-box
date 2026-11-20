@@ -196,7 +196,11 @@ class OnlineVideoCommentsTest {
 
     @Test
     fun dialogActionSharesMetadataRowAndPanelSlidesInAndOut() {
-        val root = comment(10L, "有对话的评论", replyCount = 1).copy(ipLocation = "广东")
+        val root = comment(10L, "有对话的评论", replyCount = 1).copy(
+            timestampSeconds = 1_600_000_000L,
+            likes = 32L,
+            ipLocation = "广东",
+        )
         val reply = comment(12L, "有对话的回复").copy(
             timestampSeconds = 1_700_000_000L,
             likes = 5L,
@@ -209,7 +213,12 @@ class OnlineVideoCommentsTest {
             loadDialog = { _, _, _ -> VideoCommentPage(listOf(reply), null) },
         )
         compose.onNodeWithText("评论 24").performClick()
-        compose.onNodeWithText("广东").assertIsDisplayed()
+        val rootLocation = compose.onNodeWithText("广东").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val rootLikes = compose.onNodeWithContentDescription("32 个赞").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val details = compose.onNodeWithTag("playerDetails").getUnclippedBoundsInRoot()
+        assertEquals(16f, (details.right - rootLikes.right).value, 0.5f)
+        assertTrue(rootLocation.right < rootLikes.left)
+        assertTrue(rootLikes.top < rootLocation.bottom && rootLocation.top < rootLikes.bottom)
         compose.onNodeWithText("浙江").assertDoesNotExist()
         compose.onNodeWithText("查看 1 条回复").performClick()
 
