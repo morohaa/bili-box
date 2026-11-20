@@ -12,6 +12,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -148,7 +149,9 @@ internal fun VideoPlayerScreen(
     var episodesExpanded by remember(player) { mutableStateOf(false) }
     var qualityMenuExpanded by remember(player) { mutableStateOf(false) }
     var playbackState by remember(player) { mutableIntStateOf(player.playbackState) }
-    var detailsTab by remember(player) { mutableIntStateOf(0) }
+    val detailsPagerState = key(player) {
+        rememberPagerState { if (showDetailTabs) detailTabs.size.coerceAtLeast(1) else 1 }
+    }
     val lightsOffPreferences = remember(context) { LightsOffPreferences(context) }
     var lightsOff by remember(player) { mutableStateOf(false) }
     var lightsOffMode by remember(player) { mutableStateOf(lightsOffPreferences.load()) }
@@ -367,7 +370,7 @@ internal fun VideoPlayerScreen(
     LaunchedEffect(player, mediaKey) {
         if (mediaKey == lastMediaKey) return@LaunchedEffect
         lastMediaKey = mediaKey
-        detailsTab = 0
+        detailsPagerState.requestScrollToPage(0)
         controlsVisible = true
         scrub.cancel()
         speedMenuExpanded = false
@@ -395,7 +398,7 @@ internal fun VideoPlayerScreen(
             gestures.clearFeedback()
         }
     }
-    val dismissDetailOverlay = if (!fullScreen && showDetailTabs && detailsTab != 0) {
+    val dismissDetailOverlay = if (!fullScreen && showDetailTabs && detailsPagerState.settledPage != 0) {
         (extraDetailPane as? PlayerExtraDetailPane.ScrollableList)?.overlay?.onDismiss
     } else {
         null
@@ -763,8 +766,7 @@ internal fun VideoPlayerScreen(
                     detailsBackground = detailsBackground,
                     showDetailTabs = showDetailTabs,
                     detailTabs = detailTabs,
-                    detailsTab = detailsTab,
-                    onDetailsTabChange = { detailsTab = it },
+                    pagerState = detailsPagerState,
                     sourcePill = sourcePill,
                     sourceLabel = sourceLabel,
                     danmakuEnabled = danmakuSettings.enabled,

@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToIndexAction
@@ -23,6 +24,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.espresso.Espresso.pressBack
@@ -458,6 +461,57 @@ class OnlineVideoCommentsTest {
     }
 
     @Test
+    fun detailTabsFollowSwipesAndRememberCommentScroll() {
+        val comments = List(24) { index -> comment(index + 1L, "测试评论 ${index + 1}") }
+        var requests = 0
+        setPlayerContent(loadComments = { _, _ ->
+            requests++
+            VideoCommentPage(comments, null)
+        })
+
+        val pager = compose.onNodeWithTag("player-detail-pager")
+        val intro = compose.onNodeWithText("简介").assertIsSelected()
+        val commentsTab = compose.onNodeWithText("评论 24")
+        compose.runOnIdle { assertEquals(0, requests) }
+        pager.performTouchInput { swipeLeft(startX = width * .8f, endX = width * .2f) }
+        commentsTab.assertIsSelected()
+        compose.onNodeWithText(comments.first().message).assertIsDisplayed()
+        compose.onNodeWithTag("player-detail-list").performScrollToIndex(10)
+        val anchor = compose.onNodeWithText(comments[9].message).assertIsDisplayed()
+        val anchorTop = anchor.getUnclippedBoundsInRoot().top.value
+
+        pager.performTouchInput { swipeRight(startX = width * .2f, endX = width * .8f) }
+        intro.assertIsSelected()
+        compose.onNodeWithText("视频简介").assertIsDisplayed()
+        commentsTab.performClick().assertIsSelected()
+        assertEquals(anchorTop, anchor.assertIsDisplayed().getUnclippedBoundsInRoot().top.value, 0.5f)
+        compose.runOnIdle { assertEquals(1, requests) }
+    }
+
+    @Test
+    fun tappingCommentTabSlidesContentWithoutMovingTheTabBar() {
+        val first = comment(1L, "测试评论")
+        setPlayerContent(loadComments = { _, _ -> VideoCommentPage(listOf(first), null) })
+
+        val introContent = compose.onNodeWithText("视频简介").assertIsDisplayed()
+        val originalLeft = introContent.getUnclippedBoundsInRoot().left.value
+        val bar = compose.onNodeWithTag("player-detail-bar")
+        val originalBar = bar.getUnclippedBoundsInRoot()
+        val commentsTab = compose.onNodeWithText("评论 24")
+        compose.mainClock.autoAdvance = false
+        try {
+            commentsTab.performClick()
+            compose.mainClock.advanceTimeBy(64)
+            assertTrue(introContent.getUnclippedBoundsInRoot().left.value < originalLeft)
+            assertEquals(originalBar, bar.getUnclippedBoundsInRoot())
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        commentsTab.assertIsSelected()
+        compose.onNodeWithText(first.message).assertIsDisplayed()
+    }
+
+    @Test
     fun orderBarScrollsAwayWhileDetailTabsStayVisible() {
         val comments = List(24) { index -> comment(index + 1L, "测试评论 ${index + 1}") }
         setPlayerContent(loadComments = { _, _ -> VideoCommentPage(comments, null) })
@@ -466,7 +520,7 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("按热度").assertIsDisplayed()
         compose.onNodeWithText("热门评论").assertIsDisplayed()
 
-        val list = compose.onNode(hasScrollToIndexAction())
+        val list = compose.onNodeWithTag("player-detail-list")
         list.performScrollToIndex(10)
         compose.onNodeWithText("按热度").assertIsNotDisplayed()
         compose.onNodeWithText("热门评论").assertIsNotDisplayed()

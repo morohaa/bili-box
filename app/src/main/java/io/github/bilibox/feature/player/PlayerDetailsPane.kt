@@ -3,18 +3,15 @@ package io.github.bilibox.feature.player
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -37,6 +34,7 @@ import io.github.bilibox.core.ui.theme.PlaybackDivider
 import io.github.bilibox.core.ui.theme.PlaybackInk
 import io.github.bilibox.core.ui.theme.PlaybackMuted
 import io.github.bilibox.data.player.LightsOffMode
+import kotlinx.coroutines.launch
 
 internal sealed interface PlayerExtraDetailPane {
     class Content(val render: @Composable (Long) -> Unit) : PlayerExtraDetailPane
@@ -49,15 +47,13 @@ internal sealed interface PlayerExtraDetailPane {
     class Overlay(val onDismiss: () -> Unit, val render: @Composable (Modifier) -> Unit)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PlayerDetailsPane(
     modifier: Modifier = Modifier,
     detailsBackground: Color,
     showDetailTabs: Boolean,
     detailTabs: List<String>,
-    detailsTab: Int,
-    onDetailsTabChange: (Int) -> Unit,
+    pagerState: PagerState,
     sourcePill: Boolean,
     sourceLabel: String,
     danmakuEnabled: Boolean,
@@ -86,81 +82,46 @@ internal fun PlayerDetailsPane(
     episodeOverlayVisible: Boolean,
 ) {
     val overlayVisible = episodeOverlayVisible && episodeOverlay != null
-    val activePane = if (showDetailTabs) detailsTab else 0
-    val detailScroll = rememberScrollState()
-    val detailListStateHolder = rememberSaveableStateHolder()
-    LaunchedEffect(activePane) { detailScroll.scrollTo(0) }
+    val listPane = extraDetailPane as? PlayerExtraDetailPane.ScrollableList
+    val commentsVisible = showDetailTabs && pagerState.settledPage != 0
+    val detailOverlay = if (commentsVisible) listPane?.overlay else null
+    if (commentsVisible) listPane?.onVisible?.invoke()
+    val pageStateHolder = rememberSaveableStateHolder()
+    val scope = rememberCoroutineScope()
     val blurRadius by animateDpAsState(
         targetValue = if (lightsOff) lightsOffMode.contentBlurRadius() else 0.dp,
         animationSpec = tween(220),
         label = "关灯模糊半径",
     )
     val blurModifier = if (blurRadius > 0.dp) Modifier.blur(blurRadius) else Modifier
-    val tabBar: @Composable () -> Unit = {
-        PlayerDetailBar(
-            tabs = detailTabs,
-            selectedTab = detailsTab,
-            onSelectTab = onDetailsTabChange,
-            sourcePill = sourcePill,
-            sourceLabel = sourceLabel,
-            danmakuEnabled = danmakuEnabled,
-            onOpenDanmakuComposer = onOpenDanmakuComposer,
-            onToggleDanmaku = onToggleDanmaku,
-            lightsOffMode = lightsOffMode,
-            onToggleLights = onToggleLights,
-            onSelectLightsOffMode = onSelectLightsOffMode,
-        )
-        HorizontalDivider(color = PlaybackDivider, thickness = 1.dp)
-    }
     Box(
         modifier.testTag("playerDetails").fillMaxWidth().background(detailsBackground)
             .navigationBarsPadding().clipToBounds()
     ) {
-        if (activePane != 0 && extraDetailPane is PlayerExtraDetailPane.ScrollableList) {
-            extraDetailPane.onVisible()
-            val detailOverlay = extraDetailPane.overlay
-            AnimatedContent(
-                targetState = detailOverlay,
-                contentKey = { it != null },
-                transitionSpec = {
-                    if (targetState != null) {
-                        (PlayerDetailsOverlayEnter togetherWith ExitTransition.KeepUntilTransitionsFinished)
-                            .apply { targetContentZIndex = 1f }
-                    } else {
-                        EnterTransition.None togetherWith PlayerDetailsOverlayExit
-                    }
-                },
-                label = "播放详情面板切换",
-            ) { visibleOverlay ->
-                val contentModifier = Modifier.fillMaxSize().then(blurModifier)
-                if (visibleOverlay != null) {
-                    visibleOverlay.render(contentModifier)
+        AnimatedContent(
+            targetState = detailOverlay,
+            contentKey = { it != null },
+            transitionSpec = {
+                if (targetState != null) {
+                    (PlayerDetailsOverlayEnter togetherWith ExitTransition.KeepUntilTransitionsFinished)
+                        .apply { targetContentZIndex = 1f }
                 } else {
-                    val obscured = detailOverlay != null
-                    val listModifier = if (obscured) {
-                        contentModifier.clearAndSetSemantics { hideFromAccessibility() }
-                    } else {
-                        contentModifier
-                    }
-                    detailListStateHolder.SaveableStateProvider("extra-detail-list") {
-                        LazyColumn(listModifier, userScrollEnabled = !lightsOff && !obscured) {
-                            stickyHeader {
-                                Column(Modifier.fillMaxWidth().background(detailsBackground)) {
-                                    tabBar()
-                                }
-                            }
-                            extraDetailPane.render(this)
-                        }
-                    }
+                    EnterTransition.None togetherWith PlayerDetailsOverlayExit
                 }
-            }
-        } else {
-            Column(
-                Modifier.fillMaxSize()
-                    .verticalScroll(detailScroll, enabled = !lightsOff)
-                    .then(blurModifier)
-            ) {
-                if (showDetailTabs) tabBar()
+            },
+            label = "播放详情面板切换",
+        ) { visibleOverlay ->
+            val contentModifier = Modifier.fillMaxSize().then(blurModifier)
+            if (visibleOverlay != null) {
+                visibleOverlay.render(contentModifier)
+            } else {
+                val obscured = detailOverlay != null
+                val scrollEnabled = !lightsOff && !obscured && !overlayVisible
+                val pagesModifier = if (obscured) {
+                    contentModifier.clearAndSetSemantics { hideFromAccessibility() }
+                } else {
+                    contentModifier
+                }
 
                 val detailActions = PlayerDetailActions(
                     speed = speed,
@@ -173,43 +134,62 @@ internal fun PlayerDetailsPane(
                     takeScreenshot = onTakeScreenshot,
                     seekTo = onSeekTo,
                 )
-                CompositionLocalProvider(LocalPlayerDetailActions provides detailActions) {
-                    AnimatedContent(
-                        targetState = activePane,
-                        transitionSpec = {
-                            val forward = targetState > initialState
-                            val enter = fadeIn(tween(180)) +
-                                slideInHorizontally(
-                                    animationSpec = tween(220, easing = FastOutSlowInEasing),
-                                    initialOffsetX = { width -> if (forward) width / 8 else -width / 8 },
-                                )
-                            val exit = fadeOut(tween(120)) +
-                                slideOutHorizontally(
-                                    animationSpec = tween(160, easing = FastOutSlowInEasing),
-                                    targetOffsetX = { width -> if (forward) -width / 8 else width / 8 },
-                                )
-                            enter togetherWith exit
-                        },
-                        label = "播放详情标签切换",
-                    ) { tab ->
-                        when {
-                            tab == 0 -> Column(Modifier.fillMaxWidth()) {
-                                details(duration)
-                                playbackError?.let { message ->
-                                    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
-                                        Text("播放失败：$message", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                                        TextButton(onClick = onRetry) { Text("重试", color = Pink) }
+                pageStateHolder.SaveableStateProvider("detail-pages") {
+                    Column(pagesModifier) {
+                        if (showDetailTabs) {
+                            PlayerDetailBar(
+                                tabs = detailTabs,
+                                selectedTab = pagerState.currentPage,
+                                onSelectTab = { tab ->
+                                    scope.launch { pagerState.animateScrollToPage(tab, animationSpec = tween(250)) }
+                                },
+                                sourcePill = sourcePill,
+                                sourceLabel = sourceLabel,
+                                danmakuEnabled = danmakuEnabled,
+                                onOpenDanmakuComposer = onOpenDanmakuComposer,
+                                onToggleDanmaku = onToggleDanmaku,
+                                lightsOffMode = lightsOffMode,
+                                onToggleLights = onToggleLights,
+                                onSelectLightsOffMode = onSelectLightsOffMode,
+                            )
+                            HorizontalDivider(color = PlaybackDivider, thickness = 1.dp)
+                        }
+                        CompositionLocalProvider(LocalPlayerDetailActions provides detailActions) {
+                            HorizontalPager(
+                                state = pagerState,
+                                modifier = Modifier.weight(1f).fillMaxWidth().testTag("player-detail-pager"),
+                                userScrollEnabled = scrollEnabled && pagerState.pageCount > 1,
+                            ) { tab ->
+                                if (tab != 0 && listPane != null) {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize().testTag("player-detail-list"),
+                                        userScrollEnabled = scrollEnabled,
+                                        content = listPane.render,
+                                    )
+                                } else {
+                                    Column(
+                                        Modifier.fillMaxSize().verticalScroll(rememberScrollState(), enabled = scrollEnabled)
+                                    ) {
+                                        when {
+                                            tab == 0 -> {
+                                                details(duration)
+                                                playbackError?.let { message ->
+                                                    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+                                                        Text("播放失败：$message", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                                                        TextButton(onClick = onRetry) { Text("重试", color = Pink) }
+                                                    }
+                                                }
+                                            }
+
+                                            extraDetailPane is PlayerExtraDetailPane.Content -> extraDetailPane.render(duration)
+
+                                            else -> Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
+                                                Text(detailTabs[tab], color = PlaybackInk, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                                Spacer(Modifier.height(8.dp))
+                                                Text(commentMessage, color = PlaybackMuted, fontSize = 13.sp)
+                                            }
+                                        }
                                     }
-                                }
-                            }
-
-                            extraDetailPane is PlayerExtraDetailPane.Content -> extraDetailPane.render(duration)
-
-                            else -> {
-                                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp)) {
-                                    Text(detailTabs.getOrNull(1) ?: "评论", color = PlaybackInk, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(commentMessage, color = PlaybackMuted, fontSize = 13.sp)
                                 }
                             }
                         }

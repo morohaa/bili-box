@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -102,6 +104,7 @@ internal fun PlayerDetailBar(
         Row(
             Modifier.height(30.dp)
                 .background(BarButtonBackground, RoundedCornerShape(15.dp))
+                .selectableGroup()
                 .padding(2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -118,7 +121,7 @@ internal fun PlayerDetailBar(
                         .then(if (selected) Modifier.shadow(2.dp, shape) else Modifier)
                         .clip(shape)
                         .background(if (selected) PlaybackSurface else Color.Transparent)
-                        .clickable(role = Role.Tab) { onSelectTab(index) }
+                        .selectable(selected = selected, role = Role.Tab) { onSelectTab(index) }
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
