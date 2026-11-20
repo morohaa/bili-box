@@ -1,6 +1,11 @@
 package io.github.bilibox.feature.online
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.os.Build
+import android.widget.Toast
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
@@ -11,6 +16,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextLayoutResult
@@ -78,8 +87,24 @@ internal fun CommentMessage(
             put(token, content)
         }
     }
+    val context = LocalContext.current
+    val clipboard = context.getSystemService(ClipboardManager::class.java)
+    val copyModifier = if (comment.message.isNotBlank() && clipboard != null) {
+        val copyMessage = {
+            clipboard.setPrimaryClip(ClipData.newPlainText("评论正文", comment.message))
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                Toast.makeText(context, "评论正文已复制", Toast.LENGTH_SHORT).show()
+            }
+            true
+        }
+        Modifier.pointerInput(context, comment.message) { detectTapGestures(onLongPress = { copyMessage() }) }
+            .semantics { onLongClick(label = "复制评论正文", action = copyMessage) }
+    } else {
+        Modifier
+    }
     Text(
         text,
+        modifier = copyModifier,
         color = PlaybackInk,
         fontSize = if (inThread) 14.sp else 15.sp,
         lineHeight = if (inThread) 22.sp else 23.sp,

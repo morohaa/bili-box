@@ -1,5 +1,6 @@
 package io.github.bilibox.feature.online
 
+import android.content.ClipboardManager
 import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -20,9 +22,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.platform.app.InstrumentationRegistry
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.data.bili.BiliException
 import io.github.bilibox.data.bili.VideoComment
@@ -417,8 +421,8 @@ class OnlineVideoCommentsTest {
     }
 
     @Test
-    fun longCommentStartsCollapsedAndCanBeExpandedAndCollapsedAgain() {
-        val message = (1..7).joinToString("\n") { "评论第 $it 行" }
+    fun longCommentCanBeCopiedInFullWhileCollapsedAndStillToggles() {
+        val message = (1..7).joinToString("\n") { "评论第 $it 行" } + "[滑稽]"
         setPlayerContent(loadComments = { _, _ -> VideoCommentPage(listOf(comment(1L, message)), null) })
         compose.onNodeWithText("评论 24").performClick()
 
@@ -430,6 +434,12 @@ class OnlineVideoCommentsTest {
 
         assertEquals(5, messageLayout().lineCount)
         assertTrue(messageLayout().isLineEllipsized(4))
+        compose.onNodeWithText(message).performTouchInput { longClick() }
+        compose.runOnIdle {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val clipboard = context.getSystemService(ClipboardManager::class.java)
+            assertEquals(message, clipboard?.primaryClip?.getItemAt(0)?.text?.toString())
+        }
         compose.onNodeWithText("展开全文").performClick()
         assertEquals(7, messageLayout().lineCount)
         assertFalse(messageLayout().hasVisualOverflow)
