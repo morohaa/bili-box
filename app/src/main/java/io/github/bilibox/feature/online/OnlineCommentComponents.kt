@@ -17,13 +17,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.InlineTextContent
-import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,13 +35,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.Placeholder
-import androidx.compose.ui.text.PlaceholderVerticalAlign
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.bilibox.core.ui.component.RemoteCover
@@ -54,6 +51,12 @@ import io.github.bilibox.data.bili.VideoCommentOrder
 internal val CommentInset: Color
     @Composable @ReadOnlyComposable
     get() = playbackColor(Color(0xFFF7F8FA), Color(0xFF2A2D33))
+
+private val CommentActionInk: Color
+    @Composable @ReadOnlyComposable
+    get() = playbackColor(Color(0xFFB52E61), Color(0xFFFFA3C1))
+
+private const val CollapsedCommentLines = 5
 
 @Composable
 internal fun CommentOrderBar(order: VideoCommentOrder, onOrderChange: (VideoCommentOrder) -> Unit) {
@@ -97,6 +100,7 @@ internal fun CommentFloor(
     ownerId: Long,
     compact: Boolean = false,
     inset: Boolean = false,
+    collapseLongMessage: Boolean = false,
     footer: (@Composable () -> Unit)? = null,
 ) {
     val avatar = normalizeImageUrl(comment.avatarUrl).takeIf { it.startsWith("https://") }.orEmpty()
@@ -111,12 +115,27 @@ internal fun CommentFloor(
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             CommentIdentity(comment, ownerId)
+            var expanded by rememberSaveable(comment.id, comment.message) { mutableStateOf(false) }
+            var overflows by remember(comment.id, comment.message) { mutableStateOf(false) }
+            val collapsed = collapseLongMessage && !expanded
             Text(
                 comment.message.ifBlank { "（无文字内容）" },
                 color = PlaybackInk,
                 fontSize = if (compact) 14.sp else 15.sp,
                 lineHeight = if (compact) 20.sp else 23.sp,
+                maxLines = if (collapsed) CollapsedCommentLines else Int.MAX_VALUE,
+                overflow = if (collapsed) TextOverflow.Ellipsis else TextOverflow.Clip,
+                onTextLayout = { if (collapsed) overflows = it.hasVisualOverflow },
             )
+            if (collapseLongMessage && (expanded || overflows)) {
+                Text(
+                    if (expanded) "收起全文" else "展开全文",
+                    Modifier.clickable(role = Role.Button) { expanded = !expanded }.padding(vertical = 4.dp),
+                    color = CommentActionInk,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
             CommentMetadata(comment)
             if (footer != null) Box(Modifier.padding(top = 4.dp)) { footer() }
         }
@@ -173,43 +192,21 @@ private fun CommentMetadata(comment: VideoComment) {
 }
 
 @Composable
-internal fun CommentReplyPreview(comment: VideoComment, onClick: () -> Unit) {
-    val authorInk = PlaybackMuted
-    val accent = playbackColor(Color(0xFFB52E61), Color(0xFFFFA3C1))
-    Column(
+internal fun CommentReplyEntry(replyCount: Int, onClick: () -> Unit) {
+    val accent = CommentActionInk
+    Row(
         Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(8.dp)).background(CommentInset)
             .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 11.dp, vertical = 7.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        comment.previewReply?.let { preview ->
-            val teaser = buildAnnotatedString {
-                withStyle(SpanStyle(color = authorInk, fontWeight = FontWeight.Medium)) {
-                    append(preview.author)
-                    preview.authorLevel?.let { level ->
-                        append(" ")
-                        appendInlineContent("level", "LV$level")
-                    }
-                    append("：")
-                }
-                append(preview.message.ifBlank { "（无文字内容）" })
-            }
-            val inlineContent = preview.authorLevel?.let { level ->
-                val badge = InlineTextContent(Placeholder(20.sp, 10.sp, PlaceholderVerticalAlign.TextCenter)) {
-                    OnlineUserLevelBadge(level, Modifier.fillMaxSize())
-                }
-                mapOf("level" to badge)
-            }.orEmpty()
-            Text(teaser, color = PlaybackInk, fontSize = 13.sp, lineHeight = 19.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, inlineContent = inlineContent)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("查看 ${formatCompactCount(comment.replyCount.toLong())} 条回复", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-            Canvas(Modifier.size(12.dp)) {
-                val start = Offset(size.width * .38f, size.height * .22f)
-                val point = Offset(size.width * .66f, size.height * .5f)
-                val end = Offset(start.x, size.height - start.y)
-                drawLine(accent, start, point, 1.3.dp.toPx(), StrokeCap.Round)
-                drawLine(accent, point, end, 1.3.dp.toPx(), StrokeCap.Round)
-            }
+        Text("查看 ${formatCompactCount(replyCount.toLong())} 条回复", color = accent, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Canvas(Modifier.size(12.dp)) {
+            val start = Offset(size.width * .38f, size.height * .22f)
+            val point = Offset(size.width * .66f, size.height * .5f)
+            val end = Offset(start.x, size.height - start.y)
+            drawLine(accent, start, point, 1.3.dp.toPx(), StrokeCap.Round)
+            drawLine(accent, point, end, 1.3.dp.toPx(), StrokeCap.Round)
         }
     }
 }

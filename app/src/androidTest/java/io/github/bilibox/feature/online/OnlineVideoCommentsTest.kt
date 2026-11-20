@@ -4,6 +4,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.hasScrollToIndexAction
@@ -12,6 +13,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.media3.exoplayer.ExoPlayer
 import io.github.bilibox.core.ui.theme.BiliBoxTheme
 import io.github.bilibox.data.bili.BiliException
@@ -21,6 +24,8 @@ import io.github.bilibox.data.bili.VideoCommentPage
 import io.github.bilibox.feature.player.VideoPlayerScreen
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -66,11 +71,12 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("按热度").assertIsDisplayed()
         compose.onNodeWithText("共 24 条评论").assertDoesNotExist()
         compose.onNodeWithText("第一条热门评论").assertIsDisplayed()
+        compose.onNodeWithText("展开全文").assertDoesNotExist()
         compose.onNodeWithText("置顶").assertIsDisplayed()
         compose.onNodeWithText("UP").assertIsDisplayed()
         compose.onNodeWithContentDescription("LV6").assertIsDisplayed()
-        compose.onNodeWithContentDescription("LV0", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithText("第一条回复预览", substring = true).assertIsDisplayed()
+        compose.onNodeWithContentDescription("LV0", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("第一条回复预览", substring = true).assertDoesNotExist()
         compose.onNodeWithText("查看 12 条回复").performClick()
         compose.onNodeWithText("评论详情").assertIsDisplayed()
         compose.onNodeWithText("全部回复（12）").assertIsDisplayed()
@@ -88,13 +94,14 @@ class OnlineVideoCommentsTest {
         compose.onNodeWithText("最新评论").assertIsDisplayed()
         compose.onNodeWithText("最新的一条测试评论").assertIsDisplayed()
         compose.onNodeWithText("第一条热门评论").assertDoesNotExist()
-        compose.onNodeWithContentDescription("LV0", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("页内回复").assertDoesNotExist()
         compose.onNodeWithText("查看 2 条回复").performClick()
         compose.onNodeWithText("页内回复").assertIsDisplayed()
         compose.onNodeWithContentDescription("LV3").assertIsDisplayed()
         compose.onNodeWithText("评论详情").assertDoesNotExist()
         compose.onNodeWithText("收起回复").performClick()
         compose.onNodeWithText("页内回复").assertDoesNotExist()
+        compose.onNodeWithText("查看 2 条回复").assertIsDisplayed()
         compose.onNodeWithText("按时间").performClick()
         compose.onNodeWithText("按热度").assertIsDisplayed()
         compose.onNodeWithText("热门评论").assertIsDisplayed()
@@ -112,6 +119,28 @@ class OnlineVideoCommentsTest {
                 requests,
             )
         }
+    }
+
+    @Test
+    fun longCommentStartsCollapsedAndCanBeExpandedAndCollapsedAgain() {
+        val message = (1..7).joinToString("\n") { "评论第 $it 行" }
+        setPlayerContent(loadComments = { _, _ -> VideoCommentPage(listOf(comment(1L, message)), null) })
+        compose.onNodeWithText("评论 24").performClick()
+
+        fun messageLayout(): TextLayoutResult {
+            val results = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText(message).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+            return results.single()
+        }
+
+        assertEquals(5, messageLayout().lineCount)
+        assertTrue(messageLayout().isLineEllipsized(4))
+        compose.onNodeWithText("展开全文").performClick()
+        assertEquals(7, messageLayout().lineCount)
+        assertFalse(messageLayout().hasVisualOverflow)
+        compose.onNodeWithText("收起全文").performClick()
+        assertEquals(5, messageLayout().lineCount)
+        assertTrue(messageLayout().isLineEllipsized(4))
     }
 
     @Test

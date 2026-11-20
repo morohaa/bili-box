@@ -115,11 +115,11 @@ internal fun onlineVideoCommentsPane(
         item(key = "comment-order") { CommentOrderBar(order) { order = it } }
         items(pager.comments, key = { it.id }) { comment ->
             Column {
-                CommentFloor(comment, ownerId) {
+                CommentFloor(comment, ownerId, collapseLongMessage = true) {
                     if (comment.id == inlineRoot && inlineReplies != null) {
                         InlineCommentReplies(inlineReplies, ownerId, onCollapse = { inlineRoot = null })
                     } else if (comment.replyCount > 0) {
-                        CommentReplyPreview(comment) {
+                        CommentReplyEntry(comment.replyCount) {
                             if (comment.replyCount <= InlineReplyLimit) inlineRoot = comment.id else sheetRoot = comment
                         }
                     }
