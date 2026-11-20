@@ -5,6 +5,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+private val IpLocationPrefix = Regex("^IP\\s*属地\\s*[:：]?\\s*", RegexOption.IGNORE_CASE)
+
 internal enum class VideoCommentOrder(val mode: String) {
     HOT("3"),
     NEWEST("2"),
@@ -24,6 +26,7 @@ internal data class VideoComment(
     val previewReply: VideoComment? = null,
     val dialogId: Long = 0L,
     val emotes: Map<String, VideoCommentEmote> = emptyMap(),
+    val ipLocation: String? = null,
 )
 
 internal data class VideoCommentPage<Key : Any>(
@@ -122,6 +125,7 @@ internal data class VideoCommentPayload(
     private val replies: List<VideoCommentPayload>? = null,
     @SerialName("dialog_str") private val dialogId: String? = null,
     private val dialog: Long = 0L,
+    @SerialName("reply_control") private val replyControl: VideoCommentReplyControl? = null,
 ) {
     fun toComment(pinned: Boolean = false, includePreview: Boolean = false): VideoComment? {
         val commentId = (id?.toLongOrNull() ?: rpid).takeIf { it > 0 } ?: return null
@@ -139,9 +143,13 @@ internal data class VideoCommentPayload(
             previewReply = if (includePreview) replies.orEmpty().firstNotNullOfOrNull { it.toComment() } else null,
             dialogId = dialogId?.toLongOrNull() ?: dialog,
             emotes = content?.emotes.orEmpty(),
+            ipLocation = replyControl?.location?.trim()?.replaceFirst(IpLocationPrefix, "")?.takeIf(String::isNotEmpty),
         )
     }
 }
+
+@Serializable
+internal data class VideoCommentReplyControl(val location: String? = null)
 
 @Serializable
 internal data class VideoCommentMember(

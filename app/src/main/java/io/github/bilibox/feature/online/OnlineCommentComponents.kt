@@ -175,9 +175,10 @@ private fun CommentBadge(label: String, ink: Color, fill: Color) {
 private fun CommentMetadata(comment: VideoComment, inThread: Boolean, onViewDialog: (() -> Unit)?) {
     val muted = PlaybackMuted
     val likes = formatCompactCount(comment.likes)
+    val hasMetadata = comment.timestampSeconds > 0 || comment.ipLocation != null || onViewDialog != null
     val arrangement = when {
         !inThread -> Arrangement.spacedBy(14.dp)
-        comment.timestampSeconds > 0 || onViewDialog != null -> Arrangement.SpaceBetween
+        hasMetadata -> Arrangement.SpaceBetween
         else -> Arrangement.End
     }
     FlowRow(
@@ -185,11 +186,12 @@ private fun CommentMetadata(comment: VideoComment, inThread: Boolean, onViewDial
         horizontalArrangement = arrangement,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        if (comment.timestampSeconds > 0 || onViewDialog != null) {
+        if (hasMetadata) {
             FlowRow(Modifier.align(Alignment.CenterVertically), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (comment.timestampSeconds > 0) {
                     Text(remember(comment.timestampSeconds) { formatPublishDateTime(comment.timestampSeconds) }, color = muted, fontSize = 11.sp)
                 }
+                comment.ipLocation?.let { location -> Text(location, color = muted, fontSize = 11.sp) }
                 if (onViewDialog != null) {
                     Text(
                         "查看对话",

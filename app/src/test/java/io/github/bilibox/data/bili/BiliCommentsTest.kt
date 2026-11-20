@@ -134,6 +134,25 @@ class BiliCommentsTest {
         assertTrue(page.comments[1].emotes.isEmpty())
     }
 
+    @Test
+    fun keepsOnlyTheRegionFromReportedIpLocationAndOmitsMissingOrBlankValues() {
+        val page = Json.decodeFromString<VideoCommentRepliesPayload>(
+            """
+                {"page":{"size":20,"count":8},"replies":[
+                    {"rpid":1,"reply_control":{"location":" IP属地：广东 "}},
+                    {"rpid":2,"reply_control":{"location":"  "}},
+                    {"rpid":3,"reply_control":{"location":null}},
+                    {"rpid":4,"reply_control":{}},
+                    {"rpid":5},
+                    {"rpid":6,"reply_control":{"location":"  ip 属地: 浙江 "}},
+                    {"rpid":7,"reply_control":{"location":"上海"}},
+                    {"rpid":8,"reply_control":{"location":"IP属地： "}}
+                ]}
+            """.trimIndent(),
+        ).toPage(requestedPage = 1)
+        assertEquals(listOf("广东", null, null, null, null, "浙江", "上海", null), page.comments.map(VideoComment::ipLocation))
+    }
+
     private fun client(requests: MutableList<Request>, respond: (Request) -> String): BiliClient = BiliClient(
         OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()

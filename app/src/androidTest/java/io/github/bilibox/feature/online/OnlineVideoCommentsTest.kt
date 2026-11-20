@@ -188,22 +188,33 @@ class OnlineVideoCommentsTest {
 
     @Test
     fun dialogActionSharesMetadataRowAndPanelSlidesInAndOut() {
-        val root = comment(10L, "有对话的评论", replyCount = 1)
-        val reply = comment(12L, "有对话的回复").copy(timestampSeconds = 1_700_000_000L, likes = 5L, dialogId = 11L)
+        val root = comment(10L, "有对话的评论", replyCount = 1).copy(ipLocation = "广东")
+        val reply = comment(12L, "有对话的回复").copy(
+            timestampSeconds = 1_700_000_000L,
+            likes = 5L,
+            dialogId = 11L,
+            ipLocation = "浙江",
+        )
         setPlayerContent(
             loadComments = { _, _ -> VideoCommentPage(listOf(root), null) },
             loadReplies = { _, _ -> VideoCommentPage(listOf(reply), null) },
             loadDialog = { _, _, _ -> VideoCommentPage(listOf(reply), null) },
         )
         compose.onNodeWithText("评论 24").performClick()
+        compose.onNodeWithText("广东").assertIsDisplayed()
+        compose.onNodeWithText("浙江").assertDoesNotExist()
         compose.onNodeWithText("查看 1 条回复").performClick()
 
         val action = compose.onNodeWithText("查看对话")
         val actionBounds = action.getUnclippedBoundsInRoot()
         val timeBounds = compose.onNodeWithText(formatPublishDateTime(reply.timestampSeconds)).getUnclippedBoundsInRoot()
+        val location = compose.onNodeWithText("浙江").assertIsDisplayed()
+        val locationBounds = location.getUnclippedBoundsInRoot()
         val likesBounds = compose.onNodeWithContentDescription("5 个赞").getUnclippedBoundsInRoot()
         assertEquals(timeBounds.top.value, actionBounds.top.value, 0.5f)
-        assertTrue(timeBounds.right < actionBounds.left && actionBounds.right < likesBounds.left)
+        assertEquals(timeBounds.top.value, locationBounds.top.value, 0.5f)
+        assertTrue(timeBounds.right < locationBounds.left && locationBounds.right < actionBounds.left)
+        assertTrue(actionBounds.right < likesBounds.left)
         assertTrue(likesBounds.top < actionBounds.bottom && actionBounds.top < likesBounds.bottom)
 
         val panelTop = compose.onNodeWithTag("comment-replies-panel").getUnclippedBoundsInRoot().top.value
@@ -215,6 +226,7 @@ class OnlineVideoCommentsTest {
             assertTrue(dialog.getUnclippedBoundsInRoot().top.value > panelTop)
             compose.mainClock.advanceTimeBy(384)
             assertEquals(panelTop, dialog.getUnclippedBoundsInRoot().top.value, 0.5f)
+            location.assertIsDisplayed()
 
             compose.onNodeWithContentDescription("关闭对话列表").performClick()
             compose.mainClock.advanceTimeBy(96)
