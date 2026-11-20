@@ -46,6 +46,7 @@ internal data class PlayerBottomBarState(
     val bufferedPosition: Long,
     val scrubbing: Boolean,
     val scrubPosition: Float,
+    val isPlaying: Boolean,
     val playWhenReady: Boolean,
     val playbackState: Int,
     val danmakuSupported: Boolean,
@@ -99,6 +100,7 @@ internal fun PlayerBottomBar(
             preview = preview,
             onSeekCanceled = actions.onSeekCanceled,
             bookmarkPositions = state.bookmarkPositions,
+            isPlaying = state.isPlaying,
         )
     }
 

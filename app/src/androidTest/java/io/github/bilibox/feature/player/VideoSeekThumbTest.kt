@@ -70,4 +70,56 @@ class VideoSeekThumbTest {
             }
         }
     }
+
+    @Test
+    fun corgiKeepsItsFaceCenteredAndWagsOnlyDuringPlayback() {
+        var playing by mutableStateOf(false)
+        var scrubbing by mutableStateOf(false)
+        compose.setContent {
+            CompositionLocalProvider(LocalSeekThumbStyle provides SeekThumbStyle.CORGI) {
+                VideoSeekBar(
+                    position = 500f,
+                    duration = 1_000L,
+                    bufferedPosition = 750L,
+                    onSeek = {},
+                    onSeekFinished = {},
+                    scrubbing = scrubbing,
+                    isPlaying = playing,
+                )
+            }
+        }
+        val thumb = compose.onNodeWithTag("player-seek-thumb-CORGI", useUnmergedTree = true)
+        val track = compose.onNodeWithTag("player-seek-track", useUnmergedTree = true)
+        val originalTrackBounds = track.fetchSemanticsNode().boundsInRoot
+        val resting = thumb.captureToImage().toPixelMap()
+        val eyesAndNose = listOf(.41f to .45f, .59f to .45f, .51f to .55f)
+        eyesAndNose.forEach { (horizontal, vertical) ->
+            val ink = resting[(resting.width * horizontal).toInt(), (resting.height * vertical).toInt()]
+            assertTrue(ink.red < .35f && ink.green < .35f && ink.blue < .35f)
+        }
+
+        fun matchesResting(columns: IntRange): Boolean {
+            val frame = thumb.captureToImage().toPixelMap()
+            return columns.all { column -> (0 until resting.height).all { row -> frame[column, row] == resting[column, row] } }
+        }
+
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { playing = true }
+        compose.mainClock.advanceTimeBy(64)
+        val faceStart = resting.width / 3
+        assertTrue(!matchesResting(0 until faceStart))
+        assertTrue(matchesResting(faceStart until resting.width))
+        assertEquals(originalTrackBounds, track.fetchSemanticsNode().boundsInRoot)
+
+        compose.runOnIdle { scrubbing = true }
+        compose.mainClock.advanceTimeBy(64)
+        assertTrue(matchesResting(0 until resting.width))
+
+        compose.runOnIdle {
+            playing = false
+            scrubbing = false
+        }
+        compose.mainClock.advanceTimeBy(64)
+        assertTrue(matchesResting(0 until resting.width))
+    }
 }

@@ -546,6 +546,7 @@ internal fun VideoPlayerScreen(
                             bufferedPosition = bufferedPosition,
                             scrubbing = scrub.active,
                             scrubPosition = scrub.position,
+                            isPlaying = isPlaying,
                             playWhenReady = playWhenReady,
                             playbackState = playbackState,
                             danmakuSupported = danmakuSupported,

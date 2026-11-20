@@ -30,6 +30,7 @@ internal fun VideoSeekBar(
     preview: PlayerSeekPreviewController? = null,
     onSeekCanceled: () -> Unit = {},
     bookmarkPositions: List<Long> = emptyList(),
+    isPlaying: Boolean = false,
 ) {
     // Keep the visual layout compact; Compose still expands the touch target.
     val accent = OnlinePink
@@ -53,7 +54,14 @@ internal fun VideoSeekBar(
                 enabled = duration > 0,
                 modifier = Modifier.fillMaxWidth().height(24.dp).semantics { contentDescription = "播放进度" },
                 interactionSource = interactionSource,
-                thumb = { SeekThumb(thumbStyle, accent, Modifier.testTag("player-seek-thumb-${thumbStyle.name}")) },
+                thumb = {
+                    SeekThumb(
+                        style = thumbStyle,
+                        accent = accent,
+                        modifier = Modifier.testTag("player-seek-thumb-${thumbStyle.name}"),
+                        animate = isPlaying && !scrubbing,
+                    )
+                },
                 track = { sliderState ->
                     Canvas(Modifier.fillMaxWidth().height(2.5.dp).testTag("player-seek-track")) {
                         val played = (sliderState.value / duration.coerceAtLeast(1L)).coerceIn(0f, 1f)

@@ -22,12 +22,14 @@ import kotlin.math.sin
 internal val SeekThumbWidth = 18.dp
 
 @Composable
-internal fun SeekThumb(style: SeekThumbStyle, accent: Color, modifier: Modifier = Modifier) {
+internal fun SeekThumb(style: SeekThumbStyle, accent: Color, modifier: Modifier = Modifier, animate: Boolean = false) {
     val thumbModifier = modifier.size(width = SeekThumbWidth, height = 16.dp)
     when (style) {
         SeekThumbStyle.TELEVISION -> TelevisionSeekThumb(accent, thumbModifier)
 
         SeekThumbStyle.XIAOHEI -> XiaoheiSeekThumb(thumbModifier)
+
+        SeekThumbStyle.CORGI -> CorgiSeekThumb(thumbModifier, animate)
 
         SeekThumbStyle.DOT -> Canvas(thumbModifier) {
             val radius = 5.dp.toPx()
