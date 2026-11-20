@@ -42,7 +42,7 @@ class BiliFavoritesTest {
         val requests = mutableListOf<Request>()
         val source = source(requests) {
             """{"code":0,"data":{"has_more":1,"info":{"media_count":24},"medias":[
-                {"id":1,"type":2,"attr":0,"title":"A & B","bvid":"BV123","duration":3661,"cover":"http://i.example/a","upper":{"name":"UP"},"cnt_info":{"play":123,"danmaku":7},"fav_time":100,"pubtime":90},
+                {"id":1,"type":2,"attr":0,"title":"A & B","bvid":"BV123","duration":3661,"cover":"http://i.example/a","upper":{"name":"UP","mid":42,"face":"//i.example/face.jpg"},"cnt_info":{"play":123,"danmaku":7},"fav_time":100,"pubtime":90},
                 {"id":2,"type":2,"attr":9,"title":"失效视频","bvid":"BV456"},
                 {"id":3,"type":12,"title":"音频"},
                 {"id":4,"type":2,"title":"无 BV"}
@@ -59,6 +59,8 @@ class BiliFavoritesTest {
         assertEquals(7L, video.commentCount)
         assertEquals("123", video.playCount)
         assertEquals("https://i.example/a", video.coverUrl)
+        assertEquals(42L, video.authorId)
+        assertEquals("https://i.example/face.jpg", video.authorAvatarUrl)
         page.items.drop(1).forEach {
             assertNull(it.video)
             assertNotNull(it.unavailableReason)

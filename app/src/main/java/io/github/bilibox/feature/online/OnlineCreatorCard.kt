@@ -19,6 +19,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -43,6 +48,26 @@ import io.github.bilibox.core.ui.theme.PlaybackDivider
 import io.github.bilibox.core.ui.theme.PlaybackMuted
 import io.github.bilibox.core.ui.theme.PlaybackSurface
 import io.github.bilibox.core.ui.theme.PlaybackText
+import io.github.bilibox.data.bili.BiliClient
+import io.github.bilibox.data.bili.UserCardData
+import kotlinx.coroutines.CancellationException
+
+@Composable
+internal fun rememberOnlineCreatorCard(client: BiliClient, summaryAuthorId: Long, detailAuthorId: Long?): UserCardData? {
+    val authorId = detailAuthorId?.takeIf { it > 0L } ?: summaryAuthorId
+    var card by remember(client, authorId) { mutableStateOf<UserCardData?>(null) }
+    LaunchedEffect(client, authorId) {
+        if (authorId <= 0L) return@LaunchedEffect
+        card = try {
+            client.userCard(authorId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
+    }
+    return card
+}
 
 /** Creator card with the reference design's pink accent line on the left. */
 @Composable

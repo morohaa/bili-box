@@ -36,7 +36,6 @@ import io.github.bilibox.data.bili.BiliClient
 import io.github.bilibox.data.bili.BiliPlayback
 import io.github.bilibox.data.bili.BiliQn
 import io.github.bilibox.data.bili.PlayData
-import io.github.bilibox.data.bili.UserCardData
 import io.github.bilibox.data.bili.VideoInfo
 import io.github.bilibox.data.danmaku.Danmaku
 import io.github.bilibox.data.danmaku.DanmakuParser
@@ -89,6 +88,8 @@ internal fun OnlineVideoScreen(
     var durlFallbackTried by remember(video.bvid, cookie) { mutableStateOf(false) }
     var html5FallbackTried by remember(video.bvid, cookie) { mutableStateOf(false) }
     var videoInfo by remember(video.bvid, cookie) { mutableStateOf<VideoInfo?>(null) }
+    var clientReady by remember(client) { mutableStateOf(false) }
+    val creatorCard = if (clientReady) rememberOnlineCreatorCard(client, video.authorId, videoInfo?.owner?.mid) else null
     var selectedPage by rememberSaveable(video.bvid, cookie) { mutableIntStateOf(1) }
     var selectedQn by rememberSaveable(video.bvid, cookie) { mutableIntStateOf(BiliQn.P1080) }
     // The quality the server actually started, which can be lower than the requested one.
@@ -100,7 +101,6 @@ internal fun OnlineVideoScreen(
     var episodesSheetVisible by rememberSaveable(video.bvid, cookie) { mutableStateOf(false) }
     var playbackMode by rememberSaveable(video.bvid, cookie) { mutableStateOf(PlaybackMode.SEQUENTIAL) }
     var episodesInGridView by rememberSaveable(video.bvid, cookie) { mutableStateOf(false) }
-    var creatorCard by remember(video.bvid, cookie) { mutableStateOf<UserCardData?>(null) }
     // Cache sheet data + queue. The controller lives for the whole video screen
     // so downloads keep running after the sheet is dismissed.
     val cacheDownloader = remember(context, client, cookie) {
@@ -456,14 +456,8 @@ internal fun OnlineVideoScreen(
                     playbackCid = 0L
                     exoPlayer.stop()
                 },
-                onVideoInfo = { info ->
-                    videoInfo = info
-                    if (info.owner.mid > 0) {
-                        scope.launch {
-                            creatorCard = runCatching { client.userCard(info.owner.mid) }.getOrNull()
-                        }
-                    }
-                },
+                onClientReady = { clientReady = true },
+                onVideoInfo = { videoInfo = it },
                 onPageResolved = { selectedPage = it },
                 onLoaded = { cid, data, qn, resumeAtMs, resumePlaying ->
                     playbackCid = cid

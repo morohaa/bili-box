@@ -167,6 +167,8 @@ data class VideoSearchItem(
     val duration: String = "",
     val bvid: String = "",
     val pic: String = "",
+    val authorId: Long = 0,
+    val authorAvatarUrl: String = "",
 )
 
 data class VideoSearchPage(

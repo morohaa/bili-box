@@ -20,16 +20,20 @@ class BiliSearchTest {
             val request = chain.request()
             requests += request
             val body = when (request.url.encodedPath) {
-                "/x/web-interface/nav" -> """{"code":0,"data":{"wbi_img":{
+                "/x/web-interface/nav" ->
+                    """{"code":0,"data":{"wbi_img":{
                     "img_url":"https://example.com/0123456789abcdef0123456789abcdef.png",
                     "sub_url":"https://example.com/abcdef0123456789abcdef0123456789.png"
                 }}}"""
+
                 "/x/frontend/finger/spi" -> """{"code":0,"data":{"b_3":"fixture-fingerprint"}}"""
+
                 "/x/web-interface/wbi/search/type" -> if (++searchAttempts == 1) {
                     """{"code":-403}"""
                 } else {
-                    """{"code":0,"data":{"result":[{"bvid":"BV-fixture"}]}}"""
+                    """{"code":0,"data":{"result":[{"bvid":"BV-fixture","mid":42,"upic":"//i.example/face.jpg"}]}}"""
                 }
+
                 else -> error("Unexpected request path: ${request.url.encodedPath}")
             }
             Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(200).message("OK")
@@ -40,6 +44,8 @@ class BiliSearchTest {
         val result = client.searchVideos("Kotlin", page = 2, forceAnonymous = true)
 
         assertEquals("BV-fixture", result.items.single().bvid)
+        assertEquals(42L, result.items.single().authorId)
+        assertEquals("//i.example/face.jpg", result.items.single().authorAvatarUrl)
         assertEquals(2, searchAttempts)
         assertFalse(requests.any { it.url.encodedPath.endsWith("/spi") })
         requests.forEach { assertNull(it.header("Cookie")) }

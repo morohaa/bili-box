@@ -8,5 +8,7 @@ internal data class VideoSummary(
     val publishTime: Long,
     val duration: String,
     val bvid: String,
-    val coverUrl: String
+    val coverUrl: String,
+    val authorId: Long = 0,
+    val authorAvatarUrl: String = "",
 )

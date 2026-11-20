@@ -20,6 +20,7 @@ internal data class OnlinePlaybackLoadRequest(
 /** UI callbacks used to publish the result without coupling the loader to Compose or ExoPlayer. */
 internal data class OnlinePlaybackLoadCallbacks(
     val onStart: () -> Unit,
+    val onClientReady: () -> Unit,
     val onVideoInfo: (VideoInfo) -> Unit,
     val onPageResolved: (Int) -> Unit,
     val onLoaded: (cid: Long, data: PlayData, quality: Int, resumeAtMs: Long, resumePlaying: Boolean) -> Unit,
@@ -50,6 +51,7 @@ internal class OnlinePlaybackLoadCoordinator(
             try {
                 val info = videoInfo ?: run {
                     client.warmUp()
+                    callbacks.onClientReady()
                     client.videoInfo(bvid).also {
                         videoInfo = it
                         callbacks.onVideoInfo(it)

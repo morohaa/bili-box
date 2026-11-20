@@ -64,7 +64,8 @@ private fun favoriteVideo(item: JsonObject): FavoriteVideo? {
     val title = item.text("title").ifBlank { "失效视频" }
     val bvid = item.text("bvid").ifBlank { item.text("bv_id") }
     val cover = secureCover(item.text("cover"))
-    val author = (item["upper"] as? JsonObject)?.text("name").orEmpty().ifBlank { "未知 UP 主" }
+    val upper = item["upper"] as? JsonObject
+    val author = upper?.text("name").orEmpty().ifBlank { "未知 UP 主" }
     val seconds = item.number("duration").coerceAtLeast(0)
     val duration = if (seconds >= 3600) {
         "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60)
@@ -95,6 +96,8 @@ private fun favoriteVideo(item: JsonObject): FavoriteVideo? {
                 duration = duration,
                 bvid = bvid,
                 coverUrl = cover,
+                authorId = upper?.number("mid") ?: 0L,
+                authorAvatarUrl = secureCover(upper?.text("face").orEmpty()),
             )
         } else {
             null

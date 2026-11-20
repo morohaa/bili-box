@@ -14,6 +14,8 @@ internal fun toVideoSummary(item: VideoSearchItem): VideoSummary {
         publishTime = item.publishTime,
         duration = item.duration,
         bvid = item.bvid,
+        authorId = item.authorId,
+        authorAvatarUrl = item.authorAvatarUrl,
         coverUrl = when {
             item.pic.startsWith("//") -> "https:${item.pic}"
             item.pic.startsWith("http://") -> item.pic.replaceFirst("http://", "https://")

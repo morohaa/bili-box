@@ -86,7 +86,10 @@ internal fun OnlineVideoDetails(
     val ownerName = owner?.name?.takeIf { it.isNotBlank() }
         ?: creatorCard?.card?.name?.takeIf { it.isNotBlank() }
         ?: video.author
-    val avatar = normalizeImageUrl(owner?.face.orEmpty().ifBlank { creatorCard?.card?.face.orEmpty() })
+    val summaryAvatar = video.authorAvatarUrl.takeIf { owner == null || owner.mid <= 0L || owner.mid == video.authorId }
+    val avatar = normalizeImageUrl(
+        owner?.face.orEmpty().ifBlank { creatorCard?.card?.face.orEmpty() }.ifBlank { summaryAvatar.orEmpty() },
+    )
     val stat = info?.stat
     val title = info?.title?.takeIf { it.isNotBlank() } ?: video.title
     val bvId = info?.bvid?.ifBlank { video.bvid } ?: video.bvid

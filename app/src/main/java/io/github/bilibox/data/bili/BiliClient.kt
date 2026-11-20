@@ -233,6 +233,8 @@ class BiliClient(
                 duration = item.stringValue("duration").ifBlank { "--:--" },
                 bvid = bvid,
                 pic = item.stringValue("pic"),
+                authorId = item.stringValue("mid").toLongOrNull() ?: 0L,
+                authorAvatarUrl = item.stringValue("upic"),
             )
         }
         val totalPages = data.stringValue("numPages").toIntOrNull() ?: 0
