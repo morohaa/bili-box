@@ -30,7 +30,7 @@ class BiliCommentsTest {
                     }}
                 """.trimIndent()
 
-                "/x/v2/reply/reply" -> """{"code":0,"data":{"page":{"size":20,"count":42},"replies":[{"rpid":3,"member":{"level_info":{"current_level":4}},"content":{"message":"楼中楼回复"}}]}}"""
+                "/x/v2/reply/reply" -> """{"code":0,"data":{"page":{"size":20,"count":42},"replies":[{"rpid":3,"dialog_str":"9007199254740993","member":{"level_info":{"current_level":4}},"content":{"message":"楼中楼回复"}}]}}"""
 
                 else -> error("Unexpected request: ${request.url.encodedPath}")
             }
@@ -58,6 +58,7 @@ class BiliCommentsTest {
         val thread = client.videoCommentReplies(42L, page.comments.first().id, 2)
         assertEquals("楼中楼回复", thread.comments.single().message)
         assertEquals(4, thread.comments.single().authorLevel)
+        assertEquals(9007199254740993L, thread.comments.single().dialogId)
         assertEquals(3, thread.nextKey)
 
         assertEquals(4, requests.size)
@@ -78,6 +79,29 @@ class BiliCommentsTest {
     }
 
     @Test
+    fun followsDialogFloorCursorAndStopsAtTheLastFloor() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val client = client(requests) { request ->
+            assertEquals("/x/v2/reply/dialog/cursor", request.url.encodedPath)
+            assertEquals("1", request.url.queryParameter("type"))
+            assertEquals("42", request.url.queryParameter("oid"))
+            assertEquals("31", request.url.queryParameter("root"))
+            assertEquals("9007199254740993", request.url.queryParameter("dialog"))
+            when (request.url.queryParameter("min_floor")) {
+                "0" -> """{"code":0,"data":{"cursor":{"next":100,"is_begin":true},"dialog":{"max_floor":243},"replies":[{"rpid":11,"dialog":9007199254740993}]}}"""
+                "100" -> """{"code":0,"data":{"cursor":{"next":244},"dialog":{"max_floor":243},"replies":[{"rpid":12}]}}"""
+                else -> error("Unexpected dialog cursor: ${request.url}")
+            }
+        }
+        val first = client.videoCommentDialog(42L, 31L, 9007199254740993L, 0L)
+        assertEquals(9007199254740993L, first.comments.single().dialogId)
+        val last = client.videoCommentDialog(42L, 31L, 9007199254740993L, checkNotNull(first.nextKey))
+        assertEquals(12L, last.comments.single().id)
+        assertNull(last.nextKey)
+        assertEquals(2, requests.size)
+    }
+
+    @Test
     fun emptyAndFinalPagesDoNotOfferAnotherRequest() {
         val top = Json.decodeFromString<VideoCommentListPayload>(
             """{"cursor":{"is_end":true,"pagination_reply":{"next_offset":"unused"}},"replies":null}""",
@@ -85,9 +109,14 @@ class BiliCommentsTest {
         val thread = Json.decodeFromString<VideoCommentRepliesPayload>(
             """{"page":{"size":20,"count":21},"replies":[{"rpid":5}]}""",
         ).toPage(requestedPage = 2)
+        val dialog = Json.decodeFromString<VideoCommentDialogPayload>(
+            """{"cursor":{"is_end":true},"replies":[]}""",
+        ).toPage(minFloor = 244L)
         assertTrue(top.comments.isEmpty())
         assertNull(top.nextKey)
         assertNull(thread.nextKey)
+        assertTrue(dialog.comments.isEmpty())
+        assertNull(dialog.nextKey)
     }
 
     private fun client(requests: MutableList<Request>, respond: (Request) -> String): BiliClient = BiliClient(

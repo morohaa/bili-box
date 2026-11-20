@@ -77,6 +77,15 @@ class BiliClient(
         return response.data?.toPage(page) ?: throw BiliException(-1, "回复接口未返回数据")
     }
 
+    internal suspend fun videoCommentDialog(aid: Long, rootId: Long, dialogId: Long, minFloor: Long): VideoCommentPage<Long> {
+        require(aid > 0L && rootId > 0L && dialogId > 0L && minFloor >= 0L)
+        val response = getJson<VideoCommentDialogPayload>(
+            "$COMMENTS_URL/dialog/cursor?type=1&oid=$aid&root=$rootId&dialog=$dialogId&min_floor=$minFloor&size=20",
+        )
+        ensureOk(response)
+        return response.data?.toPage(minFloor) ?: throw BiliException(-1, "对话接口未返回数据")
+    }
+
     /** 收藏接口沿用当前客户端的登录 Cookie 与请求头。 */
     internal suspend fun favoriteData(path: String, parameters: Map<String, String> = emptyMap()): JsonObject {
         val query = parameters.entries.joinToString("&") { (key, value) -> "$key=${encodeQuery(value)}" }

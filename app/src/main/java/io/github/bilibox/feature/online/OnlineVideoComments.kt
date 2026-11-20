@@ -1,9 +1,14 @@
 package io.github.bilibox.feature.online
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -11,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
@@ -26,8 +32,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,6 +53,8 @@ import io.github.bilibox.data.bili.VideoComment
 import io.github.bilibox.data.bili.VideoCommentOrder
 import io.github.bilibox.data.bili.VideoCommentPage
 import io.github.bilibox.feature.player.PlayerDetailBarHeight
+import io.github.bilibox.feature.player.PlayerDetailsOverlayEnter
+import io.github.bilibox.feature.player.PlayerDetailsOverlayExit
 import io.github.bilibox.feature.player.PlayerExtraDetailPane
 
 @Composable
@@ -62,6 +72,7 @@ internal fun rememberOnlineVideoComments(
     ownerId = ownerId,
     loadComments = { order, offset -> client.videoComments(requireNotNull(aid), offset, order) },
     loadReplies = { root, page -> client.videoCommentReplies(requireNotNull(aid), root, page) },
+    loadDialog = { root, dialog, minFloor -> client.videoCommentDialog(requireNotNull(aid), root, dialog, minFloor) },
 )
 
 @Composable
@@ -72,21 +83,23 @@ internal fun onlineVideoCommentsPane(
     onRetryVideoInfo: () -> Unit,
     loadComments: suspend (VideoCommentOrder, String) -> VideoCommentPage<String>,
     loadReplies: suspend (Long, Int) -> VideoCommentPage<Int>,
+    loadDialog: suspend (Long, Long, Long) -> VideoCommentPage<Long>,
     ownerId: Long = 0L,
 ): PlayerExtraDetailPane {
     val scope = rememberCoroutineScope()
     var order by remember(videoKey) { mutableStateOf(VideoCommentOrder.HOT) }
     var panelRoot by remember(videoKey, order) { mutableStateOf<VideoComment?>(null) }
+    var selectedReply by remember(videoKey, order, panelRoot?.id) { mutableStateOf<VideoComment?>(null) }
     val pager = remember(videoKey, order, scope) {
         val selectedOrder = order
         OnlineCommentPager("", scope) { offset -> loadComments(selectedOrder, offset) }
     }
     DisposableEffect(pager) { onDispose { pager.cancel() } }
     val repliesOverlay = panelRoot?.let { root ->
-        val dismiss = { panelRoot = null }
+        val dismiss = { if (selectedReply != null) selectedReply = null else panelRoot = null }
         PlayerExtraDetailPane.Overlay(onDismiss = dismiss) { modifier ->
             val replies = rememberCommentReplies(videoKey, root.id, loadReplies)
-            CommentRepliesPanel(modifier, root, ownerId, replies, dismiss)
+            CommentRepliesPanel(modifier, root, ownerId, replies, selectedReply, loadDialog, { selectedReply = it }, dismiss)
         }
     }
 
@@ -142,20 +155,94 @@ private fun CommentRepliesPanel(
     root: VideoComment,
     ownerId: Long,
     pager: OnlineCommentPager<Int>,
+    selectedReply: VideoComment?,
+    loadDialog: suspend (Long, Long, Long) -> VideoCommentPage<Long>,
+    onOpenDialog: (VideoComment) -> Unit,
     onDismiss: () -> Unit,
 ) {
     LaunchedEffect(pager) { pager.loadInitial() }
     var order by remember(root.id) { mutableStateOf(VideoCommentOrder.HOT) }
-    val replies = if (pager.hasMore) emptyList() else remember(pager.comments, order) {
-        val newestFirst = compareByDescending<VideoComment> { it.timestampSeconds }.thenByDescending { it.id }
-        val ordering = if (order == VideoCommentOrder.HOT) {
-            compareByDescending<VideoComment> { it.likes }.then(newestFirst)
-        } else {
-            newestFirst
-        }
-        pager.comments.sortedWith(ordering)
+    val listState = rememberLazyListState()
+    val sharedDialogs = remember(pager.comments) {
+        pager.comments.groupingBy(VideoComment::dialogId).eachCount()
     }
-    Column(modifier.background(PlaybackSurface).testTag("comment-replies-panel")) {
+    val replies = if (pager.hasMore) {
+        emptyList()
+    } else {
+        remember(pager.comments, order) {
+            val newestFirst = compareByDescending<VideoComment> { it.timestampSeconds }.thenByDescending { it.id }
+            val ordering = if (order == VideoCommentOrder.HOT) {
+                compareByDescending<VideoComment> { it.likes }.then(newestFirst)
+            } else {
+                newestFirst
+            }
+            pager.comments.sortedWith(ordering)
+        }
+    }
+    AnimatedContent(
+        targetState = selectedReply,
+        modifier = modifier.clipToBounds().testTag("comment-replies-panel"),
+        contentKey = { it != null },
+        transitionSpec = {
+            if (targetState != null) {
+                (PlayerDetailsOverlayEnter togetherWith ExitTransition.KeepUntilTransitionsFinished)
+                    .apply { targetContentZIndex = 1f }
+            } else {
+                EnterTransition.None togetherWith PlayerDetailsOverlayExit
+            }
+        },
+        label = "评论对话面板切换",
+    ) { dialogReply ->
+        val inDialog = dialogReply != null
+        val pageModifier = Modifier.fillMaxSize().background(PlaybackSurface)
+        Column(if (inDialog) pageModifier.testTag("comment-dialog-panel") else pageModifier) {
+            CommentPanelHeader(inDialog, onDismiss)
+            if (dialogReply != null) {
+                CommentDialogList(root.id, ownerId, dialogReply, loadDialog)
+                return@Column
+            }
+
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState) {
+                item(key = "thread-root") { CommentFloor(root, ownerId, inThread = true) }
+                item(key = "thread-order") {
+                    Column {
+                        HorizontalDivider(thickness = 8.dp, color = CommentInset)
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "相关回复共${root.replyCount}条",
+                                Modifier.weight(1f).padding(end = 8.dp),
+                                color = PlaybackMuted,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            CommentOrderToggle(order) { order = it }
+                        }
+                    }
+                }
+                items(replies, key = { it.id }) { reply ->
+                    val hasDialog = reply.dialogId > 0L && (reply.dialogId != reply.id || (sharedDialogs[reply.dialogId] ?: 0) > 1)
+                    val onViewDialog: (() -> Unit)? = if (hasDialog) ({ onOpenDialog(reply) }) else null
+                    CommentThreadReply(reply, ownerId, onViewDialog = onViewDialog)
+                }
+                item(key = "reply-status-${replies.size}") { CommentLoadState(pager, "暂无回复") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommentPanelHeader(inDialog: Boolean, onDismiss: () -> Unit) {
+    if (inDialog) {
+        Row(Modifier.fillMaxWidth().height(PlayerDetailBarHeight), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = "返回评论详情" }) {
+                AppGlyphIcon(AppIcon.BACK, PlaybackMuted, Modifier.size(22.dp))
+            }
+            Text("对话", color = PlaybackInk, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        }
+    } else {
         Row(
             Modifier.fillMaxWidth().height(PlayerDetailBarHeight).testTag("comment-replies-header").padding(start = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -168,35 +255,54 @@ private fun CommentRepliesPanel(
                 AppGlyphIcon(AppIcon.CLOSE, PlaybackMuted, Modifier.size(22.dp))
             }
         }
-        HorizontalDivider(color = PlaybackDivider, thickness = 1.dp)
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-            item(key = "thread-root") { CommentFloor(root, ownerId, inThread = true) }
-            item(key = "thread-order") {
-                Column {
-                    HorizontalDivider(thickness = 8.dp, color = CommentInset)
-                    Row(
-                        Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "相关回复共${root.replyCount}条",
-                            Modifier.weight(1f).padding(end = 8.dp),
-                            color = PlaybackMuted,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        CommentOrderToggle(order) { order = it }
-                    }
-                }
-            }
-            items(replies, key = { it.id }) { reply ->
-                Column {
-                    CommentFloor(reply, ownerId, inThread = true)
-                    HorizontalDivider(Modifier.padding(start = 54.dp, end = 12.dp), color = PlaybackDivider)
-                }
-            }
-            item(key = "reply-status-${replies.size}") { CommentLoadState(pager, "暂无回复") }
+    }
+    HorizontalDivider(color = PlaybackDivider, thickness = 1.dp)
+}
+
+@Composable
+private fun CommentDialogList(
+    rootId: Long,
+    ownerId: Long,
+    selectedReply: VideoComment,
+    loadDialog: suspend (Long, Long, Long) -> VideoCommentPage<Long>,
+) {
+    val scope = rememberCoroutineScope()
+    val pager = remember(rootId, selectedReply.dialogId, scope) {
+        OnlineCommentPager(0L, scope, loadAllPages = true) { minFloor -> loadDialog(rootId, selectedReply.dialogId, minFloor) }
+    }
+    DisposableEffect(pager) { onDispose { pager.cancel() } }
+    LaunchedEffect(pager) { pager.loadInitial() }
+    val replies = if (pager.hasMore) {
+        emptyList()
+    } else {
+        remember(pager.comments) { pager.comments.sortedWith(compareBy<VideoComment> { it.timestampSeconds }.thenBy { it.id }) }
+    }
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedReply.id, replies) {
+        val index = replies.indexOfFirst { it.id == selectedReply.id }
+        if (index >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.key == selectedReply.id }) {
+            listState.requestScrollToItem(index)
         }
+    }
+    LazyColumn(Modifier.fillMaxWidth().testTag("comment-dialog-list"), state = listState) {
+        items(replies, key = { it.id }) { reply ->
+            CommentThreadReply(reply, ownerId, highlighted = reply.id == selectedReply.id)
+        }
+        item(key = "dialog-status") { CommentLoadState(pager, "暂无对话") }
+    }
+}
+
+@Composable
+private fun CommentThreadReply(
+    reply: VideoComment,
+    ownerId: Long,
+    highlighted: Boolean = false,
+    onViewDialog: (() -> Unit)? = null,
+) {
+    val modifier = if (highlighted) Modifier.background(Pink.copy(alpha = .12f)).semantics { selected = true } else Modifier
+    Column(modifier) {
+        CommentFloor(reply, ownerId, inThread = true, onViewDialog = onViewDialog)
+        HorizontalDivider(Modifier.padding(start = 54.dp, end = 12.dp), color = PlaybackDivider)
     }
 }
 

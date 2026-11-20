@@ -8,8 +8,12 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -126,6 +130,96 @@ class OnlineVideoCommentsTest {
                 ),
                 requests,
             )
+        }
+    }
+
+    @Test
+    fun dialogShowsOnlyItsRepliesInTimeOrderAndBackRestoresTheReplyList() {
+        val anchor = comment(11L, "对话第一条").copy(timestampSeconds = 100L, dialogId = 11L)
+        val selected = comment(12L, "点开的那条回复").copy(timestampSeconds = 200L, dialogId = 11L)
+        val unrelated = List(12) { index ->
+            val id = 100L + index
+            comment(id, "无对话的回复 ${index + 1}").copy(
+                timestampSeconds = if (index < 6) 1_000L - index else 1L,
+                dialogId = id,
+            )
+        }
+        val root = comment(10L, "有一组对话的评论", replyCount = 14)
+        val requests = mutableListOf<Triple<Long, Long, Long>>()
+        setPlayerContent(
+            loadComments = { _, _ -> VideoCommentPage(listOf(root), null) },
+            loadReplies = { _, _ -> VideoCommentPage(unrelated + listOf(anchor, selected), null) },
+            loadDialog = { rootId, dialogId, minFloor ->
+                requests += Triple(rootId, dialogId, minFloor)
+                if (minFloor == 0L) VideoCommentPage(listOf(selected), 30L) else VideoCommentPage(listOf(anchor, selected), null)
+            },
+        )
+        compose.onNodeWithText("评论 24").performClick()
+        compose.onNodeWithText("查看 14 条回复").performClick()
+        compose.onNodeWithText("按热度").performClick()
+        compose.onNodeWithText("查看对话").assertDoesNotExist()
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(8)
+        val reply = compose.onNodeWithText(selected.message)
+        val originalTop = reply.getUnclippedBoundsInRoot().top.value
+        compose.onAllNodesWithText("查看对话")[0].performClick()
+
+        compose.onNodeWithText("对话").assertIsDisplayed()
+        compose.onNodeWithText(root.message).assertDoesNotExist()
+        compose.onNodeWithText("无对话的回复", substring = true).assertDoesNotExist()
+        compose.onNode(hasText(selected.message) and hasAnyAncestor(isSelected())).assertIsDisplayed()
+        compose.onNodeWithTag("comment-dialog-list").performScrollToIndex(0)
+        val firstTop = compose.onNodeWithText(anchor.message).getUnclippedBoundsInRoot().top.value
+        assertTrue(firstTop < reply.getUnclippedBoundsInRoot().top.value)
+        compose.runOnIdle { assertEquals(listOf(Triple(10L, 11L, 0L), Triple(10L, 11L, 30L)), requests) }
+
+        pressBack()
+        compose.onNodeWithText("评论详情").assertIsDisplayed()
+        assertEquals(originalTop, reply.getUnclippedBoundsInRoot().top.value, 0.5f)
+        compose.onAllNodesWithText("查看对话")[0].performClick()
+        compose.onNodeWithContentDescription("返回评论详情").performClick()
+        assertEquals(originalTop, reply.getUnclippedBoundsInRoot().top.value, 0.5f)
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(1)
+        compose.onNodeWithText("按时间").assertIsDisplayed()
+    }
+
+    @Test
+    fun dialogActionSharesMetadataRowAndPanelSlidesInAndOut() {
+        val root = comment(10L, "有对话的评论", replyCount = 1)
+        val reply = comment(12L, "有对话的回复").copy(timestampSeconds = 1_700_000_000L, likes = 5L, dialogId = 11L)
+        setPlayerContent(
+            loadComments = { _, _ -> VideoCommentPage(listOf(root), null) },
+            loadReplies = { _, _ -> VideoCommentPage(listOf(reply), null) },
+            loadDialog = { _, _, _ -> VideoCommentPage(listOf(reply), null) },
+        )
+        compose.onNodeWithText("评论 24").performClick()
+        compose.onNodeWithText("查看 1 条回复").performClick()
+
+        val action = compose.onNodeWithText("查看对话")
+        val actionBounds = action.getUnclippedBoundsInRoot()
+        val timeBounds = compose.onNodeWithText(formatPublishDateTime(reply.timestampSeconds)).getUnclippedBoundsInRoot()
+        val likesBounds = compose.onNodeWithContentDescription("5 个赞").getUnclippedBoundsInRoot()
+        assertEquals(timeBounds.top.value, actionBounds.top.value, 0.5f)
+        assertTrue(timeBounds.right < actionBounds.left && actionBounds.right < likesBounds.left)
+        assertTrue(likesBounds.top < actionBounds.bottom && actionBounds.top < likesBounds.bottom)
+
+        val panelTop = compose.onNodeWithTag("comment-replies-panel").getUnclippedBoundsInRoot().top.value
+        val dialog = compose.onNodeWithTag("comment-dialog-panel")
+        compose.mainClock.autoAdvance = false
+        try {
+            action.performClick()
+            compose.mainClock.advanceTimeBy(96)
+            assertTrue(dialog.getUnclippedBoundsInRoot().top.value > panelTop)
+            compose.mainClock.advanceTimeBy(384)
+            assertEquals(panelTop, dialog.getUnclippedBoundsInRoot().top.value, 0.5f)
+
+            compose.onNodeWithContentDescription("返回评论详情").performClick()
+            compose.mainClock.advanceTimeBy(96)
+            assertTrue(dialog.getUnclippedBoundsInRoot().top.value > panelTop)
+            compose.mainClock.advanceTimeBy(384)
+            dialog.assertDoesNotExist()
+            action.assertIsDisplayed()
+        } finally {
+            compose.mainClock.autoAdvance = true
         }
     }
 
@@ -278,6 +372,7 @@ class OnlineVideoCommentsTest {
     private fun setPlayerContent(
         loadComments: suspend (VideoCommentOrder, String) -> VideoCommentPage<String>,
         loadReplies: suspend (Long, Int) -> VideoCommentPage<Int> = { _, _ -> VideoCommentPage(emptyList(), null) },
+        loadDialog: suspend (Long, Long, Long) -> VideoCommentPage<Long> = { _, _, _ -> VideoCommentPage(emptyList(), null) },
     ) {
         compose.setContent {
             val context = LocalContext.current
@@ -298,6 +393,7 @@ class OnlineVideoCommentsTest {
                         ownerId = 1L,
                         loadComments = loadComments,
                         loadReplies = loadReplies,
+                        loadDialog = loadDialog,
                     ),
                     onBack = {},
                     onRetry = {},

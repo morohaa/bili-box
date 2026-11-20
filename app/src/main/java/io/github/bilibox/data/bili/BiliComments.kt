@@ -22,6 +22,7 @@ internal data class VideoComment(
     val authorId: Long = 0L,
     val authorLevel: Int? = null,
     val previewReply: VideoComment? = null,
+    val dialogId: Long = 0L,
 )
 
 internal data class VideoCommentPage<Key : Any>(
@@ -85,6 +86,30 @@ internal data class VideoCommentRepliesPayload(
 internal data class VideoCommentReplyPage(val size: Int = 0, val count: Long = 0)
 
 @Serializable
+internal data class VideoCommentDialogPayload(
+    private val cursor: VideoCommentDialogCursor? = null,
+    private val dialog: VideoCommentDialogBounds? = null,
+    private val replies: List<VideoCommentPayload>? = null,
+) {
+    fun toPage(minFloor: Long): VideoCommentPage<Long> {
+        val pagination = cursor ?: throw BiliException(-1, "对话接口未返回分页信息")
+        val next = pagination.next.takeIf {
+            !pagination.isEnd && replies.orEmpty().isNotEmpty() && it > minFloor && it <= (dialog?.maxFloor ?: Long.MAX_VALUE)
+        }
+        return VideoCommentPage(replies.orEmpty().mapNotNull { it.toComment() }, next)
+    }
+}
+
+@Serializable
+internal data class VideoCommentDialogCursor(
+    val next: Long = 0L,
+    @SerialName("is_end") val isEnd: Boolean = false,
+)
+
+@Serializable
+internal data class VideoCommentDialogBounds(@SerialName("max_floor") val maxFloor: Long? = null)
+
+@Serializable
 internal data class VideoCommentPayload(
     @SerialName("rpid_str") private val id: String? = null,
     private val rpid: Long = 0,
@@ -94,6 +119,8 @@ internal data class VideoCommentPayload(
     private val member: VideoCommentMember? = null,
     private val content: VideoCommentContent? = null,
     private val replies: List<VideoCommentPayload>? = null,
+    @SerialName("dialog_str") private val dialogId: String? = null,
+    private val dialog: Long = 0L,
 ) {
     fun toComment(pinned: Boolean = false, includePreview: Boolean = false): VideoComment? {
         val commentId = (id?.toLongOrNull() ?: rpid).takeIf { it > 0 } ?: return null
@@ -109,6 +136,7 @@ internal data class VideoCommentPayload(
             authorId = member?.mid ?: 0L,
             authorLevel = member?.levelInfo?.currentLevel,
             previewReply = if (includePreview) replies.orEmpty().firstNotNullOfOrNull { it.toComment() } else null,
+            dialogId = dialogId?.toLongOrNull() ?: dialog,
         )
     }
 }

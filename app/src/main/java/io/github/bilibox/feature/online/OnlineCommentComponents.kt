@@ -104,6 +104,7 @@ internal fun CommentFloor(
     ownerId: Long,
     inThread: Boolean = false,
     collapseLongMessage: Boolean = false,
+    onViewDialog: (() -> Unit)? = null,
     footer: (@Composable () -> Unit)? = null,
 ) {
     val avatar = normalizeImageUrl(comment.avatarUrl).takeIf { it.startsWith("https://") }.orEmpty()
@@ -139,7 +140,7 @@ internal fun CommentFloor(
                     fontWeight = FontWeight.Medium,
                 )
             }
-            CommentMetadata(comment, inThread)
+            CommentMetadata(comment, inThread, onViewDialog)
             if (footer != null) Box(Modifier.padding(top = 4.dp)) { footer() }
         }
     }
@@ -173,12 +174,12 @@ private fun CommentBadge(label: String, ink: Color, fill: Color) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CommentMetadata(comment: VideoComment, inThread: Boolean) {
+private fun CommentMetadata(comment: VideoComment, inThread: Boolean, onViewDialog: (() -> Unit)?) {
     val muted = PlaybackMuted
     val likes = formatCompactCount(comment.likes)
     val arrangement = when {
         !inThread -> Arrangement.spacedBy(14.dp)
-        comment.timestampSeconds > 0 -> Arrangement.SpaceBetween
+        comment.timestampSeconds > 0 || onViewDialog != null -> Arrangement.SpaceBetween
         else -> Arrangement.End
     }
     FlowRow(
@@ -186,11 +187,24 @@ private fun CommentMetadata(comment: VideoComment, inThread: Boolean) {
         horizontalArrangement = arrangement,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        if (comment.timestampSeconds > 0) {
-            Text(remember(comment.timestampSeconds) { formatPublishDateTime(comment.timestampSeconds) }, color = muted, fontSize = 11.sp)
+        if (comment.timestampSeconds > 0 || onViewDialog != null) {
+            FlowRow(Modifier.align(Alignment.CenterVertically), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (comment.timestampSeconds > 0) {
+                    Text(remember(comment.timestampSeconds) { formatPublishDateTime(comment.timestampSeconds) }, color = muted, fontSize = 11.sp)
+                }
+                if (onViewDialog != null) {
+                    Text(
+                        "查看对话",
+                        Modifier.clickable(role = Role.Button, onClick = onViewDialog),
+                        color = muted,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Normal,
+                    )
+                }
+            }
         }
         Row(
-            Modifier.semantics(mergeDescendants = true) { contentDescription = "$likes 个赞" },
+            Modifier.align(Alignment.CenterVertically).semantics(mergeDescendants = true) { contentDescription = "$likes 个赞" },
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
