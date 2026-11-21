@@ -76,7 +76,7 @@ internal fun VideoPlayerScreen(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     episodes: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
-    episodeOverlay: (@Composable () -> Unit)? = null,
+    episodeOverlay: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     episodeOverlayVisible: Boolean = episodeOverlay != null,
     episodeOverlayDismiss: (() -> Unit)? = null,
     onNextEpisode: (() -> Unit)? = null,
@@ -817,7 +817,9 @@ internal fun VideoPlayerScreen(
                     },
                     details = details,
                     extraDetailPane = extraDetailPane,
-                    episodeOverlay = episodeOverlay,
+                    episodeOverlay = episodeOverlay?.let { overlay ->
+                        @Composable { overlay { episodeOverlayDismiss?.invoke() } }
+                    },
                     episodeOverlayVisible = episodeOverlayVisible,
                 )
             }
@@ -981,7 +983,7 @@ internal fun VideoPlayerScreen(
                     val modes = if (listenInfo?.online == false) PlaybackMode.entries else PlaybackMode.standard
                     onPlaybackModeChange(modes[(modes.indexOf(playbackMode) + 1) % modes.size])
                 },
-                onOpenQueue = listenControls?.onOpenQueue ?: {},
+                queueContent = episodeOverlay ?: episodes,
                 onCollapse = { listenPageOpen = false },
                 onRestoreVideo = { restoreVideo() },
             )

@@ -313,22 +313,28 @@ internal fun ToolButton(
     icon: @Composable (Color) -> Unit,
     label: String,
     active: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
+    val tint = when {
+        !enabled -> Color.White.copy(alpha = .35f)
+        active -> Color(0xFFFFB3CA)
+        else -> Color.White.copy(alpha = .8f)
+    }
     Column(
         modifier = Modifier
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label }
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-            icon(if (active) Color(0xFFFFB3CA) else Color.White.copy(alpha = .8f))
+            icon(tint)
         }
         Text(
             label,
-            color = if (active) Color(0xFFFFB3CA) else Color.White.copy(alpha = .8f),
+            color = tint,
             fontSize = 10.5.sp,
             fontWeight = FontWeight.Medium
         )

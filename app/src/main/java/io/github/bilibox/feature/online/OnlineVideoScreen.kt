@@ -35,6 +35,7 @@ import io.github.bilibox.data.auth.hasLoginCookies
 import io.github.bilibox.data.bili.BiliClient
 import io.github.bilibox.data.bili.BiliPlayback
 import io.github.bilibox.data.bili.BiliQn
+import io.github.bilibox.data.bili.Page
 import io.github.bilibox.data.bili.PlayData
 import io.github.bilibox.data.bili.VideoInfo
 import io.github.bilibox.data.danmaku.Danmaku
@@ -577,9 +578,13 @@ internal fun OnlineVideoScreen(
     val episodeOverlayVisible = LocalConfiguration.current.orientation
         .let { it != Configuration.ORIENTATION_LANDSCAPE } &&
         episodesSheetVisible && episodePages != null
-    val overlayPages = episodePages
-    val episodeOverlayContent: (@Composable () -> Unit)? = if (overlayPages != null) {
-        {
+    val overlayPages = videoInfo?.let { info ->
+        info.pages.ifEmpty {
+            info.cid.takeIf { it > 0 }?.let { listOf(Page(it, 1, video.title, info.duration)) }.orEmpty()
+        }
+    }?.takeIf { it.isNotEmpty() }
+    val episodeOverlayContent: (@Composable (onDismiss: () -> Unit) -> Unit)? = if (overlayPages != null) {
+        { onDismiss ->
             OnlineEpisodesBottomSheet(
                 pages = overlayPages,
                 selectedPage = selectedPage,
@@ -587,7 +592,7 @@ internal fun OnlineVideoScreen(
                 onPlaybackModeChange = { playbackMode = it },
                 gridView = episodesInGridView,
                 onGridViewChange = { episodesInGridView = it },
-                onDismiss = { episodesSheetVisible = false },
+                onDismiss = onDismiss,
                 onPageSelected = { selectedPage = it }
             )
         }

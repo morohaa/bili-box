@@ -1,6 +1,7 @@
 package io.github.bilibox.feature.player
 
 import android.content.res.Configuration
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
@@ -36,11 +38,13 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.data.bili.Page
 import io.github.bilibox.data.danmaku.DanmakuBlockType
 import io.github.bilibox.data.danmaku.DanmakuSettings
+import io.github.bilibox.data.localvideo.LocalVideo
 import io.github.bilibox.feature.listen.ListenInfo
 import io.github.bilibox.feature.online.OnlineEpisodesBottomSheet
 import io.github.bilibox.feature.online.OnlineEpisodesSection
@@ -743,6 +747,93 @@ class VideoPlayerScreenTest {
         compose.runOnIdle { visible = false }
         compose.onNodeWithText("视频选集").assertDoesNotExist()
         compose.onNodeWithText("搜索视频简介").assertExists()
+    }
+
+    @Test
+    fun listenModeOpensEpisodePickerAndKeepsAudioModeAfterSelection() {
+        val pages = listOf(
+            Page(cid = 101, page = 1, part = "第一集", duration = 60),
+            Page(cid = 202, page = 2, part = "第二集", duration = 90),
+        )
+        var selectedPage by mutableStateOf(1)
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            VideoPlayerScreen(
+                player = player,
+                title = "听视频测试",
+                sourceLabel = "哔哩哔哩",
+                commentMessage = "暂无评论",
+                onBack = {},
+                onRetry = {},
+                listenInfo = ListenInfo(subtitle = "P$selectedPage", online = true),
+                episodeOverlayVisible = false,
+                episodeOverlay = { dismiss ->
+                    OnlineEpisodesBottomSheet(
+                        pages = pages,
+                        selectedPage = selectedPage,
+                        playbackMode = PlaybackMode.SEQUENTIAL,
+                        onPlaybackModeChange = {},
+                        gridView = false,
+                        onGridViewChange = {},
+                        onDismiss = dismiss,
+                        onPageSelected = { selectedPage = it },
+                    )
+                },
+                details = { Text("搜索视频简介") },
+            )
+        }
+
+        compose.onNodeWithContentDescription("听视频").performClick()
+        compose.onNodeWithContentDescription("选集").performClick()
+        compose.onNodeWithText("视频选集").assertIsDisplayed()
+        compose.onNodeWithText("第二集", substring = true).performClick()
+        compose.onNodeWithText("(2/2)").assertIsDisplayed()
+
+        pressBack()
+        compose.onNodeWithText("视频选集").assertDoesNotExist()
+        compose.onNodeWithText("听视频 · 仅加载音频流").assertIsDisplayed()
+        compose.onNodeWithContentDescription("选集").performClick()
+        compose.onNodeWithContentDescription("关闭选集").performClick()
+        compose.onNodeWithText("视频选集").assertDoesNotExist()
+        compose.onNodeWithText("P2").assertIsDisplayed()
+    }
+
+    @Test
+    fun listenModeOpensLocalQueueAndSelectsVideo() {
+        val first = LocalVideo(Uri.parse("file:///first.mp4"), "第一个视频", 60_000L, 0L)
+        val second = LocalVideo(Uri.parse("file:///second.mp4"), "第二个视频", 90_000L, 0L)
+        val playlist = listOf(first, second)
+        var current by mutableStateOf(first)
+        compose.setContent {
+            val context = LocalContext.current
+            val player = remember { ExoPlayer.Builder(context).build() }
+            DisposableEffect(player) { onDispose { player.release() } }
+            VideoPlayerScreen(
+                player = player,
+                title = current.name,
+                sourceLabel = "本地视频",
+                commentMessage = "暂无评论",
+                onBack = {},
+                onRetry = {},
+                listenInfo = ListenInfo(subtitle = "本地视频", online = false),
+                episodes = { dismiss ->
+                    LocalVideoEpisodes(playlist, current, onDismiss = dismiss, onVideoSelected = {
+                        current = it
+                        dismiss()
+                    })
+                },
+                details = {},
+            )
+        }
+
+        compose.onNodeWithContentDescription("听视频").performClick()
+        compose.onNodeWithContentDescription("选集").performClick()
+        compose.onNodeWithText("P2 第二个视频").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("收起选集").assertDoesNotExist()
+        compose.onNodeWithText("听视频 · 画面已停止解码").assertIsDisplayed()
+        compose.onNodeWithText("第二个视频").assertIsDisplayed()
     }
 
     @Test

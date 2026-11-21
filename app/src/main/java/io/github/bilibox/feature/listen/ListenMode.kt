@@ -23,8 +23,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +53,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.AudioAttributes
@@ -63,6 +66,7 @@ import io.github.bilibox.core.playback.PlaybackMode
 import io.github.bilibox.core.playback.PlaybackSleepTimer
 import io.github.bilibox.core.playback.SleepTimerMode
 import io.github.bilibox.core.playback.buildListenMetadata
+import io.github.bilibox.core.ui.component.playback.PlayerSidePanelWidth
 import io.github.bilibox.core.ui.component.playback.SleepTimerLabel
 import io.github.bilibox.core.ui.component.playback.SleepTimerSheet
 import io.github.bilibox.core.ui.component.playback.SpeedPanel
@@ -95,7 +99,7 @@ internal data class ListenInfo(
 )
 
 /**
- * Queue controls on the 听视频 page (上一个/下一个/播放模式/选集). Kept in one
+ * Previous and next controls on the 听视频 page. Kept in one
  * object so VideoPlayerScreen does not grow more parameters: that composable is
  * already so large that extra parameters pushed it past ART's verifier.
  */
@@ -104,7 +108,6 @@ internal class ListenControls(
     val hasNext: Boolean = false,
     val onPrevious: () -> Unit = {},
     val onNext: () -> Unit = {},
-    val onOpenQueue: () -> Unit = {},
 )
 
 /**
@@ -394,13 +397,14 @@ internal fun ListenScreen(
     onNext: () -> Unit,
     onSpeedChange: (Float) -> Unit,
     onCycleMode: () -> Unit = {},
-    onOpenQueue: () -> Unit = {},
+    queueContent: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     onCollapse: () -> Unit,
     onRestoreVideo: () -> Unit,
 ) {
     val context = LocalContext.current
     var speedOpen by remember { mutableStateOf(false) }
     var timerOpen by remember { mutableStateOf(false) }
+    var queueOpen by remember(open, queueContent != null) { mutableStateOf(false) }
     var scrubbing by remember { mutableStateOf(false) }
     var scrubValue by remember { mutableFloatStateOf(0f) }
 
@@ -638,7 +642,8 @@ internal fun ListenScreen(
                     icon = { QueueGlyph(it) },
                     label = "选集",
                     active = false,
-                    onClick = { onOpenQueue() }
+                    enabled = queueContent != null,
+                    onClick = { queueOpen = true }
                 )
             }
 
@@ -672,6 +677,21 @@ internal fun ListenScreen(
                 durationMs = durationMs,
                 onDismiss = { timerOpen = false },
             )
+        }
+    }
+
+    if (open && queueOpen && queueContent != null) {
+        val dismissQueue: () -> Unit = { queueOpen = false }
+        ModalBottomSheet(
+            onDismissRequest = dismissQueue,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetMaxWidth = if (info.online) Dp.Unspecified else PlayerSidePanelWidth,
+            containerColor = Color.Transparent,
+            dragHandle = null,
+        ) {
+            Box(Modifier.fillMaxWidth().fillMaxHeight(.65f)) {
+                queueContent(dismissQueue)
+            }
         }
     }
 }
